@@ -79,6 +79,23 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, token, user: { id: user.id, username: user.username } });
 });
 
+app.post('/api/bind-discord', async (req, res) => {
+  const { token, discordId } = req.body;
+  if (!token || !discordId) return res.status(400).json({ error: 'Missing token or discordId' });
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const success = db.updateUserDiscordId(decoded.username, discordId);
+    if (success) {
+      res.json({ success: true, message: 'Discord ID bound successfully' });
+    } else {
+      res.status(404).json({ error: 'User not found' });
+    }
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -136,11 +153,13 @@ io.on('connection', (socket) => {
       
       const ip = getRealIP(socket);
       const geo = geoip.lookup(ip) || { country: 'UNKNOWN', ll: [0, 0] };
+      const dbUser = db.findUserByUsername(decoded.username);
       
       const user = {
         socketId: socket.id,
         id: decoded.id,
         username: decoded.username,
+        discordId: dbUser?.discord_id || null,
         ip: ip,
         country: geo.country,
         lat: geo.ll[0],
@@ -155,6 +174,7 @@ io.on('connection', (socket) => {
       socket.emit('init_data', {
         userId: user.id,
         username: user.username,
+        discordId: user.discordId,
         ip: user.ip,
         country: user.country,
         lat: user.lat,

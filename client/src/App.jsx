@@ -190,6 +190,13 @@ function Dashboard({ token, onLogout }) {
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       
+      // Save to backend
+      await fetch(`${API_URL}/api/bind-discord`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, discordId })
+      });
+
       const avatarUrl = data.user.avatar 
         ? `https://cdn.discordapp.com/avatars/${data.user.id}/${data.user.avatar}.png?size=128`
         : `https://cdn.discordapp.com/embed/avatars/${(BigInt(data.user.id) >> 22n) % 6n}.png`;
@@ -229,9 +236,28 @@ function Dashboard({ token, onLogout }) {
       onLogout();
     });
 
-    s.on('init_data', (data) => {
+    s.on('init_data', async (data) => {
       setMyNode(data);
       addLog(`身分確認：節點 [${data.username}] 成功接入全球網路`);
+      
+      // Auto-load Discord avatar if it's bound in database
+      if (data.discordId) {
+        try {
+          const res = await fetch(`https://dcdn.dstn.to/profile/${data.discordId}`);
+          if (res.ok) {
+            const discordData = await res.json();
+            const avatarUrl = discordData.user.avatar 
+              ? `https://cdn.discordapp.com/avatars/${discordData.user.id}/${discordData.user.avatar}.png?size=128`
+              : `https://cdn.discordapp.com/embed/avatars/${(BigInt(discordData.user.id) >> 22n) % 6n}.png`;
+            setBoundDiscord({
+              username: discordData.user.global_name || discordData.user.username,
+              avatar: avatarUrl
+            });
+          }
+        } catch (e) {
+          console.error("Failed to load discord data on init");
+        }
+      }
     });
 
     s.on('all_nodes', (data) => {
@@ -457,9 +483,13 @@ function Dashboard({ token, onLogout }) {
 
           <MapContainer 
             center={[20, 0]} 
-            zoom={2} 
+            zoom={2.5} 
+            minZoom={2.5}
+            maxBounds={[[-90, -180], [90, 180]]}
+            maxBoundsViscosity={1.0}
+            worldCopyJump={false}
             style={{ height: '100%', width: '100%' }}
-            zoomControl={false}
+            zoomControl={true}
           >
             <div style={{position: 'absolute', bottom: '20px', right: '20px', zIndex: 1000, display: 'flex', gap: '10px'}}>
               <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'satellite' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'satellite' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('satellite')}>衛星</button>
