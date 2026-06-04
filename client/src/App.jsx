@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Rectangle, CircleMarker, Popup } from 'react-leaflet';
 import { io } from 'socket.io-client';
-import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck } from 'lucide-react';
+import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
 
@@ -108,7 +108,9 @@ function Dashboard({ token, onLogout }) {
   const [ping, setPing] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [showDiscordModal, setShowDiscordModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   const [discordId, setDiscordId] = useState('');
+  const [mapTheme, setMapTheme] = useState('satellite');
   
   // Fake bound Discord data for UI demo (since backend DB isn't fully updated yet)
   const [boundDiscord, setBoundDiscord] = useState(null);
@@ -207,12 +209,10 @@ function Dashboard({ token, onLogout }) {
     return `${h}:${m}:${s}`;
   };
 
-  const calculateVitalSigns = (seconds) => {
-    const blocks = 10;
-    const decreaseRate = 3600; // 1 block per hour
-    const filled = Math.max(1, blocks - Math.floor(seconds / decreaseRate));
-    const empty = blocks - filled;
-    return '●'.repeat(filled) + '○'.repeat(empty); // softer circles instead of squares
+  const calculateHealthPercentage = (seconds) => {
+    const totalLifespan = 36000; // 10 hours max
+    const remaining = Math.max(0, totalLifespan - seconds);
+    return (remaining / totalLifespan) * 100;
   };
 
   // Group nodes into a global pixel grid
@@ -248,13 +248,12 @@ function Dashboard({ token, onLogout }) {
           <span style={{color: 'var(--text-secondary)'}}>// 所在伺服器地區 [{myNode?.country || '連線中...'}]</span>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div className="system-stats" style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-            <div style={{display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,255,204,0.1)', padding: '5px 15px', borderRadius: '20px', border: '1px solid rgba(0,255,204,0.3)'}}>
-              <span className="blink" style={{color: 'var(--accent-color)'}}>●</span>
-              <span>實時連線人數: <strong style={{color: 'var(--accent-color)', fontSize: '1.2rem'}}>{globalStats.activeUsers}</strong></span>
+          <div className="system-stats" style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+            <div style={{display: 'flex', alignItems: 'center'}}>
+              <span style={{color: 'var(--text-secondary)'}}>實時連線人數: <strong style={{color: 'var(--accent-color)'}}>{globalStats.activeUsers}</strong></span>
             </div>
-            <div style={{display: 'flex', alignItems: 'center', padding: '5px 10px'}}>
-              <span style={{color: 'var(--text-secondary)'}}>地球總人口: <strong style={{color: 'var(--text-main)'}}>{globalStats.totalPopulation}</strong></span>
+            <div style={{display: 'flex', alignItems: 'center'}}>
+              <span style={{color: 'var(--text-secondary)'}}>地球總人口: <strong style={{color: 'var(--text-primary)'}}>{globalStats.totalPopulation}</strong></span>
             </div>
             {!isConnected && <span style={{color: 'var(--danger-color)', fontWeight: 'bold'}}>[中斷連線]</span>}
           </div>
@@ -314,6 +313,23 @@ function Dashboard({ token, onLogout }) {
             </div>
           </div>
 
+          <div className="metric-group" style={{ marginBottom: '20px' }}>
+            <div className="metric-title" style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px'}}>
+              <Activity size={16} /> 健康狀態 (Health Status)
+            </div>
+            <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ 
+                width: `${calculateHealthPercentage(lifespan)}%`, 
+                height: '100%', 
+                background: calculateHealthPercentage(lifespan) > 30 ? 'var(--accent-color)' : 'var(--danger-color)',
+                transition: 'width 1s linear'
+              }}></div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '5px', textAlign: 'right' }}>
+              {Math.floor(calculateHealthPercentage(lifespan))}%
+            </div>
+          </div>
+
           <div className="metric-group">
             <div className="metric-title" style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
               <Server size={16} /> 網路連線狀態 (Network)
@@ -323,6 +339,12 @@ function Dashboard({ token, onLogout }) {
               下載 (Downlink): {Math.floor(Math.random()*1500 + 500)} KB/s<br/>
               封包遺失 (Loss): 0.00%
             </div>
+          </div>
+
+          <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+            <button className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}} onClick={() => setShowAboutModal(true)}>
+              <Info size={16} /> 檔案說明與系統資訊
+            </button>
           </div>
         </aside>
 
@@ -361,11 +383,30 @@ function Dashboard({ token, onLogout }) {
             style={{ height: '100%', width: '100%' }}
             zoomControl={false}
           >
-            {/* Earth Satellite Base Map (Colorful) */}
-            <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-            />
+            <div style={{position: 'absolute', bottom: '20px', right: '20px', zIndex: 1000, display: 'flex', gap: '10px'}}>
+              <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'satellite' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'satellite' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('satellite')}>衛星</button>
+              <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'dark' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'dark' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('dark')}>暗黑</button>
+              <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'street' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'street' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('street')}>街道</button>
+            </div>
+
+            {mapTheme === 'satellite' && (
+              <TileLayer
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+              />
+            )}
+            {mapTheme === 'dark' && (
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              />
+            )}
+            {mapTheme === 'street' && (
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; OpenStreetMap contributors'
+              />
+            )}
             
             {/* Grid Pixel Blocks or Individual Points */}
             {Object.values(gridBlocks).map(block => {
@@ -467,6 +508,25 @@ function Dashboard({ token, onLogout }) {
                 <button type="button" className="terminal-btn" style={{flex: 1, background: 'rgba(255,255,255,0.1)'}} onClick={() => setShowDiscordModal(false)}>取消</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* About Modal */}
+      {showAboutModal && (
+        <div className="modal-overlay">
+          <div className="modal-box floating-panel">
+            <h3 style={{display: 'flex', alignItems: 'center', gap: '10px', marginTop: 0}}>
+              <Info size={20} /> 系統檔案說明與開發者資訊
+            </h3>
+            <div style={{color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '20px', lineHeight: '1.6'}}>
+              <p style={{marginBottom: '10px'}}><strong style={{color: 'var(--text-primary)'}}>地球在線 (EARTH ONLINE)</strong> 是一個全球節點即時觀測與管理的實驗性平台，結合了 WebSocket 與地理資訊系統 (GIS) 即時繪製全球活動熱區。</p>
+              <p style={{marginBottom: '10px'}}>系統具備動態負載平衡展示、Discord 第三方認證整合，以及防碰撞的分散式網路架構。</p>
+              <hr style={{borderColor: 'var(--border-color)', margin: '15px 0'}} />
+              <p><strong style={{color: 'var(--accent-color)'}}>開發者 (Developer)</strong>: 胡家綸</p>
+              <p><strong style={{color: 'var(--accent-color)'}}>聯絡信箱 (Contact)</strong>: <a href="mailto:huchialun97@gmail.com" style={{color: 'var(--text-primary)'}}>huchialun97@gmail.com</a></p>
+            </div>
+            <button type="button" className="terminal-btn" style={{width: '100%'}} onClick={() => setShowAboutModal(false)}>關閉視窗</button>
           </div>
         </div>
       )}
