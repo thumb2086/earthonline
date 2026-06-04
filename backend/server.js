@@ -21,6 +21,7 @@ app.get('/', (req, res) => {
 const JWT_SECRET = process.env.JWT_SECRET || 'earth_online_secret_key_9988';
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://earthonline.onrender.com';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'http://localhost:3001/api/auth/discord/callback';
 
 // Discord Webhook configuration
@@ -86,13 +87,16 @@ app.get('/api/auth/discord', (req, res) => {
   const state = req.query.state;
   if (!state) return res.status(400).send('Missing state');
   
-  const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify&state=${state}`;
+  const redirectUri = `${BACKEND_URL}/api/auth/discord/callback`;
+  
+  const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=${state}`;
   res.redirect(discordAuthUrl);
 });
 
 app.get('/api/auth/discord/callback', async (req, res) => {
   const { code, state, error } = req.query;
-  
+  const redirectUri = `${BACKEND_URL}/api/auth/discord/callback`;
+
   if (error || !code || !state) {
     return res.status(400).send(`Discord Authentication Failed. <a href="/">Return to app</a>`);
   }
@@ -117,7 +121,7 @@ app.get('/api/auth/discord/callback', async (req, res) => {
         client_secret: DISCORD_CLIENT_SECRET,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: DISCORD_REDIRECT_URI,
+        redirect_uri: redirectUri,
         scope: 'identify',
       }),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
