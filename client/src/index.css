@@ -73,28 +73,34 @@ body {
 
 /* Left Sidebar - Metrics Terminal */
 .metrics-terminal {
-  width: 350px;
-  background-color: var(--panel-bg);
-  border-right: 1px solid var(--border-color);
-  padding: 20px;
+  width: 320px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
+  padding: 15px;
+  margin: 15px;
+  height: calc(100vh - 100px);
   gap: 20px;
   overflow-y: auto;
 }
 
 .metric-group {
-  border: 1px solid var(--border-color);
   padding: 15px;
-  background: rgba(0, 0, 0, 0.3);
+  margin-bottom: 15px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
 }
 
 .metric-title {
+  font-size: 0.85rem;
   color: var(--text-secondary);
-  font-size: 0.75rem;
   margin-bottom: 10px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }
 
 .metric-value {
@@ -120,18 +126,23 @@ body {
 .map-overlays {
   position: absolute;
   top: 20px;
-  left: 20px;
+  right: 20px;
   z-index: 1000;
-  pointer-events: none;
   display: flex;
-  gap: 20px;
+  gap: 15px;
+}
+
+.floating-panel {
+  background: rgba(20, 20, 25, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
 .overlay-box {
-  background: rgba(13, 13, 13, 0.85);
-  border: 1px solid var(--accent-color);
-  padding: 15px;
-  backdrop-filter: blur(4px);
+  padding: 15px 20px;
+  min-width: 150px;
 }
 
 .overlay-title {
@@ -174,13 +185,8 @@ body {
   bottom: 20px;
   left: 20px;
   right: 20px;
-  background: rgba(15, 15, 15, 0.75);
-  border: 1px solid rgba(0, 255, 204, 0.3);
-  border-radius: 8px;
-  backdrop-filter: blur(8px);
   padding: 10px 15px;
   z-index: 1000;
-  font-family: var(--font-sans);
   max-height: 150px;
   overflow: hidden;
   display: flex;

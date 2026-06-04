@@ -226,20 +226,20 @@ function Dashboard({ token, onLogout }) {
 
       <div className="main-content">
         {/* Left Metrics Terminal */}
-        <aside className="metrics-terminal">
+        <aside className="metrics-terminal floating-panel">
           <div className="metric-group">
-            <div className="metric-title">帳號識別資訊 (SUBJECT ID)</div>
-            <div className="metric-value">{myNode ? myNode.username : 'LOADING...'}</div>
-            <div style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '5px'}}>
-              NODE ID: {myNode?.userId.substring(0, 13) || '...'}<br/>
-              IP: {myNode?.ip || '...'} <br/>
-              REGION: {myNode?.country || '...'}
+            <div className="metric-title">使用者帳號 (User ID)</div>
+            <div style={{color: 'var(--accent-color)', fontSize: '1.2rem', fontWeight: 'bold'}}>{myNode?.username}</div>
+            <div style={{fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '5px'}}>
+              NODE ID: {myNode?.userId}<br/>
+              IP: {myNode?.ip}<br/>
+              REGION: {myNode?.country}
             </div>
           </div>
-
+          
           <div className="metric-group">
-            <div className="metric-title">系統生命週期 (LIFESPAN)</div>
-            <div className="metric-value" style={{fontFamily: 'var(--font-mono)'}}>
+            <div className="metric-title">本次上線時間 (Online Time)</div>
+            <div style={{color: 'var(--accent-color)', fontSize: '1.5rem', fontWeight: 'bold'}}>
               {formatTime(lifespan)}
             </div>
           </div>
@@ -264,19 +264,19 @@ function Dashboard({ token, onLogout }) {
         {/* Right Geographic Matrix */}
         <main className="geographic-matrix">
           <div className="map-overlays">
-            <div className="overlay-box" style={{borderColor: 'rgba(0, 255, 204, 0.4)'}}>
-              <div className="overlay-title" style={{color: 'var(--accent-color)'}}>全球總掛機時間</div>
+            <div className="overlay-box floating-panel">
+              <div className="overlay-title">全球總掛機時間</div>
               <div className="overlay-value">{formatTime(globalStats.globalProduction)}</div>
             </div>
-            <div className="overlay-box" style={{borderColor: 'rgba(255, 100, 100, 0.4)'}}>
-              <div className="overlay-title" style={{color: 'var(--danger-color)'}}>伺服器即時負載</div>
+            <div className="overlay-box floating-panel">
+              <div className="overlay-title">伺服器即時負載</div>
               <div className="overlay-value" style={{color: 'var(--danger-color)'}}>
                 {globalStats.totalPopulation > 0 ? ((globalStats.activeUsers / globalStats.totalPopulation) * 100).toFixed(1) : 0}%
               </div>
             </div>
-            <div className="overlay-box" style={{borderColor: 'rgba(150, 150, 150, 0.4)'}}>
-              <div className="overlay-title" style={{color: '#a0a0a0'}}>連線延遲 (Ping)</div>
-              <div className="overlay-value" style={{color: '#a0a0a0', fontSize: '1.2rem'}}>{ping} ms</div>
+            <div className="overlay-box floating-panel">
+              <div className="overlay-title">連線延遲 (Ping)</div>
+              <div className="overlay-value" style={{fontSize: '1.2rem'}}>{ping} ms</div>
             </div>
           </div>
 
@@ -352,7 +352,7 @@ function Dashboard({ token, onLogout }) {
           </MapContainer>
 
           {/* Bottom Console Log Module */}
-          <div className="bottom-log-console">
+          <div className="bottom-log-console floating-panel">
             <div className="log-header">
               系統即時通知 (System Event Log)
             </div>
