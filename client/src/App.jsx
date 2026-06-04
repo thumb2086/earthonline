@@ -385,11 +385,14 @@ function Dashboard({ token, onLogout }) {
 
   // Lifespan timer
   useEffect(() => {
-    if (!myNode) return;
+    if (!myNode || !myNode.createdAt) return;
     
     const interval = setInterval(() => {
-      setLifespan(Math.floor((Date.now() - myNode.connectedAt) / 1000));
+      setLifespan(Math.floor((Date.now() - myNode.createdAt) / 1000));
     }, 1000);
+
+    // Run once immediately so it doesn't wait 1s to show
+    setLifespan(Math.floor((Date.now() - myNode.createdAt) / 1000));
 
     return () => clearInterval(interval);
   }, [myNode]);

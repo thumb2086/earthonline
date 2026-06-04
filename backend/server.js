@@ -192,19 +192,11 @@ const io = new Server(server, {
 // State
 const connectedUsers = new Map();
 let globalProduction = 0; // Total accumulated idle time (seconds)
-let globalProductionBase = 0; // The base saved production when users disconnect
 
 // Periodic global calculation
 setInterval(() => {
-  let currentSessionProduction = 0;
   const now = Date.now();
-  
-  connectedUsers.forEach(user => {
-    const sessionTime = Math.floor((now - user.connectedAt) / 1000);
-    currentSessionProduction += sessionTime;
-  });
-
-  globalProduction = globalProductionBase + currentSessionProduction;
+  globalProduction = db.getGlobalProduction(now);
 
   // Broadcast global stats to everyone every 2 seconds
   io.emit('global_stats', {
@@ -249,6 +241,7 @@ io.on('connection', (socket) => {
         country: geo.country,
         lat: geo.ll[0],
         lon: geo.ll[1],
+        createdAt: dbUser?.createdAt || Date.now(),
         connectedAt: Date.now()
       };
 
@@ -264,6 +257,7 @@ io.on('connection', (socket) => {
         country: user.country,
         lat: user.lat,
         lon: user.lon,
+        createdAt: user.createdAt,
         connectedAt: user.connectedAt,
         activeUsers: connectedUsers.size,
         totalPopulation: db.getTotalPopulation()
@@ -293,12 +287,8 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const disconnectedUser = connectedUsers.get(socket.id);
     if (disconnectedUser) {
-      const sessionTime = Math.floor((Date.now() - disconnectedUser.connectedAt) / 1000);
-      globalProductionBase += sessionTime; // Add their contribution to the base
       connectedUsers.delete(socket.id);
-      
-      console.log(`[SYS] Node Disconnected: ${socket.id} | Lifespan: ${sessionTime}s`);
-      
+      console.log(`[SYS] Node Disconnected: ${socket.id}`);
       io.emit('node_disconnected', { id: socket.id });
     }
   });
