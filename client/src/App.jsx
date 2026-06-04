@@ -254,7 +254,8 @@ function Dashboard({ token, onLogout }) {
 
   const handleBindDiscord = (e) => {
     e.preventDefault();
-    const discordOAuthUrl = `${API_URL}/api/auth/discord?token=${token}`;
+    const statePayload = btoa(JSON.stringify({ token, returnTo: window.location.origin }));
+    const discordOAuthUrl = `${API_URL}/api/auth/discord?state=${statePayload}`;
     window.location.href = discordOAuthUrl;
   };
 

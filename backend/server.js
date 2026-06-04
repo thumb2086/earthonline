@@ -83,23 +83,25 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.get('/api/auth/discord', (req, res) => {
-  const token = req.query.token;
-  if (!token) return res.status(400).send('Missing token');
+  const state = req.query.state;
+  if (!state) return res.status(400).send('Missing state');
   
-  const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify&state=${token}`;
+  const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify&state=${state}`;
   res.redirect(discordAuthUrl);
 });
 
 app.get('/api/auth/discord/callback', async (req, res) => {
-  const { code, state: token, error } = req.query;
+  const { code, state, error } = req.query;
   
-  if (error || !code) {
+  if (error || !code || !state) {
     return res.status(400).send(`Discord Authentication Failed. <a href="/">Return to app</a>`);
   }
 
-  let decoded;
+  let decoded, returnTo;
   try {
-    decoded = jwt.verify(token, JWT_SECRET);
+    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    decoded = jwt.verify(stateData.token, JWT_SECRET);
+    returnTo = stateData.returnTo;
   } catch (err) {
     return res.status(401).send('Invalid or expired application token. Please login again.');
   }
@@ -146,10 +148,8 @@ app.get('/api/auth/discord/callback', async (req, res) => {
     const success = db.updateUserDiscord(decoded.username, profile);
     
     if (success) {
-      // Redirect back to frontend
-      // Assuming frontend is running on localhost:5173 or same domain in production
-      const frontendUrl = process.env.NODE_ENV === 'production' ? '/' : 'http://localhost:5173/';
-      res.redirect(frontendUrl);
+      // Redirect back to frontend dynamically based on where they came from
+      res.redirect(returnTo || '/');
     } else {
       res.status(404).send('User not found in Earth Online database');
     }
