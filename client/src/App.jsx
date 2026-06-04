@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Rectangle, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Rectangle, CircleMarker, Popup } from 'react-leaflet';
 import { io } from 'socket.io-client';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
@@ -179,7 +179,7 @@ function Dashboard({ token, onLogout }) {
     const decreaseRate = 3600; // 1 block per hour
     const filled = Math.max(1, blocks - Math.floor(seconds / decreaseRate));
     const empty = blocks - filled;
-    return '■'.repeat(filled) + '□'.repeat(empty);
+    return '●'.repeat(filled) + '○'.repeat(empty); // softer circles instead of squares
   };
 
   // Group nodes into a global pixel grid
@@ -196,11 +196,13 @@ function Dashboard({ token, onLogout }) {
         lat: gridLat,
         lon: gridLon,
         count: 0,
-        users: []
+        users: [],
+        rawNodes: []
       };
     }
     gridBlocks[gridId].count += 1;
     gridBlocks[gridId].users.push(node.username);
+    gridBlocks[gridId].rawNodes.push(node);
   });
 
   return (
@@ -243,18 +245,18 @@ function Dashboard({ token, onLogout }) {
           </div>
 
           <div className="metric-group">
-            <div className="metric-title">生物能耗值 (VITAL SIGNS)</div>
+            <div className="metric-title">健康狀態 (Health Status)</div>
             <div className="vital-signs">
-              [{calculateVitalSigns(lifespan)}]
+              {calculateVitalSigns(lifespan)}
             </div>
           </div>
           
           <div className="metric-group" style={{marginTop: '40px'}}>
-            <div className="metric-title">網路頻寬通量 (NETWORK FLUX)</div>
-            <div style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>
-              UPLINK: {Math.floor(Math.random()*500 + 100)} KB/s<br/>
-              DOWNLINK: {Math.floor(Math.random()*1500 + 500)} KB/s<br/>
-              PACKET LOSS: 0.00%
+            <div className="metric-title">網路連線狀態 (Network)</div>
+            <div style={{fontSize: '0.85rem', color: 'var(--text-secondary)'}}>
+              上傳 (Uplink): {Math.floor(Math.random()*500 + 100)} KB/s<br/>
+              下載 (Downlink): {Math.floor(Math.random()*1500 + 500)} KB/s<br/>
+              封包遺失 (Loss): 0.00%
             </div>
           </div>
         </aside>
@@ -262,17 +264,19 @@ function Dashboard({ token, onLogout }) {
         {/* Right Geographic Matrix */}
         <main className="geographic-matrix">
           <div className="map-overlays">
-            <div className="overlay-box">
-              <div className="overlay-title">世界總產出指標</div>
-              <div className="overlay-value">{globalStats.globalProduction.toLocaleString()} 單位</div>
+            <div className="overlay-box" style={{borderColor: 'rgba(0, 255, 204, 0.4)'}}>
+              <div className="overlay-title" style={{color: 'var(--accent-color)'}}>全球總掛機時間</div>
+              <div className="overlay-value">{formatTime(globalStats.globalProduction)}</div>
             </div>
-            <div className="overlay-box" style={{borderColor: 'var(--danger-color)'}}>
-              <div className="overlay-title" style={{color: 'var(--danger-color)'}}>社會總壓迫常數</div>
-              <div className="overlay-value" style={{color: 'var(--danger-color)'}}>{globalStats.socialCompression} Ω</div>
+            <div className="overlay-box" style={{borderColor: 'rgba(255, 100, 100, 0.4)'}}>
+              <div className="overlay-title" style={{color: 'var(--danger-color)'}}>伺服器即時負載</div>
+              <div className="overlay-value" style={{color: 'var(--danger-color)'}}>
+                {globalStats.totalPopulation > 0 ? ((globalStats.activeUsers / globalStats.totalPopulation) * 100).toFixed(1) : 0}%
+              </div>
             </div>
-            <div className="overlay-box" style={{borderColor: '#7a7a7a'}}>
-              <div className="overlay-title" style={{color: '#7a7a7a'}}>核心伺服器延遲</div>
-              <div className="overlay-value" style={{color: '#7a7a7a', fontSize: '1.2rem'}}>{ping} ms</div>
+            <div className="overlay-box" style={{borderColor: 'rgba(150, 150, 150, 0.4)'}}>
+              <div className="overlay-title" style={{color: '#a0a0a0'}}>連線延遲 (Ping)</div>
+              <div className="overlay-value" style={{color: '#a0a0a0', fontSize: '1.2rem'}}>{ping} ms</div>
             </div>
           </div>
 
@@ -288,44 +292,69 @@ function Dashboard({ token, onLogout }) {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
             
-            {/* Grid Pixel Blocks */}
+            {/* Grid Pixel Blocks or Individual Points */}
             {Object.values(gridBlocks).map(block => {
-              const intensity = Math.min(0.2 + (block.count * 0.15), 0.95);
-              return (
-                <Rectangle
-                  key={`${block.lat}-${block.lon}`}
-                  bounds={[
-                    [block.lat, block.lon],
-                    [block.lat + gridSize, block.lon + gridSize]
-                  ]}
-                  pathOptions={{ 
-                    color: 'var(--accent-color)', 
-                    fillColor: 'var(--accent-color)', 
-                    fillOpacity: intensity,
-                    weight: 1
-                  }}
-                >
-                  <Popup>
-                    <div style={{ fontFamily: 'var(--font-mono)' }}>
-                      <div style={{ color: 'var(--text-secondary)' }}>區域座標 [{block.lat}, {block.lon}]</div>
-                      <div style={{ color: 'var(--accent-color)', fontWeight: 'bold', margin: '5px 0' }}>
-                        活躍節點數: {block.count}
+              if (block.count >= 3) {
+                // High density: Colored Block
+                const intensity = Math.min(0.3 + (block.count * 0.1), 0.95);
+                const blockColor = block.count >= 10 ? '#ff4444' : (block.count >= 5 ? '#ffaa00' : 'var(--accent-color)');
+                return (
+                  <Rectangle
+                    key={`rect-${block.lat}-${block.lon}`}
+                    bounds={[
+                      [block.lat, block.lon],
+                      [block.lat + gridSize, block.lon + gridSize]
+                    ]}
+                    pathOptions={{ 
+                      color: blockColor, 
+                      fillColor: blockColor, 
+                      fillOpacity: intensity,
+                      weight: 1
+                    }}
+                  >
+                    <Popup>
+                      <div style={{ fontFamily: 'var(--font-sans)' }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>熱區座標 [{block.lat}, {block.lon}]</div>
+                        <div style={{ color: blockColor, fontWeight: 'bold', margin: '5px 0' }}>
+                          高密度聚集: {block.count} 個節點
+                        </div>
+                        <div style={{ fontSize: '0.8rem' }}>
+                          包含: {block.users.slice(0, 5).join(', ')}
+                          {block.count > 5 ? ' ...等' : ''}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.8rem' }}>
-                        ID: {block.users.slice(0, 5).join(', ')}
-                        {block.count > 5 ? ' ...等' : ''}
+                    </Popup>
+                  </Rectangle>
+                );
+              } else {
+                // Low density: Individual Points
+                return block.rawNodes.map(node => (
+                  <CircleMarker
+                    key={`node-${node.id}`}
+                    center={[node.lat, node.lon]}
+                    radius={5}
+                    pathOptions={{ 
+                      color: 'var(--accent-color)', 
+                      fillColor: 'var(--accent-color)', 
+                      fillOpacity: 0.9,
+                      weight: 2
+                    }}
+                  >
+                    <Popup>
+                      <div style={{ fontFamily: 'var(--font-sans)' }}>
+                        使用者: {node.username}
                       </div>
-                    </div>
-                  </Popup>
-                </Rectangle>
-              );
+                    </Popup>
+                  </CircleMarker>
+                ));
+              }
             })}
           </MapContainer>
 
           {/* Bottom Console Log Module */}
           <div className="bottom-log-console">
             <div className="log-header">
-              <span className="blink">_</span> 全球節點實時事件日誌 (EVENT LOG)
+              系統即時通知 (System Event Log)
             </div>
             <div className="log-content">
               {logs.map((log, i) => (
