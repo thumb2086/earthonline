@@ -53,7 +53,7 @@ function LoginGateway({ onLogin }) {
 
         <div style={{textAlign: 'center', marginBottom: '25px', zIndex: 10, position: 'relative'}}>
           <h2 style={{fontFamily: 'var(--font-sans)', color: 'var(--text-main)', fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}}>
-            <Globe2 className="icon-glow" size={32} /> 地球在線
+            <Globe2 className="icon-glow icon-spin" size={32} /> 地球在線
           </h2>
           <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '5px'}}>全球節點觀測與管理中心</p>
         </div>
@@ -243,7 +243,7 @@ function Dashboard({ token, onLogout }) {
       {/* Header Panel */}
       <header className="system-header">
         <div className="system-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Globe2 color="var(--accent-color)" size={24} /> 
+          <Globe2 className="icon-spin" color="var(--accent-color)" size={24} /> 
           <span style={{fontWeight: 'bold', fontSize: '1.2rem'}}>地球在線</span> 
           <span style={{color: 'var(--text-secondary)'}}>// 所在伺服器地區 [{myNode?.country || '連線中...'}]</span>
         </div>
@@ -267,7 +267,7 @@ function Dashboard({ token, onLogout }) {
         <aside className="metrics-terminal floating-panel">
           <div className="brand-banner" style={{ textAlign: 'center', paddingBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '15px' }}>
             <div style={{display: 'flex', justifyContent: 'center', marginBottom: '10px'}}>
-              <Globe2 size={56} color="var(--accent-color)" className="icon-glow" />
+              <Globe2 size={56} color="var(--accent-color)" className="icon-glow icon-spin" />
             </div>
             <h3 style={{margin: '0', color: 'var(--text-primary)', letterSpacing: '2px'}}>EARTH ONLINE</h3>
           </div>
