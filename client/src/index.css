@@ -536,3 +536,41 @@ body {
 .doc-grid-value a:hover {
   text-decoration-color: var(--accent-color);
 }
+
+.discord-mock-menu {
+  background-color: #2b2d31;
+  border-radius: 8px;
+  padding: 8px;
+  width: fit-content;
+  margin: 15px auto;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  font-size: 14px;
+  color: #dbdee1;
+  text-align: left;
+}
+.discord-mock-item {
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.discord-mock-item:hover {
+  background-color: #3f4147;
+}
+.discord-mock-highlight {
+  border: 2px solid #ed4245;
+  background-color: rgba(237, 66, 69, 0.1);
+  color: white;
+  position: relative;
+  font-weight: bold;
+}
+.discord-mock-highlight::after {
+  content: '← 點擊複製';
+  position: absolute;
+  right: -90px;
+  color: #ed4245;
+  font-weight: bold;
+  font-size: 13px;
+}

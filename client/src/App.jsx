@@ -248,6 +248,8 @@ function Dashboard({ token, onLogout }) {
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [mapTheme, setMapTheme] = useState('satellite');
+  const [discordId, setDiscordId] = useState('');
+  const [showManualBind, setShowManualBind] = useState(false);
   
   // Fake bound Discord data for UI demo (since backend DB isn't fully updated yet)
   const [boundDiscord, setBoundDiscord] = useState(null);
@@ -257,6 +259,35 @@ function Dashboard({ token, onLogout }) {
     const statePayload = btoa(JSON.stringify({ token, returnTo: window.location.origin }));
     const discordOAuthUrl = `${API_URL}/api/auth/discord?state=${statePayload}`;
     window.location.href = discordOAuthUrl;
+  };
+
+  const handleBindDiscordManual = async (e) => {
+    e.preventDefault();
+    if (!discordId) return;
+    
+    if (!/^\d{17,20}$/.test(discordId)) {
+      alert('請輸入您的 Discord「使用者 ID」(17~20碼數字)！');
+      return;
+    }
+
+    try {
+      addLog(`[SYS] 嘗試手動綁定 Discord ID: ${discordId}...`);
+      const res = await fetch(`${API_URL}/api/bind-discord-manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, discordId })
+      });
+      if (res.ok) {
+        setBoundDiscord({
+          username: discordId,
+          avatar: `https://cdn.discordapp.com/embed/avatars/${(BigInt(discordId) >> 22n) % 6n}.png`
+        });
+        setShowDiscordModal(false);
+        addLog(`系統通知：手動綁定成功！`);
+      }
+    } catch (err) {
+      alert('綁定失敗');
+    }
   };
 
   const addLog = (msg) => {
@@ -624,20 +655,51 @@ function Dashboard({ token, onLogout }) {
 
       {showDiscordModal && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content" style={{maxWidth: '500px'}}>
             <h3 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#5865F2'}}>
               <LinkIcon /> 連結 Discord 帳號
             </h3>
-            <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '25px', lineHeight: '1.6'}}>
-              透過官方驗證安全登入，連結後將即時同步您最新的 Discord 大頭貼與暱稱。<br/>
-              <span style={{color: 'var(--accent-color)'}}>※ 我們僅會獲取您的公開基本資料，絕對安全。</span>
-            </p>
-            <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
-              <button type="button" onClick={() => setShowDiscordModal(false)} className="terminal-btn" style={{padding: '10px 15px', background: 'rgba(255,255,255,0.1)'}}>取消</button>
-              <button onClick={handleBindDiscord} className="terminal-btn" style={{padding: '10px 20px', background: '#5865F2', color: '#fff', border: 'none', fontWeight: 'bold'}}>
-                🔗 前往 Discord 官方授權
-              </button>
-            </div>
+            
+            {!showManualBind ? (
+              <>
+                <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '25px', lineHeight: '1.6'}}>
+                  透過官方驗證安全登入，連結後將即時同步您最新的 Discord 大頭貼與暱稱。<br/>
+                  <span style={{color: 'var(--accent-color)'}}>※ 我們僅會獲取您的公開基本資料，絕對安全。</span>
+                </p>
+                <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center'}}>
+                  <a href="#" onClick={(e) => { e.preventDefault(); setShowManualBind(true); }} style={{color: '#888', fontSize: '0.85rem', marginRight: 'auto', textDecoration: 'underline'}}>無法使用授權？點此手動綁定</a>
+                  <button type="button" onClick={() => setShowDiscordModal(false)} className="terminal-btn" style={{padding: '10px 15px', background: 'rgba(255,255,255,0.1)'}}>取消</button>
+                  <button onClick={handleBindDiscord} className="terminal-btn" style={{padding: '10px 20px', background: '#5865F2', color: '#fff', border: 'none', fontWeight: 'bold'}}>
+                    🔗 前往 Discord 官方授權
+                  </button>
+                </div>
+              </>
+            ) : (
+              <form onSubmit={handleBindDiscordManual}>
+                <p style={{color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '15px', lineHeight: '1.6'}}>
+                  手動輸入需開啟開發者模式，請依照下方圖示指示，對著您的頭像點擊右鍵複製。
+                </p>
+                <div className="discord-mock-menu">
+                  <div className="discord-mock-item">編輯個人資料</div>
+                  <div className="discord-mock-item" style={{color: '#ed4245'}}>請勿打擾</div>
+                  <div className="discord-mock-item">切換帳號</div>
+                  <div className="discord-mock-item discord-mock-highlight">複製使用者 ID</div>
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="在此貼上您複製的 ID (例如: 123456789012345678)" 
+                  value={discordId}
+                  onChange={e => setDiscordId(e.target.value)}
+                  className="terminal-input"
+                  style={{marginBottom: '20px', marginTop: '15px', width: '100%', boxSizing: 'border-box'}}
+                  required
+                />
+                <div style={{display: 'flex', gap: '10px'}}>
+                  <button type="button" className="terminal-btn" style={{flex: 1, background: 'rgba(255,255,255,0.1)'}} onClick={() => setShowManualBind(false)}>返回</button>
+                  <button type="submit" className="terminal-btn" style={{flex: 1}}>確認手動綁定</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

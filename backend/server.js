@@ -83,6 +83,24 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, token, user: { id: user.id, username: user.username } });
 });
 
+app.post('/api/bind-discord-manual', async (req, res) => {
+  const { token, discordId, username: globalName, avatar: avatarUrl } = req.body;
+  if (!token || !discordId) return res.status(400).json({ error: 'Missing token or discordId' });
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const profile = { id: discordId, username: globalName || discordId, avatar: avatarUrl || `https://cdn.discordapp.com/embed/avatars/${(BigInt(discordId) >> 22n) % 6n}.png` };
+    const success = db.updateUserDiscord(decoded.username, profile);
+    if (success) {
+      res.json({ success: true, message: 'Discord ID bound successfully manually' });
+    } else {
+      res.status(404).json({ error: 'User not found' });
+    }
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
 app.get('/api/auth/discord', (req, res) => {
   const state = req.query.state;
   if (!state) return res.status(400).send('Missing state');
