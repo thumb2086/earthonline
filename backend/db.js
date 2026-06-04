@@ -35,11 +35,11 @@ function getTotalPopulation() {
   return db.users.length;
 }
 
-function updateUserDiscordId(username, discordId) {
+function updateUserDiscord(username, discordData) {
   const db = readDB();
   const user = db.users.find(u => u.username === username);
   if (user) {
-    user.discord_id = discordId;
+    user.discord = discordData;
     writeDB(db);
     return true;
   }
@@ -50,5 +50,5 @@ module.exports = {
   findUserByUsername,
   createUser,
   getTotalPopulation,
-  updateUserDiscordId
+  updateUserDiscord
 };

@@ -247,60 +247,15 @@ function Dashboard({ token, onLogout }) {
   const [isConnected, setIsConnected] = useState(false);
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
-  const [discordId, setDiscordId] = useState('');
   const [mapTheme, setMapTheme] = useState('satellite');
   
   // Fake bound Discord data for UI demo (since backend DB isn't fully updated yet)
   const [boundDiscord, setBoundDiscord] = useState(null);
 
-  const handleBindDiscord = async (e) => {
+  const handleBindDiscord = (e) => {
     e.preventDefault();
-    if (!discordId) return;
-    
-    // Check if it's a snowflake ID (numbers only)
-    if (!/^\d{17,20}$/.test(discordId)) {
-      alert('請輸入您的 Discord「使用者 ID」(17~20碼數字)，而非使用者名稱！\n如果您不知道如何取得，請在 Discord 設定 > 進階 中開啟「開發者模式」，然後對著您的頭像點右鍵選擇「複製使用者 ID」。');
-      return;
-    }
-
-    try {
-      addLog(`[SYS] 正在透過中繼伺服器驗證 Discord ID: ${discordId}...`);
-      
-      // Save to backend regardless of avatar fetch success
-      await fetch(`${API_URL}/api/bind-discord`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, discordId })
-      });
-
-      let avatarUrl = `https://cdn.discordapp.com/embed/avatars/${(BigInt(discordId) >> 22n) % 6n}.png`;
-      let globalName = discordId;
-
-      try {
-        const res = await fetch(`https://dcdn.dstn.to/profile/${discordId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.user) {
-            avatarUrl = data.user.avatar 
-              ? `https://cdn.discordapp.com/avatars/${data.user.id}/${data.user.avatar}.png?size=128`
-              : avatarUrl;
-            globalName = data.user.global_name || data.user.username;
-          }
-        }
-      } catch (e) {
-        addLog(`[WARN] 無法從 CDN 抓取大頭貼，使用預設頭像`);
-      }
-        
-      setBoundDiscord({
-        username: globalName,
-        avatar: avatarUrl
-      });
-      setShowDiscordModal(false);
-      addLog(`系統通知：成功綁定 Discord 帳號 [${globalName}]`);
-    } catch (err) {
-      alert('綁定失敗，無法連線至伺服器。');
-      addLog(`[ERROR] Discord 綁定失敗`);
-    }
+    const discordOAuthUrl = `${API_URL}/api/auth/discord?token=${token}`;
+    window.location.href = discordOAuthUrl;
   };
 
   const addLog = (msg) => {
@@ -331,28 +286,11 @@ function Dashboard({ token, onLogout }) {
       addLog(`身分確認：節點 [${data.username}] 成功接入全球網路`);
       
       // Auto-load Discord avatar if it's bound in database
-      if (data.discordId) {
-        try {
-          let avatarUrl = `https://cdn.discordapp.com/embed/avatars/${(BigInt(data.discordId) >> 22n) % 6n}.png`;
-          let globalName = data.discordId;
-
-          const res = await fetch(`https://dcdn.dstn.to/profile/${data.discordId}`);
-          if (res.ok) {
-            const discordData = await res.json();
-            if (discordData.user) {
-              avatarUrl = discordData.user.avatar 
-                ? `https://cdn.discordapp.com/avatars/${discordData.user.id}/${discordData.user.avatar}.png?size=128`
-                : avatarUrl;
-              globalName = discordData.user.global_name || discordData.user.username;
-            }
-          }
-          setBoundDiscord({
-            username: globalName,
-            avatar: avatarUrl
-          });
-        } catch (e) {
-          console.error("Failed to load discord data on init");
-        }
+      if (data.discordProfile) {
+        setBoundDiscord({
+          username: data.discordProfile.username,
+          avatar: data.discordProfile.avatar
+        });
       }
     });
 
@@ -683,34 +621,22 @@ function Dashboard({ token, onLogout }) {
         </main>
       </div>
 
-      {/* Discord Binding Modal */}
       {showDiscordModal && (
         <div className="modal-overlay">
-          <div className="modal-box floating-panel">
-            <h3 style={{display: 'flex', alignItems: 'center', gap: '10px', marginTop: 0}}>
-              <LinkIcon size={20} /> 連結您的 Discord
+          <div className="modal-content">
+            <h3 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#5865F2'}}>
+              <LinkIcon /> 連結 Discord 帳號
             </h3>
-            <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '10px'}}>
-              為了抓取您的真實大頭貼，請輸入您的 <strong style={{color: 'var(--accent-color)'}}>Discord 使用者 ID</strong> (一串數字，非名稱)。
+            <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '25px', lineHeight: '1.6'}}>
+              透過官方驗證安全登入，連結後將即時同步您最新的 Discord 大頭貼與暱稱。<br/>
+              <span style={{color: 'var(--accent-color)'}}>※ 我們僅會獲取您的公開基本資料，絕對安全。</span>
             </p>
-            <p style={{color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '20px', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '4px'}}>
-              👉 <strong style={{color: '#fff'}}>如何取得？</strong> 請先在 Discord 的「設定 &gt; 進階」開啟「開發者模式」，然後對著您自己的頭像點右鍵選擇「複製使用者 ID」。
-            </p>
-            <form onSubmit={handleBindDiscord}>
-              <input 
-                type="text" 
-                placeholder="貼上您的使用者 ID (例如: 123456789012345678)..." 
-                value={discordId}
-                onChange={e => setDiscordId(e.target.value)}
-                className="terminal-input"
-                style={{marginBottom: '15px'}}
-                required
-              />
-              <div style={{display: 'flex', gap: '10px'}}>
-                <button type="submit" className="terminal-btn" style={{flex: 1}}>確認綁定</button>
-                <button type="button" className="terminal-btn" style={{flex: 1, background: 'rgba(255,255,255,0.1)'}} onClick={() => setShowDiscordModal(false)}>取消</button>
-              </div>
-            </form>
+            <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+              <button type="button" onClick={() => setShowDiscordModal(false)} className="terminal-btn" style={{padding: '10px 15px', background: 'rgba(255,255,255,0.1)'}}>取消</button>
+              <button onClick={handleBindDiscord} className="terminal-btn" style={{padding: '10px 20px', background: '#5865F2', color: '#fff', border: 'none', fontWeight: 'bold'}}>
+                🔗 前往 Discord 官方授權
+              </button>
+            </div>
           </div>
         </div>
       )}

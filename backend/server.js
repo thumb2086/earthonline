@@ -19,6 +19,9 @@ app.get('/', (req, res) => {
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'earth_online_secret_key_9988';
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'http://localhost:3001/api/auth/discord/callback';
 
 // Discord Webhook configuration
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || null;
@@ -79,20 +82,80 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, token, user: { id: user.id, username: user.username } });
 });
 
-app.post('/api/bind-discord', async (req, res) => {
-  const { token, discordId } = req.body;
-  if (!token || !discordId) return res.status(400).json({ error: 'Missing token or discordId' });
+app.get('/api/auth/discord', (req, res) => {
+  const token = req.query.token;
+  if (!token) return res.status(400).send('Missing token');
+  
+  const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify&state=${token}`;
+  res.redirect(discordAuthUrl);
+});
+
+app.get('/api/auth/discord/callback', async (req, res) => {
+  const { code, state: token, error } = req.query;
+  
+  if (error || !code) {
+    return res.status(400).send(`Discord Authentication Failed. <a href="/">Return to app</a>`);
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    return res.status(401).send('Invalid or expired application token. Please login again.');
+  }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const success = db.updateUserDiscordId(decoded.username, discordId);
+    const fetch = (await import('node-fetch')).default;
+    
+    // Exchange code for token
+    const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+      method: 'POST',
+      body: new URLSearchParams({
+        client_id: DISCORD_CLIENT_ID,
+        client_secret: DISCORD_CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: DISCORD_REDIRECT_URI,
+        scope: 'identify',
+      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    const tokenData = await tokenResponse.json();
+    if (!tokenData.access_token) {
+      return res.status(400).send('Failed to obtain access token from Discord');
+    }
+
+    // Fetch user profile
+    const userResponse = await fetch('https://discord.com/api/users/@me', {
+      headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` }
+    });
+
+    const userData = await userResponse.json();
+
+    const avatarUrl = userData.avatar 
+      ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png?size=128`
+      : `https://cdn.discordapp.com/embed/avatars/${(BigInt(userData.id) >> 22n) % 6n}.png`;
+
+    const profile = {
+      id: userData.id,
+      username: userData.global_name || userData.username,
+      avatar: avatarUrl
+    };
+
+    const success = db.updateUserDiscord(decoded.username, profile);
+    
     if (success) {
-      res.json({ success: true, message: 'Discord ID bound successfully' });
+      // Redirect back to frontend
+      // Assuming frontend is running on localhost:5173 or same domain in production
+      const frontendUrl = process.env.NODE_ENV === 'production' ? '/' : 'http://localhost:5173/';
+      res.redirect(frontendUrl);
     } else {
-      res.status(404).json({ error: 'User not found' });
+      res.status(404).send('User not found in Earth Online database');
     }
   } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
+    console.error(err);
+    res.status(500).send('Internal Server Error during Discord OAuth2 callback');
   }
 });
 
@@ -159,7 +222,7 @@ io.on('connection', (socket) => {
         socketId: socket.id,
         id: decoded.id,
         username: decoded.username,
-        discordId: dbUser?.discord_id || null,
+        discordProfile: dbUser?.discord || null,
         ip: ip,
         country: geo.country,
         lat: geo.ll[0],
@@ -174,7 +237,7 @@ io.on('connection', (socket) => {
       socket.emit('init_data', {
         userId: user.id,
         username: user.username,
-        discordId: user.discordId,
+        discordProfile: user.discordProfile,
         ip: user.ip,
         country: user.country,
         lat: user.lat,
