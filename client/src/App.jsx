@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Rectangle, CircleMarker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Rectangle, CircleMarker, Popup, useMap } from 'react-leaflet';
 import { io } from 'socket.io-client';
-import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X } from 'lucide-react';
+import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X, Navigation } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
 
@@ -94,6 +94,28 @@ function LoginGateway({ onLogin }) {
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MapController({ myNode, mapTheme, setMapTheme }) {
+  const map = useMap();
+  
+  const handleLocate = () => {
+    if (myNode && myNode.lat && myNode.lon) {
+      map.flyTo([myNode.lat, myNode.lon], 5, { animate: true, duration: 1.5 });
+    }
+  };
+
+  return (
+    <div style={{position: 'absolute', bottom: '20px', right: '20px', zIndex: 1000, display: 'flex', gap: '10px'}}>
+      <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.8)', border: '1px solid var(--accent-color)'}} onClick={handleLocate}>
+        <Navigation size={14} /> 定位我的節點
+      </button>
+      <div style={{width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 5px'}}></div>
+      <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'satellite' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'satellite' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('satellite')}>衛星</button>
+      <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'dark' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'dark' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('dark')}>暗黑</button>
+      <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'street' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'street' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('street')}>街道</button>
     </div>
   );
 }
@@ -491,11 +513,7 @@ function Dashboard({ token, onLogout }) {
             style={{ height: '100%', width: '100%' }}
             zoomControl={true}
           >
-            <div style={{position: 'absolute', bottom: '20px', right: '20px', zIndex: 1000, display: 'flex', gap: '10px'}}>
-              <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'satellite' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'satellite' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('satellite')}>衛星</button>
-              <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'dark' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'dark' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('dark')}>暗黑</button>
-              <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'street' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'street' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('street')}>街道</button>
-            </div>
+            <MapController myNode={myNode} mapTheme={mapTheme} setMapTheme={setMapTheme} />
 
             {mapTheme === 'satellite' && (
               <TileLayer
