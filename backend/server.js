@@ -14,6 +14,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.send('Earth Online Backend Core is running. WebSocket and API endpoints are active.');
+});
+
 const JWT_SECRET = process.env.JWT_SECRET || 'earth_online_secret_key_9988';
 
 // Discord Webhook configuration
