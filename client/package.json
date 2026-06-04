@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
     "electron": "^42.3.3",
@@ -21,6 +22,8 @@
   "dependencies": {
     "discord-rpc": "^4.0.1",
     "leaflet": "^1.9.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-leaflet": "^5.0.0",
     "socket.io-client": "^4.8.3"
   }

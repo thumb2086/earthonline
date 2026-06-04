@@ -165,3 +165,93 @@ body {
   color: var(--accent-color) !important;
   border-bottom: 1px solid var(--border-color) !important;
 }
+
+/* Login Gateway */
+.login-gateway {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--bg-color);
+  background-image: radial-gradient(circle at center, #111 0%, #000 100%);
+}
+
+.login-box {
+  background: rgba(13, 13, 13, 0.9);
+  border: 1px solid var(--accent-color);
+  padding: 40px;
+  width: 400px;
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.1);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+
+.terminal-input {
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--border-color);
+  color: var(--accent-color);
+  padding: 10px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+
+.terminal-input:focus {
+  border-color: var(--accent-color);
+}
+
+.terminal-btn {
+  width: 100%;
+  background: transparent;
+  color: var(--accent-color);
+  border: 1px solid var(--accent-color);
+  padding: 12px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: bold;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+
+.terminal-btn:hover {
+  background: var(--accent-color);
+  color: #000;
+}
+
+.error-message {
+  color: var(--danger-color);
+  font-size: 0.85rem;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.toggle-link {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.toggle-link:hover {
+  color: var(--text-primary);
+}
+
+.logout-btn {
+  background: transparent;
+  color: var(--danger-color);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+.logout-btn:hover {
+  text-decoration: underline;
+}

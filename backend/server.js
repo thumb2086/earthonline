@@ -4,11 +4,76 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const geoip = require('geoip-lite');
 const dotenv = require('dotenv');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const db = require('./db');
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
+app.use(express.json());
+
+const JWT_SECRET = process.env.JWT_SECRET || 'earth_online_secret_key_9988';
+
+// Discord Webhook configuration
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || null;
+
+async function sendDiscordWebhook(message) {
+  if (!DISCORD_WEBHOOK_URL) return;
+  try {
+    const fetch = (await import('node-fetch')).default;
+    await fetch(DISCORD_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: message })
+    });
+  } catch (err) {
+    console.error('[SYS] Discord Webhook error:', err);
+  }
+}
+
+// Daily world flux report scheduling
+setInterval(() => {
+  const currentTotal = globalProduction;
+  const compression = calculateSocialCompression(connectedUsers.size);
+  const msg = `📊 **【每日世界通量報告】**\n目前全球掛機總產出：\`${currentTotal.toLocaleString()} 單位\`\n社會總壓迫常數：\`${compression} Ω\`\n當前真實連線節點數：\`${connectedUsers.size}\``;
+  sendDiscordWebhook(msg);
+}, 24 * 60 * 60 * 1000); // Once a day
+
+// Auth Endpoints
+app.post('/api/register', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
+  
+  if (db.findUserByUsername(username)) {
+    return res.status(400).json({ error: 'Username already exists' });
+  }
+  
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const newUser = {
+    id: 'EO-' + Date.now(),
+    username,
+    password: hashedPassword,
+    registeredAt: Date.now()
+  };
+  
+  db.createUser(newUser);
+  res.json({ success: true, message: 'Registration successful' });
+});
+
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  const user = db.findUserByUsername(username);
+  
+  if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+  
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
+  
+  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET);
+  res.json({ success: true, token, user: { id: user.id, username: user.username } });
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -38,6 +103,7 @@ setInterval(() => {
   // Broadcast global stats to everyone every 2 seconds
   io.emit('global_stats', {
     activeUsers: connectedUsers.size,
+    totalPopulation: db.getTotalPopulation(),
     globalProduction: globalProduction,
     socialCompression: calculateSocialCompression(connectedUsers.size)
   });
@@ -59,47 +125,61 @@ function getRealOrMockIP(socket) {
 }
 
 io.on('connection', (socket) => {
-  const ip = getRealOrMockIP(socket);
-  const geo = geoip.lookup(ip) || { country: 'UNKNOWN', ll: [0, 0] };
-  
-  const user = {
-    id: socket.id,
-    ip: ip,
-    country: geo.country,
-    lat: geo.ll[0],
-    lon: geo.ll[1],
-    connectedAt: Date.now()
-  };
+  // Wait for client to authenticate via token
+  socket.on('authenticate', (data) => {
+    try {
+      const decoded = jwt.verify(data.token, JWT_SECRET);
+      
+      const ip = getRealOrMockIP(socket);
+      const geo = geoip.lookup(ip) || { country: 'UNKNOWN', ll: [0, 0] };
+      
+      const user = {
+        socketId: socket.id,
+        id: decoded.id,
+        username: decoded.username,
+        ip: ip,
+        country: geo.country,
+        lat: geo.ll[0],
+        lon: geo.ll[1],
+        connectedAt: Date.now()
+      };
 
-  connectedUsers.set(socket.id, user);
+      connectedUsers.set(socket.id, user);
 
-  console.log(`[SYS] Node Connected: ${socket.id} | IP: ${ip} | Region: ${user.country}`);
+      console.log(`[SYS] Node Authenticated: ${user.username} | IP: ${ip} | Region: ${user.country}`);
 
-  // Send initial data to the connected user
-  socket.emit('init_data', {
-    userId: user.id,
-    ip: user.ip,
-    country: user.country,
-    lat: user.lat,
-    lon: user.lon,
-    connectedAt: user.connectedAt,
-    activeUsers: connectedUsers.size
+      socket.emit('init_data', {
+        userId: user.id,
+        username: user.username,
+        ip: user.ip,
+        country: user.country,
+        lat: user.lat,
+        lon: user.lon,
+        connectedAt: user.connectedAt,
+        activeUsers: connectedUsers.size,
+        totalPopulation: db.getTotalPopulation()
+      });
+
+      if (connectedUsers.size % 10 === 0 && connectedUsers.size > 0) {
+        sendDiscordWebhook(`🌐 **【地理節點高載通報】**\n偵測到大量節點湧入，目前全服掛機人數已達 **${connectedUsers.size}** 人！\n來自 \`${user.country}\` 的節點點亮了板塊。`);
+      }
+
+      io.emit('node_connected', {
+        id: user.id,
+        lat: user.lat,
+        lon: user.lon
+      });
+
+      const allNodes = Array.from(connectedUsers.values()).map(u => ({
+        id: u.id,
+        lat: u.lat,
+        lon: u.lon
+      }));
+      socket.emit('all_nodes', allNodes);
+    } catch (err) {
+      socket.emit('auth_error', { message: 'Invalid token' });
+    }
   });
-
-  // Broadcast the new node to all clients for heatmap updating
-  io.emit('node_connected', {
-    id: user.id,
-    lat: user.lat,
-    lon: user.lon
-  });
-
-  // Also send all current nodes to the new client
-  const allNodes = Array.from(connectedUsers.values()).map(u => ({
-    id: u.id,
-    lat: u.lat,
-    lon: u.lon
-  }));
-  socket.emit('all_nodes', allNodes);
 
   socket.on('disconnect', () => {
     const disconnectedUser = connectedUsers.get(socket.id);
