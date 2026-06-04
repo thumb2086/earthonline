@@ -266,8 +266,10 @@ function Dashboard({ token, onLogout }) {
         {/* Left Metrics Terminal */}
         <aside className="metrics-terminal floating-panel">
           <div className="brand-banner" style={{ textAlign: 'center', paddingBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '15px' }}>
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Blue_Marble_2002.png/240px-Blue_Marble_2002.png" alt="earth" style={{width: '60px', height: '60px', borderRadius: '50%', boxShadow: '0 0 15px rgba(0, 255, 204, 0.4)'}} />
-            <h3 style={{margin: '10px 0 0 0', color: 'var(--text-main)'}}>EARTH ONLINE</h3>
+            <div style={{display: 'flex', justifyContent: 'center', marginBottom: '10px'}}>
+              <Globe2 size={56} color="var(--accent-color)" className="icon-glow" />
+            </div>
+            <h3 style={{margin: '0', color: 'var(--text-primary)', letterSpacing: '2px'}}>EARTH ONLINE</h3>
           </div>
 
           <div className="metric-group profile-card">
