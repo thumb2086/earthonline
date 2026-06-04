@@ -207,20 +207,24 @@ function Dashboard({ token, onLogout }) {
 
   return (
     <div className="app-container">
-      {/* System Header */}
+      {/* Header Panel */}
       <header className="system-header">
-        <div className="header-left">
-          <div className="status-indicator"></div>
-          <img src="/logo.png" alt="logo" style={{width: '24px', height: '24px'}} />
-          <span>地球在線 // 觀測節點 [TW-X1]</span>
+        <div className="system-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className={`status-indicator ${isConnected ? 'online' : 'offline'}`}></div>
+          <span style={{color: 'var(--accent-color)'}}>🌐</span> 地球在線 // 觀測節點 [TW-X1]
         </div>
-        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            實時連線人數: {globalStats.activeUsers} / 
-            <img src="/logo.png" alt="logo" style={{width: '16px', height: '16px', background: 'transparent'}} />
-            地球總人口: {globalStats.totalPopulation}
-          </span>
-          <button onClick={onLogout} className="logout-btn">[ 中斷連線 ]</button>
+        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div className="system-stats" style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,255,204,0.1)', padding: '5px 15px', borderRadius: '20px', border: '1px solid rgba(0,255,204,0.3)'}}>
+              <span className="blink" style={{color: 'var(--accent-color)'}}>●</span>
+              <span>實時連線人數: <strong style={{color: 'var(--accent-color)', fontSize: '1.2rem'}}>{globalStats.activeUsers}</strong></span>
+            </div>
+            <div style={{display: 'flex', alignItems: 'center', padding: '5px 10px'}}>
+              <span style={{color: 'var(--text-secondary)'}}>地球總人口: <strong style={{color: 'var(--text-main)'}}>{globalStats.totalPopulation}</strong></span>
+            </div>
+            {!isConnected && <span style={{color: 'var(--danger-color)', fontWeight: 'bold'}}>[中斷連線]</span>}
+          </div>
+          <button onClick={onLogout} className="logout-btn" style={{padding: '5px 15px', borderRadius: '8px', background: 'rgba(255,50,50,0.1)', border: '1px solid rgba(255,50,50,0.3)', color: 'var(--danger-color)', cursor: 'pointer'}}>中斷連線</button>
         </div>
       </header>
 
