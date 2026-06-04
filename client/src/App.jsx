@@ -98,6 +98,7 @@ function Dashboard({ token, onLogout }) {
   const [lifespan, setLifespan] = useState(0);
   const [logs, setLogs] = useState(['[SYS] 地球在線終端連線建立中...', '[SYS] 正在載入全球節點矩陣...']);
   const [ping, setPing] = useState(0);
+  const [isConnected, setIsConnected] = useState(false);
 
   const addLog = (msg) => {
     setLogs(prev => {
@@ -113,10 +114,12 @@ function Dashboard({ token, onLogout }) {
     s.on('connect', () => {
       s.emit('authenticate', { token });
       addLog('驗證金鑰已發送，等待授權...');
+      setIsConnected(true);
     });
 
     s.on('auth_error', () => {
       alert('授權已過期，請重新登入');
+      setIsConnected(false);
       onLogout();
     });
 
@@ -143,6 +146,10 @@ function Dashboard({ token, onLogout }) {
     s.on('node_disconnected', ({ id }) => {
       setNodes(prev => prev.filter(n => n.id !== id));
       addLog(`通知：節點連線中斷，正在重新計算社會總壓迫常數`);
+    });
+    
+    s.on('disconnect', () => {
+      setIsConnected(false);
     });
 
     s.on('global_stats', (stats) => {
