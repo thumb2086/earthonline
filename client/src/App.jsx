@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Rectangle, CircleMarker, Popup } from 'react-leaflet';
 import { io } from 'socket.io-client';
-import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info } from 'lucide-react';
+import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
 
@@ -93,6 +93,65 @@ function LoginGateway({ onLogin }) {
             {isRegister ? '>> 返回登入程序' : '>> 申請新節點授權'}
           </span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DocumentationOverlay({ onClose }) {
+  return (
+    <div className="doc-overlay">
+      <div className="doc-header">
+        <h2 style={{margin: 0, display: 'flex', alignItems: 'center', gap: '15px', color: 'var(--text-main)'}}>
+          <BookOpen className="icon-glow" color="var(--accent-color)" size={28} />
+          EARTH ONLINE 系統文獻與參考資料
+        </h2>
+        <button onClick={onClose} className="terminal-btn" style={{padding: '8px 20px', width: 'auto', display: 'flex', alignItems: 'center', gap: '8px'}}>
+          <X size={18} /> 關閉檔案
+        </button>
+      </div>
+
+      <div className="doc-content">
+        
+        <div className="doc-section">
+          <h2><FileText size={24} /> 文獻說明 (Literature & Concept)</h2>
+          <p>
+            「地球在線 (EARTH ONLINE)」是一個基於《三體》概念與賽博龐克美學啟發的實驗性全球網路觀測專案。其核心理念在於將全球四散的網路節點（使用者）具象化為實體地理座標上的「觀測站」，並透過即時的雙向 WebSocket 通訊，建構出一個去中心化且具備高度同步性的虛擬拓樸網路。
+          </p>
+          <p>
+            本系統嘗試探討在高度資訊化的未來，人類個體如何作為巨型系統架構中的微小神經元運作。每一個登入的帳號，皆代表著為全球伺服器矩陣貢獻運算能力與觀測數據的終端節點。
+          </p>
+        </div>
+
+        <div className="doc-section">
+          <h2><Database size={24} /> 資料檔案與技術架構 (Data Files & Architecture)</h2>
+          <ul>
+            <li><strong>前端框架 (Client):</strong> React 18, Vite, React-Leaflet (GIS 地理資訊系統渲染)</li>
+            <li><strong>後端核心 (Server):</strong> Node.js, Express, Socket.IO (處理全雙工即時通訊與封包廣播)</li>
+            <li><strong>部署架構 (Infrastructure):</strong> Render 雲端運算節點、Cloudflare CDN 全球邊緣加速</li>
+            <li><strong>狀態機制 (State Mechanics):</strong> 全局掛機時間 (Global Production)、社會總壓迫常數 (Social Compression)</li>
+          </ul>
+        </div>
+
+        <div className="doc-section">
+          <h2><LinkIcon size={24} /> 參考來源 (Reference Sources)</h2>
+          <ul>
+            <li><strong>GIS 圖資來源:</strong> Esri World Imagery, OpenStreetMap, CartoDB Dark Matter</li>
+            <li><strong>3D 地球紋理貼圖:</strong> ThreeGlobe / Blue Marble (NASA)</li>
+            <li><strong>UI 介面圖示集:</strong> Lucide React Icons</li>
+            <li><strong>Discord API 代理:</strong> dcdn.dstn.to (用於免驗證即時抓取使用者公開資訊)</li>
+          </ul>
+        </div>
+
+        <div className="doc-section">
+          <h2><Code size={24} /> 開發者資訊 (Developer Info)</h2>
+          <p>本系統由獨立開發者進行架構設計、UI/UX 規劃與全端程式撰寫。</p>
+          <ul>
+            <li><strong>開發者 (Developer):</strong> 胡家綸</li>
+            <li><strong>聯絡信箱 (Contact Email):</strong> <a href="mailto:huchialun97@gmail.com" style={{color: 'var(--accent-color)', textDecoration: 'underline'}}>huchialun97@gmail.com</a></li>
+          </ul>
+        </div>
+
       </div>
     </div>
   );
@@ -534,24 +593,8 @@ function Dashboard({ token, onLogout }) {
         </div>
       )}
 
-      {/* About Modal */}
-      {showAboutModal && (
-        <div className="modal-overlay">
-          <div className="modal-box floating-panel">
-            <h3 style={{display: 'flex', alignItems: 'center', gap: '10px', marginTop: 0}}>
-              <Info size={20} /> 系統檔案說明與開發者資訊
-            </h3>
-            <div style={{color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '20px', lineHeight: '1.6'}}>
-              <p style={{marginBottom: '10px'}}><strong style={{color: 'var(--text-primary)'}}>地球在線 (EARTH ONLINE)</strong> 是一個全球節點即時觀測與管理的實驗性平台，結合了 WebSocket 與地理資訊系統 (GIS) 即時繪製全球活動熱區。</p>
-              <p style={{marginBottom: '10px'}}>系統具備動態負載平衡展示、Discord 第三方認證整合，以及防碰撞的分散式網路架構。</p>
-              <hr style={{borderColor: 'var(--border-color)', margin: '15px 0'}} />
-              <p><strong style={{color: 'var(--accent-color)'}}>開發者 (Developer)</strong>: 胡家綸</p>
-              <p><strong style={{color: 'var(--accent-color)'}}>聯絡信箱 (Contact)</strong>: <a href="mailto:huchialun97@gmail.com" style={{color: 'var(--text-primary)'}}>huchialun97@gmail.com</a></p>
-            </div>
-            <button type="button" className="terminal-btn" style={{width: '100%'}} onClick={() => setShowAboutModal(false)}>關閉視窗</button>
-          </div>
-        </div>
-      )}
+      {/* Full Page About Documentation */}
+      {showAboutModal && <DocumentationOverlay onClose={() => setShowAboutModal(false)} />}
     </div>
   );
 }
