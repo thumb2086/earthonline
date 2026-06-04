@@ -166,6 +166,48 @@ body {
   border-bottom: 1px solid var(--border-color) !important;
 }
 
+/* Bottom Console Log Module */
+.bottom-log-console {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  padding: 10px 15px;
+  z-index: 1000;
+  font-family: var(--font-mono);
+  max-height: 150px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-header {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  border-bottom: 1px dashed var(--border-color);
+  padding-bottom: 5px;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.log-content {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.blink {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
 /* Login Gateway */
 .login-gateway {
   display: flex;

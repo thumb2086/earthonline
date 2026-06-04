@@ -96,6 +96,15 @@ function Dashboard({ token, onLogout }) {
   const [myNode, setMyNode] = useState(null);
   const [globalStats, setGlobalStats] = useState({ activeUsers: 0, totalPopulation: 0, globalProduction: 0, socialCompression: '1.000' });
   const [lifespan, setLifespan] = useState(0);
+  const [logs, setLogs] = useState(['[SYS] 地球在線終端連線建立中...', '[SYS] 正在載入全球節點矩陣...']);
+  const [ping, setPing] = useState(0);
+
+  const addLog = (msg) => {
+    setLogs(prev => {
+      const time = new Date().toISOString().substring(11, 19);
+      return [...prev, `[${time}] ${msg}`].slice(-8); // Keep last 8 lines
+    });
+  };
 
   useEffect(() => {
     const s = io(SOCKET_URL);
@@ -103,6 +112,7 @@ function Dashboard({ token, onLogout }) {
 
     s.on('connect', () => {
       s.emit('authenticate', { token });
+      addLog('驗證金鑰已發送，等待授權...');
     });
 
     s.on('auth_error', () => {
@@ -112,10 +122,12 @@ function Dashboard({ token, onLogout }) {
 
     s.on('init_data', (data) => {
       setMyNode(data);
+      addLog(`身分確認：節點 [${data.username}] 成功接入全球網路`);
     });
 
     s.on('all_nodes', (data) => {
       setNodes(data);
+      addLog(`成功同步 ${data.length} 個物理座標節點資料`);
     });
 
     s.on('node_connected', (node) => {
@@ -125,14 +137,17 @@ function Dashboard({ token, onLogout }) {
         }
         return prev;
       });
+      addLog(`警告：偵測到新物理節點活動於座標 [${node.lat.toFixed(2)}, ${node.lon.toFixed(2)}]`);
     });
 
     s.on('node_disconnected', ({ id }) => {
       setNodes(prev => prev.filter(n => n.id !== id));
+      addLog(`通知：節點連線中斷，正在重新計算社會總壓迫常數`);
     });
 
     s.on('global_stats', (stats) => {
       setGlobalStats(stats);
+      setPing(Math.floor(Math.random() * 15) + 10); // Fake small ping variation for immersion
     });
 
     return () => {
@@ -233,6 +248,15 @@ function Dashboard({ token, onLogout }) {
               [{calculateVitalSigns(lifespan)}]
             </div>
           </div>
+          
+          <div className="metric-group" style={{marginTop: '40px'}}>
+            <div className="metric-title">網路頻寬通量 (NETWORK FLUX)</div>
+            <div style={{fontSize: '0.8rem', color: 'var(--text-secondary)'}}>
+              UPLINK: {Math.floor(Math.random()*500 + 100)} KB/s<br/>
+              DOWNLINK: {Math.floor(Math.random()*1500 + 500)} KB/s<br/>
+              PACKET LOSS: 0.00%
+            </div>
+          </div>
         </aside>
 
         {/* Right Geographic Matrix */}
@@ -245,6 +269,10 @@ function Dashboard({ token, onLogout }) {
             <div className="overlay-box" style={{borderColor: 'var(--danger-color)'}}>
               <div className="overlay-title" style={{color: 'var(--danger-color)'}}>社會總壓迫常數</div>
               <div className="overlay-value" style={{color: 'var(--danger-color)'}}>{globalStats.socialCompression} Ω</div>
+            </div>
+            <div className="overlay-box" style={{borderColor: '#7a7a7a'}}>
+              <div className="overlay-title" style={{color: '#7a7a7a'}}>核心伺服器延遲</div>
+              <div className="overlay-value" style={{color: '#7a7a7a', fontSize: '1.2rem'}}>{ping} ms</div>
             </div>
           </div>
 
@@ -293,6 +321,20 @@ function Dashboard({ token, onLogout }) {
               );
             })}
           </MapContainer>
+
+          {/* Bottom Console Log Module */}
+          <div className="bottom-log-console">
+            <div className="log-header">
+              <span className="blink">_</span> 全球節點實時事件日誌 (EVENT LOG)
+            </div>
+            <div className="log-content">
+              {logs.map((log, i) => (
+                <div key={i} style={{ color: log.includes('警告') ? 'var(--danger-color)' : 'var(--accent-color)' }}>
+                  {log}
+                </div>
+              ))}
+            </div>
+          </div>
         </main>
       </div>
     </div>
