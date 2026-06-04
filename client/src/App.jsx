@@ -4,8 +4,8 @@ import { io } from 'socket.io-client';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
 
-const API_URL = 'http://localhost:3001';
-const SOCKET_URL = 'http://localhost:3001';
+const API_URL = 'https://earthonline.onrender.com';
+const SOCKET_URL = 'https://earthonline.onrender.com';
 
 function LoginGateway({ onLogin }) {
   const [isRegister, setIsRegister] = useState(false);
