@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Rectangle, Popup } from 'react-leaflet';
 import { io } from 'socket.io-client';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
@@ -167,6 +167,27 @@ function Dashboard({ token, onLogout }) {
     return '■'.repeat(filled) + '□'.repeat(empty);
   };
 
+  // Group nodes into a global pixel grid
+  const gridSize = 3; // 3x3 degrees per pixel block
+  const gridBlocks = {};
+
+  nodes.forEach(node => {
+    const gridLat = Math.floor(node.lat / gridSize) * gridSize;
+    const gridLon = Math.floor(node.lon / gridSize) * gridSize;
+    const gridId = `${gridLat},${gridLon}`;
+    
+    if (!gridBlocks[gridId]) {
+      gridBlocks[gridId] = {
+        lat: gridLat,
+        lon: gridLon,
+        count: 0,
+        users: []
+      };
+    }
+    gridBlocks[gridId].count += 1;
+    gridBlocks[gridId].users.push(node.username);
+  });
+
   return (
     <div className="app-container">
       {/* System Header */}
@@ -239,24 +260,38 @@ function Dashboard({ token, onLogout }) {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
             
-            {/* Node markers */}
-            {nodes.map(node => (
-              <CircleMarker
-                key={node.id}
-                center={[node.lat, node.lon]}
-                radius={4}
-                pathOptions={{ 
-                  color: 'var(--accent-color)', 
-                  fillColor: 'var(--accent-color)', 
-                  fillOpacity: 0.8,
-                  weight: 1
-                }}
-              >
-                <Popup>
-                  User: {node.username}
-                </Popup>
-              </CircleMarker>
-            ))}
+            {/* Grid Pixel Blocks */}
+            {Object.values(gridBlocks).map(block => {
+              const intensity = Math.min(0.2 + (block.count * 0.15), 0.95);
+              return (
+                <Rectangle
+                  key={`${block.lat}-${block.lon}`}
+                  bounds={[
+                    [block.lat, block.lon],
+                    [block.lat + gridSize, block.lon + gridSize]
+                  ]}
+                  pathOptions={{ 
+                    color: 'var(--accent-color)', 
+                    fillColor: 'var(--accent-color)', 
+                    fillOpacity: intensity,
+                    weight: 1
+                  }}
+                >
+                  <Popup>
+                    <div style={{ fontFamily: 'var(--font-mono)' }}>
+                      <div style={{ color: 'var(--text-secondary)' }}>區域座標 [{block.lat}, {block.lon}]</div>
+                      <div style={{ color: 'var(--accent-color)', fontWeight: 'bold', margin: '5px 0' }}>
+                        活躍節點數: {block.count}
+                      </div>
+                      <div style={{ fontSize: '0.8rem' }}>
+                        ID: {block.users.slice(0, 5).join(', ')}
+                        {block.count > 5 ? ' ...等' : ''}
+                      </div>
+                    </div>
+                  </Popup>
+                </Rectangle>
+              );
+            })}
           </MapContainer>
         </main>
       </div>
