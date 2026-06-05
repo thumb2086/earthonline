@@ -279,7 +279,8 @@ function Dashboard({ token, onLogout }) {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/leaderboard`);
+        const baseUrl = BACKEND_URL.replace(/\/$/, '');
+        const res = await fetch(`${baseUrl}/api/leaderboard`);
         if (res.ok) setLeaderboard(await res.json());
       } catch(err) {}
     };
