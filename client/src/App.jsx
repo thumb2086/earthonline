@@ -271,8 +271,8 @@ function Dashboard({ token, onLogout }) {
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [mapTheme, setMapTheme] = useState('satellite');
-  const [discordId, setDiscordId] = useState('');
   const [showManualBind, setShowManualBind] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   
   // Fetch leaderboard data
@@ -573,7 +573,10 @@ function Dashboard({ token, onLogout }) {
             </div>
           </div>
 
-          <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+          <div style={{ marginTop: 'auto', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(255,215,0,0.1)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)'}} onClick={() => setShowLeaderboard(true)}>
+              <Activity size={16} /> 全球節點排行榜 (Leaderboard)
+            </button>
             <button className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}} onClick={() => setShowAboutModal(true)}>
               <Info size={16} /> 檔案說明與系統資訊
             </button>
@@ -699,43 +702,6 @@ function Dashboard({ token, onLogout }) {
             })}
           </MapContainer>
 
-          {/* Leaderboard Table Overlay */}
-          <div className="leaderboard-panel floating-panel" style={{
-            position: 'absolute', bottom: '150px', left: '20px', zIndex: 1000, 
-            width: 'calc(100% - 40px)', background: 'rgba(10, 15, 25, 0.85)',
-            maxHeight: '30vh', overflowY: 'auto'
-          }}>
-            <div className="overlay-title" style={{marginBottom: '10px'}}>全球節點排行榜 (GLOBAL LEADERBOARD)</div>
-            <table style={{width: '100%', fontSize: '0.85rem', color: 'var(--text-secondary)', borderCollapse: 'collapse', textAlign: 'left'}}>
-              <thead>
-                <tr style={{borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
-                  <th style={{padding: '8px'}}>排名</th>
-                  <th style={{padding: '8px'}}>頭像</th>
-                  <th style={{padding: '8px'}}>使用者 ID</th>
-                  <th style={{padding: '8px'}}>累積在線時間</th>
-                  <th style={{padding: '8px'}}>累積點數</th>
-                  <th style={{padding: '8px'}}>目前 Discord 實際身分組</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.map((user, idx) => (
-                  <tr key={user.username} style={{borderBottom: '1px solid rgba(255,255,255,0.05)', color: idx === 0 ? 'var(--accent-color)' : 'inherit'}}>
-                    <td style={{padding: '8px'}}>#{idx + 1}</td>
-                    <td style={{padding: '8px'}}>
-                      {user.avatar ? <img src={user.avatar} alt="avatar" style={{width: '24px', height: '24px', borderRadius: '50%'}} /> : '無'}
-                    </td>
-                    <td style={{padding: '8px'}}>{user.discordName !== '未綁定' ? user.discordName : user.username}</td>
-                    <td style={{padding: '8px'}}>{formatTime(user.idleTime)}</td>
-                    <td style={{padding: '8px'}}>{Number(user.points).toFixed(1)}</td>
-                    <td style={{padding: '8px', color: user.role.includes('無業遊民') ? '#F1C40F' : user.role.includes('財務自由') ? '#2ECC71' : user.role.includes('月光族') ? '#E67E22' : 'var(--text-secondary)'}}>
-                      {user.role || '平民'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
           {/* Bottom Console Log Module */}
           <div className="bottom-log-console floating-panel">
             <div className="log-header" style={{display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-color)'}}>
@@ -751,6 +717,64 @@ function Dashboard({ token, onLogout }) {
           </div>
         </main>
       </div>
+
+      {/* Leaderboard Modal */}
+      {showLeaderboard && (
+        <div className="modal-overlay" onClick={() => setShowLeaderboard(false)}>
+          <div className="modal-content" style={{maxWidth: '800px', width: '90%', maxHeight: '80vh', overflowY: 'auto'}} onClick={e => e.stopPropagation()}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px'}}>
+              <h2 style={{margin: 0, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '10px'}}>
+                <Globe2 size={24} className="icon-spin" /> 全球節點排行榜 (Global Leaderboard)
+              </h2>
+              <button className="terminal-btn" style={{padding: '5px 10px'}} onClick={() => setShowLeaderboard(false)}>關閉 (Close)</button>
+            </div>
+            
+            <table style={{width: '100%', fontSize: '0.9rem', color: 'var(--text-secondary)', borderCollapse: 'collapse', textAlign: 'left'}}>
+              <thead>
+                <tr style={{borderBottom: '1px solid rgba(255,255,255,0.2)'}}>
+                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>排名</th>
+                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>頭像</th>
+                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>使用者 ID</th>
+                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>累積在線時間</th>
+                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>累積點數</th>
+                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>目前 Discord 實際身分組</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.length === 0 && (
+                  <tr>
+                    <td colSpan="6" style={{padding: '20px', textAlign: 'center'}}>載入中或尚無資料...</td>
+                  </tr>
+                )}
+                {leaderboard.map((user, idx) => (
+                  <tr key={user.username} style={{
+                    borderBottom: '1px solid rgba(255,255,255,0.05)', 
+                    color: idx === 0 ? 'var(--accent-color)' : 'inherit',
+                    backgroundColor: idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'
+                  }}>
+                    <td style={{padding: '12px 8px', fontWeight: idx === 0 ? 'bold' : 'normal'}}>#{idx + 1}</td>
+                    <td style={{padding: '12px 8px'}}>
+                      {user.avatar ? <img src={user.avatar} alt="avatar" style={{width: '32px', height: '32px', borderRadius: '50%', border: idx === 0 ? '2px solid var(--accent-color)' : 'none'}} /> : '無'}
+                    </td>
+                    <td style={{padding: '12px 8px', fontWeight: 'bold', color: 'var(--text-main)'}}>{user.discordName !== '未綁定' ? user.discordName : user.username}</td>
+                    <td style={{padding: '12px 8px'}}>{formatTime(user.idleTime)}</td>
+                    <td style={{padding: '12px 8px', fontFamily: 'monospace', fontSize: '1.1rem'}}>{Number(user.points).toFixed(1)}</td>
+                    <td style={{
+                      padding: '12px 8px', 
+                      fontWeight: 'bold',
+                      color: user.role.includes('無業遊民') ? '#F1C40F' : 
+                             user.role.includes('財務自由') ? '#2ECC71' : 
+                             user.role.includes('月光族') ? '#E67E22' : 'var(--text-secondary)'
+                    }}>
+                      {user.role || '平民'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {showDiscordModal && (
         <div className="modal-overlay">
