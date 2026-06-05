@@ -736,31 +736,35 @@ function Dashboard({ token, onLogout }) {
               <h2 style={{margin: 0, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem'}}>
                 <Globe2 size={28} className="icon-spin" /> 全球節點排行榜 (GLOBAL LEADERBOARD)
               </h2>
-              <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+              <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
                 <button className="terminal-btn" style={{
                   padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
-                  background: sortMode === 'points' ? 'rgba(0,255,204,0.15)' : 'rgba(255,255,255,0.05)', 
-                  color: sortMode === 'points' ? 'var(--accent-color)' : 'var(--text-secondary)',
-                  border: sortMode === 'points' ? '1px solid var(--accent-color)' : '1px solid rgba(255,255,255,0.2)',
+                  width: 'auto', // Override .terminal-btn width: 100%
+                  background: sortMode === 'points' ? 'var(--accent-color)' : 'transparent', 
+                  color: sortMode === 'points' ? '#ffffff' : 'var(--text-secondary)',
+                  border: sortMode === 'points' ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
                   fontWeight: sortMode === 'points' ? 'bold' : 'normal',
-                  boxShadow: sortMode === 'points' ? '0 0 10px rgba(0,255,204,0.2)' : 'none'
+                  boxShadow: 'none', borderRadius: '4px'
                 }} onClick={() => setSortMode('points')}>
                   <Star size={16} /> 依點數排行
                 </button>
                 <button className="terminal-btn" style={{
                   padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
-                  background: sortMode === 'time' ? 'rgba(0,255,204,0.15)' : 'rgba(255,255,255,0.05)', 
-                  color: sortMode === 'time' ? 'var(--accent-color)' : 'var(--text-secondary)',
-                  border: sortMode === 'time' ? '1px solid var(--accent-color)' : '1px solid rgba(255,255,255,0.2)',
+                  width: 'auto',
+                  background: sortMode === 'time' ? 'var(--accent-color)' : 'transparent', 
+                  color: sortMode === 'time' ? '#ffffff' : 'var(--text-secondary)',
+                  border: sortMode === 'time' ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
                   fontWeight: sortMode === 'time' ? 'bold' : 'normal',
-                  boxShadow: sortMode === 'time' ? '0 0 10px rgba(0,255,204,0.2)' : 'none'
+                  boxShadow: 'none', borderRadius: '4px'
                 }} onClick={() => setSortMode('time')}>
                   <Clock size={16} /> 依時間排行
                 </button>
                 <button className="terminal-btn" style={{
                   padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
-                  background: 'rgba(255,50,50,0.1)', color: 'var(--danger-color)', 
-                  border: '1px solid rgba(255,50,50,0.3)', marginLeft: '5px'
+                  width: 'auto',
+                  background: 'transparent', color: 'var(--text-secondary)', 
+                  border: '1px solid var(--border-color)', marginLeft: '10px',
+                  boxShadow: 'none', borderRadius: '4px'
                 }} onClick={() => setShowLeaderboard(false)}>
                   <X size={16} /> 關閉
                 </button>
