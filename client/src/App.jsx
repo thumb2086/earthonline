@@ -274,6 +274,7 @@ function Dashboard({ token, onLogout }) {
   const [showManualBind, setShowManualBind] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [sortMode, setSortMode] = useState('points'); // 'points' or 'time'
   
   // Fetch leaderboard data
   useEffect(() => {
@@ -735,9 +736,27 @@ function Dashboard({ token, onLogout }) {
               <h2 style={{margin: 0, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem'}}>
                 <Globe2 size={28} className="icon-spin" /> 全球節點排行榜 (GLOBAL LEADERBOARD)
               </h2>
-              <button className="terminal-btn" style={{padding: '6px 16px', background: 'rgba(255,50,50,0.1)', color: 'var(--danger-color)', border: '1px solid rgba(255,50,50,0.3)'}} onClick={() => setShowLeaderboard(false)}>
-                ✕ 關閉
-              </button>
+              <div style={{display: 'flex', gap: '10px'}}>
+                <button className="terminal-btn" style={{
+                  padding: '6px 16px', 
+                  background: sortMode === 'points' ? 'var(--accent-color)' : 'rgba(255,255,255,0.1)', 
+                  color: sortMode === 'points' ? '#000' : '#fff',
+                  border: 'none', fontWeight: sortMode === 'points' ? 'bold' : 'normal'
+                }} onClick={() => setSortMode('points')}>
+                  ⭐ 依點數排行
+                </button>
+                <button className="terminal-btn" style={{
+                  padding: '6px 16px', 
+                  background: sortMode === 'time' ? '#00ffcc' : 'rgba(255,255,255,0.1)', 
+                  color: sortMode === 'time' ? '#000' : '#fff',
+                  border: 'none', fontWeight: sortMode === 'time' ? 'bold' : 'normal'
+                }} onClick={() => setSortMode('time')}>
+                  ⏱️ 依時間排行
+                </button>
+                <button className="terminal-btn" style={{padding: '6px 16px', background: 'rgba(255,50,50,0.1)', color: 'var(--danger-color)', border: '1px solid rgba(255,50,50,0.3)', marginLeft: '10px'}} onClick={() => setShowLeaderboard(false)}>
+                  ✕ 關閉
+                </button>
+              </div>
             </div>
             
             <table style={{width: '100%', fontSize: '0.9rem', color: 'var(--text-secondary)', borderCollapse: 'collapse', textAlign: 'left'}}>
@@ -746,8 +765,8 @@ function Dashboard({ token, onLogout }) {
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>排名</th>
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>頭像</th>
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>使用者 ID</th>
-                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>累積在線時間</th>
-                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>累積點數</th>
+                  <th style={{padding: '12px 8px', color: sortMode === 'time' ? '#00ffcc' : 'var(--text-primary)'}}>累積在線時間 {sortMode === 'time' && '▼'}</th>
+                  <th style={{padding: '12px 8px', color: sortMode === 'points' ? 'var(--accent-color)' : 'var(--text-primary)'}}>累積點數 {sortMode === 'points' && '▼'}</th>
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>目前 Discord 實際身分組</th>
                 </tr>
               </thead>
@@ -757,7 +776,7 @@ function Dashboard({ token, onLogout }) {
                     <td colSpan="6" style={{padding: '20px', textAlign: 'center'}}>載入中或尚無資料...</td>
                   </tr>
                 )}
-                {leaderboard.map((user, idx) => (
+                {[...leaderboard].sort((a, b) => sortMode === 'points' ? b.points - a.points : b.idleTime - a.idleTime).map((user, idx) => (
                   <tr key={user.username} style={{
                     borderBottom: '1px solid rgba(255,255,255,0.05)', 
                     color: idx === 0 ? 'var(--accent-color)' : 'inherit',
