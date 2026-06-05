@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Rectangle, CircleMarker, Popup, useMap } from 'react-leaflet';
 import { io } from 'socket.io-client';
-import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X, Navigation } from 'lucide-react';
+import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X, Navigation, Star, Clock } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
 
@@ -736,25 +736,33 @@ function Dashboard({ token, onLogout }) {
               <h2 style={{margin: 0, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem'}}>
                 <Globe2 size={28} className="icon-spin" /> 全球節點排行榜 (GLOBAL LEADERBOARD)
               </h2>
-              <div style={{display: 'flex', gap: '10px'}}>
+              <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
                 <button className="terminal-btn" style={{
-                  padding: '6px 16px', 
-                  background: sortMode === 'points' ? 'var(--accent-color)' : 'rgba(255,255,255,0.1)', 
-                  color: sortMode === 'points' ? '#000' : '#fff',
-                  border: 'none', fontWeight: sortMode === 'points' ? 'bold' : 'normal'
+                  padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
+                  background: sortMode === 'points' ? 'rgba(0,255,204,0.15)' : 'rgba(255,255,255,0.05)', 
+                  color: sortMode === 'points' ? 'var(--accent-color)' : 'var(--text-secondary)',
+                  border: sortMode === 'points' ? '1px solid var(--accent-color)' : '1px solid rgba(255,255,255,0.2)',
+                  fontWeight: sortMode === 'points' ? 'bold' : 'normal',
+                  boxShadow: sortMode === 'points' ? '0 0 10px rgba(0,255,204,0.2)' : 'none'
                 }} onClick={() => setSortMode('points')}>
-                  ⭐ 依點數排行
+                  <Star size={16} /> 依點數排行
                 </button>
                 <button className="terminal-btn" style={{
-                  padding: '6px 16px', 
-                  background: sortMode === 'time' ? '#00ffcc' : 'rgba(255,255,255,0.1)', 
-                  color: sortMode === 'time' ? '#000' : '#fff',
-                  border: 'none', fontWeight: sortMode === 'time' ? 'bold' : 'normal'
+                  padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
+                  background: sortMode === 'time' ? 'rgba(0,255,204,0.15)' : 'rgba(255,255,255,0.05)', 
+                  color: sortMode === 'time' ? 'var(--accent-color)' : 'var(--text-secondary)',
+                  border: sortMode === 'time' ? '1px solid var(--accent-color)' : '1px solid rgba(255,255,255,0.2)',
+                  fontWeight: sortMode === 'time' ? 'bold' : 'normal',
+                  boxShadow: sortMode === 'time' ? '0 0 10px rgba(0,255,204,0.2)' : 'none'
                 }} onClick={() => setSortMode('time')}>
-                  ⏱️ 依時間排行
+                  <Clock size={16} /> 依時間排行
                 </button>
-                <button className="terminal-btn" style={{padding: '6px 16px', background: 'rgba(255,50,50,0.1)', color: 'var(--danger-color)', border: '1px solid rgba(255,50,50,0.3)', marginLeft: '10px'}} onClick={() => setShowLeaderboard(false)}>
-                  ✕ 關閉
+                <button className="terminal-btn" style={{
+                  padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
+                  background: 'rgba(255,50,50,0.1)', color: 'var(--danger-color)', 
+                  border: '1px solid rgba(255,50,50,0.3)', marginLeft: '5px'
+                }} onClick={() => setShowLeaderboard(false)}>
+                  <X size={16} /> 關閉
                 </button>
               </div>
             </div>
