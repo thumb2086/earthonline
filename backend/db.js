@@ -3,10 +3,8 @@ const User = require('./models/User');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/earthonline';
 
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => console.log('[SYS] Database Core Online: MongoDB Connected'))
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('[SYS] Database Core Online: MongoDB Connected'))
   .catch(err => console.error('[SYS] MongoDB Connection Error:', err));
 
 async function findUserByUsername(username) {
