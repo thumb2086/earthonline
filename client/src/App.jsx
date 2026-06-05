@@ -720,13 +720,23 @@ function Dashboard({ token, onLogout }) {
 
       {/* Leaderboard Modal */}
       {showLeaderboard && (
-        <div className="modal-overlay" onClick={() => setShowLeaderboard(false)}>
-          <div className="modal-content" style={{maxWidth: '800px', width: '90%', maxHeight: '80vh', overflowY: 'auto'}} onClick={e => e.stopPropagation()}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px'}}>
-              <h2 style={{margin: 0, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '10px'}}>
-                <Globe2 size={24} className="icon-spin" /> 全球節點排行榜 (Global Leaderboard)
+        <div className="modal-overlay" onClick={() => setShowLeaderboard(false)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div className="modal-content" style={{
+            maxWidth: '900px', width: '90%', maxHeight: '85vh', overflowY: 'auto',
+            background: '#0a0f19', borderRadius: '12px', padding: '30px',
+            border: '1px solid rgba(0,255,204,0.3)', boxShadow: '0 0 40px rgba(0,255,204,0.1)'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '25px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px', flexWrap: 'wrap', gap: '15px'}}>
+              <h2 style={{margin: 0, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem'}}>
+                <Globe2 size={28} className="icon-spin" /> 全球節點排行榜 (GLOBAL LEADERBOARD)
               </h2>
-              <button className="terminal-btn" style={{padding: '5px 10px'}} onClick={() => setShowLeaderboard(false)}>關閉 (Close)</button>
+              <button className="terminal-btn" style={{padding: '6px 16px', background: 'rgba(255,50,50,0.1)', color: 'var(--danger-color)', border: '1px solid rgba(255,50,50,0.3)'}} onClick={() => setShowLeaderboard(false)}>
+                ✕ 關閉
+              </button>
             </div>
             
             <table style={{width: '100%', fontSize: '0.9rem', color: 'var(--text-secondary)', borderCollapse: 'collapse', textAlign: 'left'}}>
