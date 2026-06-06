@@ -20,18 +20,25 @@ const client = new Client({
 
 let isBotReady = false;
 
+const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder } = require('discord.js');
+// (We leave the canvas import there but don't use it to avoid changing top lines right now, or we can just ignore it)
+
 client.once('ready', async () => {
   console.log(`[SYS] Discord Bot Online: Logged in as ${client.user.tag}`);
   isBotReady = true;
   
-  // Register Slash Command
+  // Register Slash Commands
   const rest = new REST({ version: '10' }).setToken(TOKEN);
   try {
     await rest.put(
       Routes.applicationGuildCommands(client.user.id, GUILD_ID),
-      { body: [ { name: 'profile', description: '產生你的專屬地球 Online 掛機身分卡' } ] }
+      { body: [ 
+          { name: 'profile', description: '產生你的專屬地球 Online 掛機身分卡' },
+          { name: 'leaderboard', description: '查看全球掛機時間排行榜前 10 名' },
+          { name: 'server', description: '查看目前伺服器的即時狀態' }
+      ] }
     );
-    console.log('[SYS] Discord: Registered /profile slash command');
+    console.log('[SYS] Discord: Registered /profile, /leaderboard, /server commands');
   } catch (error) {
     console.error('[SYS] Discord Command Registration Failed:', error);
   }
@@ -39,87 +46,86 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
+  
   if (interaction.commandName === 'profile') {
     await interaction.deferReply();
     try {
       const dbUser = await User.findOne({ 'discord.id': interaction.user.id });
       if (!dbUser) {
-        return interaction.editReply('你還沒有綁定「地球 Online」帳號！請先在網頁端完成綁定。');
+        return interaction.editReply('❌ 你還沒有綁定「地球 Online」帳號！請先在網頁端完成綁定。');
       }
       
-      const canvas = createCanvas(800, 400);
-      const ctx = canvas.getContext('2d');
-      
-      // Draw background
-      const gradient = ctx.createLinearGradient(0, 0, 800, 400);
-      gradient.addColorStop(0, '#0f2027');
-      gradient.addColorStop(0.5, '#203a43');
-      gradient.addColorStop(1, '#2c5364');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 800, 400);
-      
-      // Draw Grid Pattern (Subtle)
-      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < 800; i += 40) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 400); ctx.stroke();
-      }
-      for (let i = 0; i < 400; i += 40) {
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke();
-      }
-      
-      // Draw Text
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 45px "Microsoft JhengHei", "Segoe UI", sans-serif';
-      ctx.fillText(dbUser.username, 220, 110);
-      
-      // Server text
-      ctx.font = '20px "Microsoft JhengHei", "Segoe UI", sans-serif';
-      ctx.fillStyle = '#00d2ff';
-      ctx.fillText(`[ ${dbUser.country === 'UNKNOWN' ? '全球' : dbUser.country} 伺服器節點 ]`, 220, 150);
-      
-      // Metrics Background
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.fillRect(220, 200, 250, 120);
-      ctx.fillRect(490, 200, 250, 120);
-      
-      // Metrics Text
-      ctx.font = '22px "Microsoft JhengHei", "Segoe UI", sans-serif';
-      ctx.fillStyle = '#a0aec0';
-      ctx.fillText('累計在線時間', 240, 240);
-      
-      ctx.font = 'bold 36px "Microsoft JhengHei", "Segoe UI", sans-serif';
-      ctx.fillStyle = '#ffffff';
       const hours = ((dbUser.accumulatedTime || 0) / 3600000).toFixed(1);
-      ctx.fillText(`${hours} 小時`, 240, 290);
-      
-      ctx.font = '22px "Microsoft JhengHei", "Segoe UI", sans-serif';
-      ctx.fillStyle = '#a0aec0';
-      ctx.fillText('累計掛機點數', 510, 240);
-      
-      ctx.font = 'bold 36px "Microsoft JhengHei", "Segoe UI", sans-serif';
-      ctx.fillStyle = '#ffcc00';
-      ctx.fillText(`${(dbUser.accumulatedBonusPoints || 0).toFixed(0)} PT`, 510, 290);
-      
-      // Avatar
-      const avatarUrl = interaction.user.displayAvatarURL({ extension: 'png', size: 256 });
-      const avatar = await loadImage(avatarUrl);
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(110, 110, 70, 0, Math.PI * 2, true);
-      ctx.closePath();
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = '#00d2ff';
-      ctx.stroke();
-      ctx.clip();
-      ctx.drawImage(avatar, 40, 40, 140, 140);
-      ctx.restore();
-      
-      const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'profile.png' });
-      await interaction.editReply({ files: [attachment] });
+      const points = (dbUser.accumulatedBonusPoints || 0).toFixed(0);
+      const region = dbUser.country === 'UNKNOWN' ? '🌍 全球' : `📍 ${dbUser.country}`;
+
+      const embed = new EmbedBuilder()
+        .setColor('#00d2ff')
+        .setTitle(`🎮 ${dbUser.username} 的地球護照`)
+        .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
+        .addFields(
+          { name: '伺服器節點', value: region, inline: true },
+          { name: '累計掛機點數', value: `🪙 ${points} PT`, inline: true },
+          { name: '累計存活時間', value: `⏳ ${hours} 小時`, inline: false }
+        )
+        .setFooter({ text: 'Earth Online Core System', iconURL: client.user.displayAvatarURL() })
+        .setTimestamp();
+        
+      await interaction.editReply({ embeds: [embed] });
     } catch (e) {
-      console.error('[SYS] Discord Profile Command Error:', e);
-      await interaction.editReply('生成卡片時發生錯誤，請稍後再試！');
+      console.error('[SYS] Profile Command Error:', e);
+      await interaction.editReply('❌ 系統異常，無法讀取資料。');
+    }
+  }
+
+  if (interaction.commandName === 'leaderboard') {
+    await interaction.deferReply();
+    try {
+      const topUsers = await User.find({ accumulatedTime: { $gt: 0 } }).sort({ accumulatedTime: -1 }).limit(10);
+      
+      if (topUsers.length === 0) {
+        return interaction.editReply('目前還沒有玩家資料。');
+      }
+
+      let description = '';
+      topUsers.forEach((u, i) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `\`${i+1}\``;
+        const hours = (u.accumulatedTime / 3600000).toFixed(1);
+        description += `${medal} **${u.username}** - ⏳ ${hours} 小時\n`;
+      });
+
+      const embed = new EmbedBuilder()
+        .setColor('#ffcc00')
+        .setTitle('🏆 全球掛機存活排行榜 (Top 10)')
+        .setDescription(description)
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      await interaction.editReply('❌ 排行榜讀取失敗。');
+    }
+  }
+
+  if (interaction.commandName === 'server') {
+    await interaction.deferReply();
+    try {
+      const result = await User.aggregate([ { $group: { _id: null, totalTime: { $sum: "$accumulatedTime" } } } ]);
+      const totalTimeMs = result.length > 0 ? result[0].totalTime : 0;
+      const totalHours = Math.floor(totalTimeMs / 3600000);
+      const totalPop = await User.countDocuments();
+
+      const embed = new EmbedBuilder()
+        .setColor('#00ff88')
+        .setTitle('🌐 地球在線伺服器狀態')
+        .addFields(
+          { name: '總註冊人口', value: `👥 ${totalPop} 人`, inline: true },
+          { name: '全球總掛機時間', value: `⏳ ${totalHours} 小時`, inline: true }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (e) {
+      await interaction.editReply('❌ 伺服器狀態讀取失敗。');
     }
   }
 });
