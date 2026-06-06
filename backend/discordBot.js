@@ -129,12 +129,22 @@ client.login(TOKEN).catch(err => {
 });
 
 // Update Bot Status
-function updateBotPresence(onlineCount) {
+async function updateBotPresence(onlineCount) {
   if (!isBotReady) return;
-  client.user.setPresence({
-    activities: [{ name: `🌍 全球伺服器 | 📡 在線節點: ${onlineCount}` }],
-    status: 'online',
-  });
+  try {
+    const result = await User.aggregate([
+      { $group: { _id: null, totalTime: { $sum: "$accumulatedTime" } } }
+    ]);
+    const totalTimeMs = result.length > 0 ? result[0].totalTime : 0;
+    const totalHours = Math.floor(totalTimeMs / 3600000);
+    
+    client.user.setPresence({
+      activities: [{ name: `🌍 全球伺服器 | 📡 在線節點: ${onlineCount} | ⏱️ 總掛機時長: ${totalHours} 小時` }],
+      status: 'online',
+    });
+  } catch (err) {
+    console.error('[SYS] Discord Presence Update Error:', err);
+  }
 }
 
 // Rename Voice Channel based on Boost status
