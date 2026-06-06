@@ -4,6 +4,8 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const geoip = require('geoip-lite');
 const dotenv = require('dotenv');
+dotenv.config(); // Load environment variables first
+
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
@@ -12,8 +14,6 @@ const discordBot = require('./discordBot'); // Starts discord bot and cron jobs
 
 // Run offline time migration once on startup
 db.migrateOfflineTime().catch(err => console.error('[SYS] Migration failed:', err));
-
-dotenv.config();
 
 const app = express();
 app.use(cors());
