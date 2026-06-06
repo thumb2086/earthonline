@@ -920,7 +920,7 @@ function Dashboard({ token, onLogout }) {
             )}
             
             {/* Individual Points */}
-            {nodes.map(node => (
+            {nodes.filter(n => typeof n.lat === 'number' && typeof n.lon === 'number').map(node => (
               <CircleMarker
                 key={`node-${node.id}`}
                 center={[node.lat, node.lon]}

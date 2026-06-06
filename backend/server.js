@@ -427,11 +427,11 @@ io.on('connection', (socket) => {
       let geo = geoip.lookup(ip);
       
       // Fallback for local IPs or if geoip fails
-      if (!geo) {
+      if (!geo || !geo.ll || geo.ll.length < 2) {
         if (ip.includes('127.0.0.1') || ip.includes('::1') || ip.startsWith('192.168.') || ip.startsWith('10.')) {
           geo = { country: 'TW', ll: [23.6978, 120.9605] };
         } else {
-          geo = { country: 'TW', ll: [0, 0] }; // Force TW as default instead of UNKNOWN for better UI
+          geo = { country: geo?.country || 'TW', ll: [0, 0] }; // Force TW as default instead of UNKNOWN for better UI
         }
       }
       const dbUser = await db.findUserByUsername(decoded.username);
@@ -458,10 +458,12 @@ io.on('connection', (socket) => {
       const existingEntry = Array.from(connectedUsers.entries()).find(([_, u]) => u.username === decoded.username);
       if (existingEntry) {
         const [oldSocketId] = existingEntry;
-        const oldSocket = io.sockets.sockets.get(oldSocketId);
-        if (oldSocket) {
-          oldSocket.emit('auth_error', { message: '您的帳號已在其他地方登入，此連線已中斷。' });
-          oldSocket.disconnect(true);
+        if (oldSocketId !== socket.id) {
+          const oldSocket = io.sockets.sockets.get(oldSocketId);
+          if (oldSocket) {
+            oldSocket.emit('auth_error', { message: '您的帳號已在其他地方登入，此連線已中斷。' });
+            oldSocket.disconnect(true);
+          }
         }
         connectedUsers.delete(oldSocketId);
       }
