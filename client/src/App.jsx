@@ -1496,15 +1496,22 @@ function AccountInfoModal({ token, onClose, onLogout }) {
 }
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('eo_token'));
+  const [token, setToken] = useState(sessionStorage.getItem('eo_token'));
   
+  useEffect(() => {
+    // Cleanup legacy persistent tokens
+    if (localStorage.getItem('eo_token')) {
+      localStorage.removeItem('eo_token');
+    }
+  }, []);
+
   const handleLogin = (newToken, username) => {
-    localStorage.setItem('eo_token', newToken);
+    sessionStorage.setItem('eo_token', newToken);
     setToken(newToken);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('eo_token');
+    sessionStorage.removeItem('eo_token');
     setToken(null);
   };
 
