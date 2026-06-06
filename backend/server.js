@@ -475,8 +475,8 @@ io.on('connection', (socket) => {
         discordProfile: dbUser?.discord || null,
         ip: ip,
         country: geo.country,
-        lat: geo.ll[0],
-        lon: geo.ll[1],
+        lat: geo.ll[0] + (Math.random() - 0.5) * 0.1,
+        lon: geo.ll[1] + (Math.random() - 0.5) * 0.1,
         accumulatedTime: dbUser?.accumulatedTime || 0,
         createdAt: dbUser?.createdAt || Date.now(),
         connectedAt: Date.now()

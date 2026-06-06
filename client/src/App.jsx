@@ -937,6 +937,7 @@ function Dashboard({ token, onLogout }) {
             center={[20, 0]} 
             zoom={2.0} 
             minZoom={2.0}
+            maxZoom={8.0}
             maxBounds={[[-90, -180], [90, 180]]}
             maxBoundsViscosity={1.0}
             worldCopyJump={false}
