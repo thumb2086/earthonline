@@ -656,7 +656,7 @@ io.on('connection', (socket) => {
 
   socket.on('send_friend_request', async ({ targetUsername }) => {
     const user = connectedUsers.get(socket.id);
-    if (!user || user.username === targetUsername) return;
+    if (!user || !targetUsername || typeof targetUsername !== 'string' || user.username === targetUsername) return;
     
     try {
       const dbTarget = await User.findOne({ username: targetUsername });
@@ -754,7 +754,7 @@ io.on('connection', (socket) => {
   // Handle Terminal Commands
   socket.on('terminal_command', async (data) => {
     const user = connectedUsers.get(socket.id);
-    if (!user) return;
+    if (!user || !data || typeof data.command !== 'string') return;
     
     const rawCmd = data.command.trim();
     const cmdUpper = rawCmd.toUpperCase();
