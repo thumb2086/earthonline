@@ -114,7 +114,8 @@ app.post('/api/register', async (req, res) => {
   };
   
   await db.createUser(newUser);
-  res.json({ success: true, message: 'Registration successful', recoveryKey });
+  const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ success: true, message: 'Registration successful', recoveryKey, token, username });
 });
 
 app.post('/api/login', async (req, res) => {
@@ -452,6 +453,18 @@ io.on('connection', (socket) => {
         createdAt: dbUser?.createdAt || Date.now(),
         connectedAt: Date.now()
       };
+
+      // Prevent multiple logins on the same account
+      const existingEntry = Array.from(connectedUsers.entries()).find(([_, u]) => u.username === decoded.username);
+      if (existingEntry) {
+        const [oldSocketId] = existingEntry;
+        const oldSocket = io.sockets.sockets.get(oldSocketId);
+        if (oldSocket) {
+          oldSocket.emit('auth_error', { message: '您的帳號已在其他地方登入，此連線已中斷。' });
+          oldSocket.disconnect(true);
+        }
+        connectedUsers.delete(oldSocketId);
+      }
 
       connectedUsers.set(socket.id, user);
 
