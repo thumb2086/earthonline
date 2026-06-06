@@ -15,7 +15,7 @@ const ROLES = {
 };
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
 
 let isBotReady = false;
@@ -231,7 +231,42 @@ cron.schedule('0 0 * * 1', async () => {
   timezone: 'Asia/Taipei'
 });
 
+const DISCORD_CHAT_CHANNEL_ID = process.env.DISCORD_CHAT_CHANNEL_ID || '1512345209005015102'; // default placeholder
+let socketIoInstance = null;
+
+function setIoInstance(io) {
+  socketIoInstance = io;
+}
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  if (message.channelId === DISCORD_CHAT_CHANNEL_ID) {
+    // Send to web
+    if (socketIoInstance) {
+      socketIoInstance.emit('chat_message', { 
+        username: `${message.author.username}`, 
+        message: message.content,
+        isDiscord: true 
+      });
+    }
+  }
+});
+
+async function sendChatMessageToDiscord(username, message) {
+  if (!isBotReady) return;
+  try {
+    const channel = await client.channels.fetch(DISCORD_CHAT_CHANNEL_ID);
+    if (channel && channel.isTextBased()) {
+      await channel.send(`**[Web] ${username}**: ${message}`);
+    }
+  } catch (err) {
+    console.error('[SYS] Failed to send chat message to Discord:', err);
+  }
+}
+
 module.exports = {
   updateBotPresence,
-  updateChannelName
+  updateChannelName,
+  setIoInstance,
+  sendChatMessageToDiscord
 };

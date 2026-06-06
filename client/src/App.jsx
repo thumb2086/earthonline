@@ -1493,53 +1493,84 @@ function EulaScreen({ onAgree }) {
   return (
     <div style={{
       height: '100vh', width: '100vw', background: '#f0f4f8', color: '#2d3748',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      fontFamily: '"Microsoft JhengHei", "Segoe UI", sans-serif', padding: '20px', boxSizing: 'border-box'
+      display: 'flex', flexDirection: 'row', alignItems: 'stretch', justifyContent: 'center',
+      fontFamily: '"Microsoft JhengHei", "Segoe UI", sans-serif', boxSizing: 'border-box'
     }}>
+      
+      {/* Left side Image */}
       <div style={{
-        maxWidth: '800px', width: '100%', background: '#ffffff',
-        borderTop: '6px solid #4299e1', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
-        padding: '40px', borderRadius: '12px', overflowY: 'auto', maxHeight: '85vh'
+        flex: '1 1 50%',
+        backgroundImage: 'url(/eula-bg.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRight: '1px solid rgba(0,0,0,0.1)'
       }}>
-        <h1 style={{ color: '#2b6cb0', textAlign: 'center', marginBottom: '10px', fontSize: '2.2rem', fontWeight: 'bold' }}>
-          ✧ 歡迎來到「地球在線」大家庭 ✧
-        </h1>
-        <p style={{ textAlign: 'center', color: '#718096', fontSize: '1.1rem', marginBottom: '30px' }}>
-          Welcome to Earth Online Official Server
-        </p>
-        
-        <div style={{ lineHeight: '1.8', fontSize: '1.1rem', color: '#4a5568' }}>
-          <p>親愛的玩家您好：</p>
-          <p>非常高興能與您在這裡相遇！「地球在線」不只是一個普通的伺服器，更是一個讓全球玩家齊聚一堂、共享時光的溫馨避風港。在這裡，無論您來自哪裡，我們都是一家人。</p>
-          
-          <div style={{ background: '#ebf8ff', borderRadius: '8px', padding: '20px', margin: '25px 0', border: '1px solid #bee3f8' }}>
-            <h3 style={{ color: '#3182ce', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              ✦ 伺服器公約 (Server Guidelines)
-            </h3>
-            <ul style={{ paddingLeft: '20px', margin: 0, color: '#2c5282' }}>
-              <li style={{ marginBottom: '10px' }}><strong>尊重與友善：</strong>請友善對待世界頻道上的每一位家人，共同維護這個溫暖的聊天環境。禁止任何形式的惡意人身攻擊與騷擾。</li>
-              <li style={{ marginBottom: '10px' }}><strong>隱私與安全：</strong>我們十分重視您的個人資訊。系統僅會匿名記錄您的連線時長與所在區域，確保您的隱私受到最嚴格的保護。</li>
-              <li><strong>享受過程：</strong>盡情享受掛機與聊天的樂趣吧！每一次的連線與每一句問候，都是我們共同創造美好回憶的證明。</li>
-            </ul>
-          </div>
-          
-          <p style={{ textAlign: 'center', fontWeight: 'bold', color: '#2d3748', marginTop: '30px' }}>
-            準備好加入我們了嗎？期待在世界頻道看見您的身影！
-          </p>
+        <div style={{ 
+          background: 'rgba(0,0,0,0.5)', color: 'white', padding: '10px 20px', 
+          borderRadius: '20px', fontSize: '0.9rem', backdropFilter: 'blur(4px)' 
+        }}>
+          請將圖片儲存為 client/public/eula-bg.png
         </div>
+      </div>
 
-        <div style={{ marginTop: '35px', display: 'flex', justifyContent: 'center' }}>
-          <button onClick={onAgree} style={{
-            background: '#4299e1', color: '#ffffff', border: 'none',
-            padding: '16px 45px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
-            borderRadius: '50px', letterSpacing: '1px', transition: 'all 0.3s',
-            boxShadow: '0 4px 6px rgba(66, 153, 225, 0.3)'
-          }}
-          onMouseOver={e => { e.target.style.background = '#3182ce'; e.target.style.transform = 'translateY(-2px)'; }}
-          onMouseOut={e => { e.target.style.background = '#4299e1'; e.target.style.transform = 'translateY(0)'; }}
-          >
-            ♥ 我已閱讀並同意，加入大家庭
-          </button>
+      {/* Right side Agreement Card */}
+      <div style={{
+        flex: '1 1 50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        overflowY: 'auto'
+      }}>
+        <div style={{
+          maxWidth: '650px', width: '100%', background: '#ffffff',
+          borderTop: '6px solid #4299e1', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+          padding: '40px', borderRadius: '12px'
+        }}>
+          <h1 style={{ color: '#2b6cb0', textAlign: 'center', marginBottom: '10px', fontSize: '2.2rem', fontWeight: 'bold' }}>
+            ✧ 歡迎來到「地球在線」大家庭 ✧
+          </h1>
+          <p style={{ textAlign: 'center', color: '#718096', fontSize: '1.1rem', marginBottom: '30px' }}>
+            Welcome to Earth Online Official Server
+          </p>
+          
+          <div style={{ lineHeight: '1.8', fontSize: '1.1rem', color: '#4a5568' }}>
+            <p>親愛的玩家您好：</p>
+            <p>非常高興能與您在這裡相遇！「地球在線」不只是一個普通的伺服器，更是一個讓全球玩家齊聚一堂、共享時光的溫馨避風港。在這裡，無論您來自哪裡，我們都是一家人。</p>
+            
+            <div style={{ background: '#ebf8ff', borderRadius: '8px', padding: '20px', margin: '25px 0', border: '1px solid #bee3f8' }}>
+              <h3 style={{ color: '#3182ce', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ✦ 伺服器公約 (Server Guidelines)
+              </h3>
+              <ul style={{ paddingLeft: '20px', margin: 0, color: '#2c5282' }}>
+                <li style={{ marginBottom: '10px' }}><strong>尊重與友善：</strong>請友善對待世界頻道上的每一位家人，共同維護這個溫暖的聊天環境。禁止任何形式的惡意人身攻擊與騷擾。</li>
+                <li style={{ marginBottom: '10px' }}><strong>隱私與安全：</strong>我們十分重視您的個人資訊。系統僅會匿名記錄您的連線時長與所在區域，確保您的隱私受到最嚴格的保護。</li>
+                <li><strong>享受過程：</strong>盡情享受掛機與聊天的樂趣吧！每一次的連線與每一句問候，都是我們共同創造美好回憶的證明。</li>
+              </ul>
+            </div>
+            
+            <p style={{ textAlign: 'center', fontWeight: 'bold', color: '#2d3748', marginTop: '30px' }}>
+              準備好加入我們了嗎？期待在世界頻道看見您的身影！
+            </p>
+          </div>
+
+          <div style={{ marginTop: '35px', display: 'flex', justifyContent: 'center' }}>
+            <button onClick={onAgree} style={{
+              background: '#4299e1', color: '#ffffff', border: 'none',
+              padding: '16px 45px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+              borderRadius: '50px', letterSpacing: '1px', transition: 'all 0.3s',
+              boxShadow: '0 4px 6px rgba(66, 153, 225, 0.3)'
+            }}
+            onMouseOver={e => { e.target.style.background = '#3182ce'; e.target.style.transform = 'translateY(-2px)'; }}
+            onMouseOut={e => { e.target.style.background = '#4299e1'; e.target.style.transform = 'translateY(0)'; }}
+            >
+              ♥ 我已閱讀並同意，加入大家庭
+            </button>
+          </div>
         </div>
       </div>
     </div>
