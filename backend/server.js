@@ -8,7 +8,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
 const User = require('./models/User'); // Required for updateMany
-const discordBot = require('./discordBot');
+const discordBot = require('./discordBot'); // Starts discord bot and cron jobs
+
+// Run offline time migration once on startup
+db.migrateOfflineTime().catch(err => console.error('[SYS] Migration failed:', err));
 
 dotenv.config();
 
@@ -187,16 +190,16 @@ app.get('/api/auth/discord/callback', async (req, res) => {
 // Leaderboard Endpoint
 app.get('/api/leaderboard', async (req, res) => {
   try {
-    const users = await User.find({}, 'username createdAt accumulatedBonusPoints discord').lean();
-    const now = Date.now();
+    const users = await User.find({}, 'username accumulatedTime accumulatedBonusPoints discord country').lean();
     let leaderboard = users.map(u => {
-      const idleTimeSeconds = Math.floor((now - u.createdAt) / 1000);
+      const idleTimeSeconds = Math.floor((u.accumulatedTime || 0) / 1000);
       const points = idleTimeSeconds + (u.accumulatedBonusPoints || 0);
       return {
         username: u.username,
         discordId: u.discord?.id || '無',
         discordName: u.discord?.username || '未綁定',
         avatar: u.discord?.avatar || null,
+        country: u.country || 'UNKNOWN',
         idleTime: idleTimeSeconds,
         points: points,
         role: ''
@@ -245,19 +248,20 @@ let globalProduction = 0; // Total accumulated idle time (seconds)
 // Periodic global calculation
 setInterval(async () => {
   const now = Date.now();
-  globalProduction = await db.getGlobalProduction(now);
+  globalProduction = await db.getGlobalProduction();
   const pop = await db.getTotalPopulation();
 
   const isBoosted = connectedUsers.size >= 5;
   const multiplier = isBoosted ? 1.2 : 1.0;
 
-  // Distribute bonus points to online users (2 seconds interval)
-  if (multiplier > 1.0 && connectedUsers.size > 0) {
-    const bonusPoints = 2 * (multiplier - 1.0);
+  // Add base time (2 seconds) and bonus points to online users
+  if (connectedUsers.size > 0) {
     const usernames = Array.from(connectedUsers.values()).map(u => u.username);
+    const bonusPoints = multiplier > 1.0 ? 2 * (multiplier - 1.0) : 0;
+    
     await User.updateMany(
       { username: { $in: usernames } },
-      { $inc: { accumulatedBonusPoints: bonusPoints } }
+      { $inc: { accumulatedTime: 2000, accumulatedBonusPoints: bonusPoints } }
     );
   }
 

@@ -5,7 +5,9 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   createdAt: { type: Number, default: Date.now },
+  accumulatedTime: { type: Number, default: 0 },
   accumulatedBonusPoints: { type: Number, default: 0 },
+  country: { type: String, default: 'UNKNOWN' },
   discord: {
     id: String,
     username: String,

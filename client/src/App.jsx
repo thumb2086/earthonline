@@ -8,6 +8,15 @@ import './index.css';
 const API_URL = 'https://earthonline.onrender.com';
 const SOCKET_URL = 'https://earthonline.onrender.com';
 
+function getFlagEmoji(countryCode) {
+  if (!countryCode || countryCode === 'UNKNOWN') return '🌐';
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map(char => 127397 + char.charCodeAt());
+  return String.fromCodePoint(...codePoints) + ' ' + countryCode;
+}
+
 function LoginGateway({ onLogin }) {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
@@ -777,6 +786,7 @@ function Dashboard({ token, onLogout }) {
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>排名</th>
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>頭像</th>
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>使用者 ID</th>
+                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>國家/地區</th>
                   <th style={{padding: '12px 8px', color: sortMode === 'time' ? '#00ffcc' : 'var(--text-primary)'}}>累積在線時間 {sortMode === 'time' && '▼'}</th>
                   <th style={{padding: '12px 8px', color: sortMode === 'points' ? 'var(--accent-color)' : 'var(--text-primary)'}}>累積點數 {sortMode === 'points' && '▼'}</th>
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>目前 Discord 實際身分組</th>

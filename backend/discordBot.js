@@ -32,7 +32,7 @@ client.login(TOKEN).catch(err => {
 function updateBotPresence(onlineCount) {
   if (!isBotReady) return;
   client.user.setPresence({
-    activities: [{ name: `目前有 ${onlineCount} 人共同掛機中` }],
+    activities: [{ name: `🌍 Global Server | 📡 Nodes: ${onlineCount}` }],
     status: 'online',
   });
 }
@@ -74,11 +74,10 @@ cron.schedule('0 0 * * 1', async () => {
 
     if (users.length === 0) return;
 
-    const now = Date.now();
-    const sortedByTime = [...users].sort((a, b) => (now - b.createdAt) - (now - a.createdAt));
+    const sortedByTime = [...users].sort((a, b) => (b.accumulatedTime || 0) - (a.accumulatedTime || 0));
     const sortedByPoints = [...users].sort((a, b) => {
-      const pA = (now - a.createdAt) / 1000 + a.accumulatedBonusPoints;
-      const pB = (now - b.createdAt) / 1000 + b.accumulatedBonusPoints;
+      const pA = (a.accumulatedTime || 0) / 1000 + (a.accumulatedBonusPoints || 0);
+      const pB = (b.accumulatedTime || 0) / 1000 + (b.accumulatedBonusPoints || 0);
       return pB - pA;
     });
 

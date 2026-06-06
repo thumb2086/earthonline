@@ -31,25 +31,32 @@ async function updateUserDiscord(username, discordData) {
   return false;
 }
 
-async function getGlobalProduction(now) {
+async function getGlobalProduction() {
   const result = await User.aggregate([
-    {
-      $project: {
-        idleSeconds: {
-          $floor: {
-            $divide: [{ $subtract: [now, "$createdAt"] }, 1000]
-          }
-        }
-      }
-    },
     {
       $group: {
         _id: null,
-        totalProduction: { $sum: "$idleSeconds" }
+        totalProduction: { $sum: "$accumulatedTime" }
       }
     }
   ]);
-  return result.length > 0 ? result[0].totalProduction : 0;
+  return result.length > 0 ? Math.floor(result[0].totalProduction / 1000) : 0;
+}
+
+async function migrateOfflineTime() {
+  try {
+    const now = Date.now();
+    // Only migrate documents that don't have accumulatedTime in the database yet
+    const result = await User.updateMany(
+      { accumulatedTime: { $exists: false } },
+      [{ $set: { accumulatedTime: { $subtract: [ now, "$createdAt" ] } } }]
+    );
+    if (result.modifiedCount > 0) {
+      console.log(`[SYS] Migration: Converted offline time for ${result.modifiedCount} old users.`);
+    }
+  } catch (err) {
+    console.error('[SYS] Migration Error:', err);
+  }
 }
 
 module.exports = {
@@ -57,5 +64,6 @@ module.exports = {
   createUser,
   getTotalPopulation,
   updateUserDiscord,
-  getGlobalProduction
+  getGlobalProduction,
+  migrateOfflineTime
 };
