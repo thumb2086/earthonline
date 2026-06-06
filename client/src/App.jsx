@@ -809,6 +809,7 @@ function Dashboard({ token, onLogout }) {
                       {user.avatar ? <img src={user.avatar} alt="avatar" style={{width: '32px', height: '32px', borderRadius: '50%', border: idx === 0 ? '2px solid var(--accent-color)' : 'none'}} /> : '無'}
                     </td>
                     <td style={{padding: '12px 8px', fontWeight: 'bold', color: 'var(--text-main)'}}>{user.discordName !== '未綁定' ? user.discordName : user.username}</td>
+                    <td style={{padding: '12px 8px'}}>{getFlagEmoji(user.country)}</td>
                     <td style={{padding: '12px 8px'}}>{formatTime(user.idleTime)}</td>
                     <td style={{padding: '12px 8px', fontFamily: 'monospace', fontSize: '1.1rem'}}>{Number(user.points).toFixed(1)}</td>
                     <td style={{
