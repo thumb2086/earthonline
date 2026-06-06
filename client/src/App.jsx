@@ -573,17 +573,16 @@ function Dashboard({ token, onLogout }) {
 
   // Lifespan timer
   useEffect(() => {
-    if (!myNode || !myNode.createdAt || myNode.accumulatedTime === undefined) return;
+    if (!myNode || myNode.accumulatedTime === undefined) return;
     
     // Check if we are currently boosted
     const isBoosted = globalStats.multiplier && globalStats.multiplier > 1.0;
     const rate = isBoosted ? 1.2 : 1.0;
     
-    // Accumulated time from backend + time since connection
+    // Avoid using Date.now() - connectedAt because server time might be different from client time, causing negative values.
     const baseAccumulatedSeconds = (myNode.accumulatedTime || 0) / 1000;
-    const sessionSeconds = Math.floor((Date.now() - myNode.connectedAt) / 1000);
     
-    let currentLocalLifespan = baseAccumulatedSeconds + sessionSeconds + (myNode.accumulatedBonusPoints || 0);
+    let currentLocalLifespan = baseAccumulatedSeconds + (myNode.accumulatedBonusPoints || 0);
 
     const interval = setInterval(() => {
       currentLocalLifespan += rate;
@@ -762,9 +761,14 @@ function Dashboard({ token, onLogout }) {
             
             {boundDiscord ? (
               <div style={{display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px'}}>
-                <img src={boundDiscord.avatar} alt="discord-avatar" style={{width: '48px', height: '48px', borderRadius: '50%', border: '2px solid var(--accent-color)'}} />
-                <div>
-                  <div style={{color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 'bold'}}>{boundDiscord.username}</div>
+                <img 
+                  src={boundDiscord.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'} 
+                  alt="" 
+                  onError={(e) => { e.target.onerror = null; e.target.src = "https://cdn.discordapp.com/embed/avatars/0.png"; }}
+                  style={{width: '48px', height: '48px', minWidth: '48px', minHeight: '48px', borderRadius: '50%', border: '2px solid var(--accent-color)', objectFit: 'cover'}} 
+                />
+                <div style={{overflow: 'hidden'}}>
+                  <div style={{color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{boundDiscord.username}</div>
                   <div style={{color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <LinkIcon size={14} color="var(--accent-color)" /> 已連結 Discord
                   </div>
@@ -772,13 +776,13 @@ function Dashboard({ token, onLogout }) {
               </div>
             ) : (
               <div style={{display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px'}}>
-                <div style={{width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)'}}>
+                <div style={{width: '48px', height: '48px', minWidth: '48px', minHeight: '48px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)'}}>
                   <User size={24} color="var(--text-secondary)" />
                 </div>
-                <div>
-                  <div style={{color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 'bold'}}>{myNode?.username}</div>
+                <div style={{overflow: 'hidden'}}>
+                  <div style={{color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{myNode?.username}</div>
                   <div style={{marginTop: '5px'}}>
-                    <a href="#" onClick={(e) => { e.preventDefault(); setShowDiscordModal(true); }} className="discord-link" style={{fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 8px', background: 'rgba(88, 101, 242, 0.2)', color: '#5865F2', borderRadius: '4px', textDecoration: 'none'}}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setShowDiscordModal(true); }} className="discord-link" style={{fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 8px', background: 'rgba(88, 101, 242, 0.2)', color: '#5865F2', borderRadius: '4px', textDecoration: 'none', whiteSpace: 'nowrap'}}>
                       <LinkIcon size={14} /> 立即連結 Discord
                     </a>
                   </div>

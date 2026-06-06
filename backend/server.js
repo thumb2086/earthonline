@@ -88,10 +88,18 @@ setInterval(() => {
 // Auth Endpoints
 app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
+  let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
+
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
   
   if (await db.findUserByUsername(username)) {
     return res.status(400).json({ error: 'Username already exists' });
+  }
+
+  const existingIpUser = await User.findOne({ registerIp: ip });
+  if (existingIpUser && ip !== '::1' && ip !== '127.0.0.1') {
+    return res.status(400).json({ error: '該 IP 位址已經註冊過帳號 (IP 限註冊一次)' });
   }
   
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -101,7 +109,8 @@ app.post('/api/register', async (req, res) => {
     username,
     password: hashedPassword,
     registeredAt: Date.now(),
-    recoveryKey
+    recoveryKey,
+    registerIp: ip
   };
   
   await db.createUser(newUser);
