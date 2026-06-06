@@ -191,6 +191,34 @@ app.post('/api/reset-password', async (req, res) => {
   res.json({ success: true, message: 'Password reset successful' });
 });
 
+app.post('/api/auth/delete-account', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'No token' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await db.findUserByUsername(decoded.username);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    await User.deleteOne({ username: user.username });
+    
+    const existingEntry = Array.from(connectedUsers.entries()).find(([_, u]) => u.username === user.username);
+    if (existingEntry) {
+      const [oldSocketId] = existingEntry;
+      const oldSocket = io.sockets.sockets.get(oldSocketId);
+      if (oldSocket) {
+        oldSocket.emit('auth_error', { message: '帳號已被刪除' });
+        oldSocket.disconnect(true);
+      }
+      connectedUsers.delete(oldSocketId);
+    }
+    
+    res.json({ success: true, message: 'Account deleted' });
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
 app.post('/api/bind-discord-manual', async (req, res) => {
   const { token, discordId, username: globalName, avatar: avatarUrl } = req.body;
   if (!token || !discordId) return res.status(400).json({ error: 'Missing token or discordId' });

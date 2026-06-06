@@ -277,24 +277,49 @@ function DocumentationOverlay({ onClose }) {
           </section>
 
           <section id="discord">
-            <div className="doc-tag">TUTORIAL</div>
-            <h1 className="doc-title">Discord Status Integration (Discord 狀態連動教學)</h1>
+            <div className="doc-tag">FEATURE UPDATE</div>
+            <h1 className="doc-title">地球在線 - 桌面版客戶端 (Desktop App)</h1>
             <div className="doc-text">
-              由於 Discord 官方的資安限制，網頁遊戲無法自動更改您的 Discord 狀態為「正在玩 地球在線」。若您希望在自己的 Discord 個人資料上炫耀您正在遊玩本系統，請依照以下步驟手動設定：
+              為了突破網頁瀏覽器的安全限制，讓玩家能自動在 Discord 上秀出「正在玩 地球在線」並顯示掛機生存時間，我們正式推出了<strong>「地球在線專屬桌面版」</strong>！<br/><br/>
+              只要下載並開啟桌面版，系統就會在背景自動與您的 Discord 連動，無需任何手動設定！
             </div>
-            <div className="doc-text" style={{backgroundColor: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '8px', borderLeft: '3px solid #5865F2'}}>
-              <ol style={{margin: 0, paddingLeft: '20px', lineHeight: '1.8'}}>
-                <li>開啟您電腦上的 <strong>Discord 桌面版軟體</strong>。</li>
-                <li>點擊左下角齒輪圖示進入 <strong>使用者設定 (User Settings)</strong>。</li>
-                <li>在左側選單往下滑，找到 <strong>「已註冊的遊戲」 (Registered Games)</strong>。</li>
-                <li>點擊畫面上方的 <strong>「加入它！」 (Add it!)</strong> 藍色按鈕。</li>
-                <li>在下拉選單中選擇您目前正在用來玩地球在線的瀏覽器（例如：Google Chrome、Edge）。</li>
-                <li>點擊「新增遊戲」後，它會出現在清單中。</li>
-                <li>點擊清單中的瀏覽器名稱，將它<strong>重新命名為「地球在線」</strong>。</li>
-              </ol>
-            </div>
-            <div className="doc-text" style={{marginTop: '15px'}}>
-              設定完成後，只要您開著瀏覽器，所有 Discord 好友都會看到您華麗的狀態：<strong>「正在玩 地球在線」</strong>！
+            
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '8px', marginTop: '20px', borderLeft: '4px solid #5865F2' }}>
+              <h3 style={{ color: '#5865F2', marginTop: 0, marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                桌面版專屬功能
+              </h3>
+              <ul style={{ color: 'var(--text-secondary)', lineHeight: '1.8', margin: 0, paddingLeft: '20px' }}>
+                <li>✅ <strong>全自動 RPC 連動</strong>：自動更改 Discord 狀態為「正在玩 地球在線」。</li>
+                <li>✅ <strong>生存時間計時器</strong>：Discord 狀態內建顯示您掛機了多久。</li>
+                <li>✅ <strong>沉浸式全螢幕體驗</strong>：無邊框、無瀏覽器網址列干擾。</li>
+                <li>✅ <strong>雙端資料互通</strong>：桌面版與網頁版資料完全同步，隨時切換無縫接軌。</li>
+              </ul>
+              
+              <div style={{ marginTop: '25px' }}>
+                <a 
+                  href="https://github.com/huchialun9-ctrl/earthonline" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    background: '#5865F2',
+                    color: 'white',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    textDecoration: 'none',
+                    fontWeight: 'bold',
+                    boxShadow: '0 4px 15px rgba(88, 101, 242, 0.4)',
+                    transition: 'all 0.3s'
+                  }}
+                >
+                  前往 GitHub 下載桌面版
+                </a>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
+                  開發者請在專案根目錄下執行 <code>cd desktop-client && npm start</code> 啟動。
+                </div>
+              </div>
             </div>
           </section>
 
@@ -1110,12 +1135,12 @@ function Dashboard({ token, onLogout }) {
 
       {/* Full Page About Documentation */}
       {showAboutModal && <DocumentationOverlay onClose={() => setShowAboutModal(false)} />}
-      {showAccountInfo && <AccountInfoModal token={token} onClose={() => setShowAccountInfo(false)} />}
+      {showAccountInfo && <AccountInfoModal token={token} onClose={() => setShowAccountInfo(false)} onLogout={onLogout} />}
     </div>
   );
 }
 
-function AccountInfoModal({ token, onClose }) {
+function AccountInfoModal({ token, onClose, onLogout }) {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -1144,6 +1169,28 @@ function AccountInfoModal({ token, onClose }) {
         setShowKey(true);
       } else {
         alert(data.error || '生成失敗');
+      }
+    } catch (err) {
+      alert('連線失敗');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmText = prompt('警告：刪除帳號將會永久清除您的所有生存時間與榮譽點數，無法恢復！\n請輸入大寫的 DELETE 來確認刪除：');
+    if (confirmText !== 'DELETE') return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/delete-account`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('您的帳號已經被永久刪除。');
+        onClose();
+        if (onLogout) onLogout();
+      } else {
+        alert(data.error || '刪除失敗');
       }
     } catch (err) {
       alert('連線失敗');
@@ -1220,6 +1267,16 @@ function AccountInfoModal({ token, onClose }) {
                   </>
                 )}
               </div>
+            </div>
+
+            <div style={{marginTop: '10px', padding: '15px', border: '1px dashed var(--danger-color)', borderRadius: '8px', textAlign: 'center'}}>
+              <button 
+                className="terminal-btn" 
+                style={{background: 'transparent', color: 'var(--danger-color)', border: 'none', textDecoration: 'underline', padding: '5px'}} 
+                onClick={handleDeleteAccount}
+              >
+                刪除帳號 (無法恢復)
+              </button>
             </div>
           </div>
         )}
