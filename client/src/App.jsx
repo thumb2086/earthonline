@@ -443,7 +443,10 @@ function Dashboard({ token, onLogout }) {
   const [myNode, setMyNode] = useState(null);
   const [globalStats, setGlobalStats] = useState({ activeUsers: 0, totalPopulation: 0, globalProduction: 0, socialCompression: '1.000' });
   const [lifespan, setLifespan] = useState(0);
-  const [logs, setLogs] = useState(['[SYS] 地球在線終端連線建立中...', '[SYS] 正在載入全球節點矩陣...']);
+  const [logs, setLogs] = useState([
+    { text: '[SYS] 地球在線連線建立中...', time: new Date().toISOString().substring(11, 19) },
+    { text: '[SYS] 進入全球節點網路...', time: new Date().toISOString().substring(11, 19) }
+  ]);
   const [ping, setPing] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [showDiscordModal, setShowDiscordModal] = useState(false);
@@ -568,10 +571,16 @@ function Dashboard({ token, onLogout }) {
     }
   };
 
-  const addLog = (msg) => {
+  const addLog = (msg, extra = {}) => {
     setLogs(prev => {
       const time = new Date().toISOString().substring(11, 19);
-      return [...prev, `[${time}] ${msg}`].slice(-150);
+      let logObj = { time, text: typeof msg === 'string' ? msg : msg.text, ...extra };
+      if (typeof msg === 'string') {
+        logObj.isChat = msg.includes('[CHAT]');
+        logObj.isDiscordChat = msg.includes('[DC_CHAT]');
+        logObj.isWarning = msg.includes('警告');
+      }
+      return [...prev, logObj].slice(-150);
     });
   };
 
@@ -624,7 +633,11 @@ function Dashboard({ token, onLogout }) {
     });
 
     s.on('chat_message', (data) => {
-      addLog(`[CHAT] ${data.username}: ${data.message}`);
+      if (data.isDiscord) {
+        addLog(`[DC_CHAT] ${data.username}: ${data.message}`);
+      } else {
+        addLog(`[CHAT] ${data.username}: ${data.message}`);
+      }
     });
 
     s.on('social_data', (data) => {
@@ -1079,17 +1092,27 @@ function Dashboard({ token, onLogout }) {
             </div>
             <div className="log-content" style={{flex: 1, overflowY: 'auto'}}>
               {logs.map((log, i) => {
-                const isChat = log.includes('[CHAT]');
-                const isWarning = log.includes('警告');
+                let logColor = 'inherit';
+                if (log.isChat) logColor = '#FFF';
+                if (log.isDiscordChat) logColor = '#5865F2';
+                if (log.isWarning) logColor = 'var(--danger-color)';
+                
                 return (
                   <div key={i} style={{ 
-                    color: isChat ? '#FFF' : isWarning ? 'var(--danger-color)' : 'inherit', 
+                    color: logColor, 
                     marginTop: '4px', 
                     display: 'flex', 
-                    gap: '8px'
+                    gap: '8px',
+                    alignItems: 'flex-start'
                   }}>
                     <span style={{color: 'var(--accent-color)', opacity: 0.7}}>&gt;</span> 
-                    <span style={{wordBreak: 'break-all', opacity: isChat ? 1 : 0.8}}>{log}</span>
+                    {log.avatar && (
+                      <img src={log.avatar} alt="avatar" style={{width: '20px', height: '20px', borderRadius: '50%'}} />
+                    )}
+                    <span style={{wordBreak: 'break-all', opacity: (log.isChat || log.isDiscordChat) ? 1 : 0.8}}>
+                      <span style={{color: '#888', marginRight: '5px'}}>[{log.time}]</span>
+                      {log.text}
+                    </span>
                   </div>
                 );
               })}
@@ -1418,8 +1441,57 @@ function AccountInfoModal({ token, onClose, onLogout }) {
   );
 }
 
+function EulaScreen({ onAgree }) {
+  return (
+    <div style={{
+      height: '100vh', width: '100vw', background: '#050a15', color: '#00ff88',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'monospace', padding: '20px', boxSizing: 'border-box'
+    }}>
+      <div style={{
+        maxWidth: '800px', width: '100%', background: 'rgba(0,0,0,0.8)',
+        border: '1px solid #00ff88', boxShadow: '0 0 20px rgba(0, 255, 136, 0.2)',
+        padding: '30px', borderRadius: '4px', overflowY: 'auto', maxHeight: '80vh'
+      }}>
+        <h1 style={{ color: '#ff416c', textAlign: 'center', textShadow: '0 0 10px #ff416c', marginBottom: '30px', letterSpacing: '2px' }}>
+          /// 終端存取協議 (Terminal Access Protocol) ///
+        </h1>
+        
+        <div style={{ lineHeight: '1.8', fontSize: '1.1rem', opacity: 0.9 }}>
+          <p>▶ 警告：您即將連線至<strong>「地球在線 (Earth Online)」</strong>全球伺服器節點網路。</p>
+          <p>▶ 這是一個高度匿名的觀測系統，您的真實地理位置與 IP 位址將被加密並轉換為座標映射至全球監控圖網中。</p>
+          
+          <div style={{ borderLeft: '3px solid #00ff88', paddingLeft: '15px', margin: '20px 0', background: 'rgba(0,255,136,0.05)' }}>
+            <span style={{ color: '#ffcc00' }}>[協議聲明 / PROTOCOL STATEMENT]</span><br/>
+            一、本系統提供實時跨節點通訊 (World Chat)，使用者須對自身言論負完全責任。<br/>
+            二、任何試圖破壞伺服器平衡、干涉系統隨機事件（如量子爆發）的惡意程式將遭到自動隔離。<br/>
+            三、您的「掛機算力」將直接影響全球節點的總通量，一旦同意登入，即代表自願貢獻運算時間。
+          </div>
+          
+          <p>▶ <span style={{ color: '#ff416c' }}>系統提示：</span>若您未滿 18 歲，或身處禁止駭客觀測站運作的司法管轄區，請立即切斷連線。</p>
+        </div>
+
+        <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'center' }}>
+          <button onClick={onAgree} style={{
+            background: 'rgba(0, 255, 136, 0.1)', border: '2px solid #00ff88', color: '#00ff88',
+            padding: '15px 40px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+            textTransform: 'uppercase', letterSpacing: '2px', transition: 'all 0.3s',
+            boxShadow: 'inset 0 0 10px rgba(0,255,136,0.2)'
+          }}
+          onMouseOver={e => e.target.style.background = 'rgba(0, 255, 136, 0.3)'}
+          onMouseOut={e => e.target.style.background = 'rgba(0, 255, 136, 0.1)'}
+          >
+            [ 我同意並建立連線 / ACCEPT & CONNECT ]
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem('eo_token'));
+  const [hasAgreedEula, setHasAgreedEula] = useState(false);
   
   const handleLogin = (newToken, username) => {
     localStorage.setItem('eo_token', newToken);
@@ -1430,6 +1502,10 @@ function App() {
     localStorage.removeItem('eo_token');
     setToken(null);
   };
+
+  if (!hasAgreedEula) {
+    return <EulaScreen onAgree={() => setHasAgreedEula(true)} />;
+  }
 
   if (!token) {
     return <LoginGateway onLogin={handleLogin} />;
