@@ -314,11 +314,21 @@ app.get('/api/auth/discord/callback', async (req, res) => {
         let baseName = profile.username.replace(/\s+/g, '_');
         let finalName = baseName;
         let counter = 1;
-        while (await User.findOne({ username: finalName })) {
+        while (await db.findUserByUsername(finalName)) {
           finalName = `${baseName}_${counter++}`;
         }
-        user = await db.registerUser(finalName, 'discord_oauth_no_password');
-        await db.updateUserDiscord(finalName, profile);
+        
+        // Pass a random password since Discord users don't need a local password but the DB requires it
+        const dummyPassword = 'discord_oauth_' + Math.random().toString(36).slice(2);
+        await db.createUser({
+          id: 'user_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+          username: finalName,
+          password: dummyPassword,
+          discord: profile,
+          country: 'UNKNOWN'
+        });
+        
+        user = await db.findUserByUsername(finalName);
       }
       
       const token = jwt.sign(

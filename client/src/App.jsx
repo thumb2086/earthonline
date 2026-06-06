@@ -1635,7 +1635,19 @@ function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket }) {
                   <span>{p.username} [{p.country}]</span>
                 </div>
                 {!socialData.friends?.find(f => f.username === p.username) && (
-                  <button onClick={() => socket.emit('send_friend_request', { targetUsername: p.username })} style={{ background: 'rgba(0,255,136,0.2)', border: '1px solid var(--accent-color)', color: 'var(--accent-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>加好友</button>
+                  <button 
+                    onClick={(e) => {
+                      socket.emit('send_friend_request', { targetUsername: p.username });
+                      e.target.disabled = true;
+                      e.target.innerText = '已發送';
+                      e.target.style.background = 'rgba(255,255,255,0.1)';
+                      e.target.style.color = '#888';
+                      e.target.style.borderColor = '#888';
+                    }} 
+                    style={{ background: 'rgba(0,255,136,0.2)', border: '1px solid var(--accent-color)', color: 'var(--accent-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                  >
+                    加好友
+                  </button>
                 )}
               </div>
             ))
