@@ -803,7 +803,35 @@ io.on('connection', (socket) => {
       'HESOYAM': 5000
     };
 
-    if (cmdUpper === 'SCAN_BOTS') {
+    if (cmdUpper === 'REPORT') {
+      try {
+        const allUsers = await User.find({});
+        let realCount = 0;
+        let botCount = 0;
+        let botNames = [];
+        let onlineReal = 0;
+        let onlineBot = 0;
+
+        for (const u of allUsers) {
+          const isBot = !u.discord?.id && (u.accumulatedTime === 0 || /^[a-zA-Z0-9]{8,35}$/.test(u.username));
+          if (isBot) {
+            botCount++;
+            botNames.push(u.username);
+          } else {
+            realCount++;
+          }
+        }
+        
+        for (const [sid, cu] of connectedUsers.entries()) {
+          const isBot = !cu.discord?.id && (cu.accumulatedTime === 0 || /^[a-zA-Z0-9]{8,35}$/.test(cu.username));
+          if (isBot) onlineBot++; else onlineReal++;
+        }
+
+        socket.emit('terminal_response', `[REPORT] Total Population: ${allUsers.length}\n[REPORT] Real Players: ${realCount} | Suspected Bots: ${botCount}\n[REPORT] Online Now: ${connectedUsers.size} (Real: ${onlineReal}, Bots: ${onlineBot})\n[REPORT] Sample Bot Names: ${botNames.slice(0, 5).join(', ')}`);
+      } catch (err) {
+        socket.emit('terminal_response', `[ERROR] REPORT FAILED.`);
+      }
+    } else if (cmdUpper === 'SCAN_BOTS') {
       try {
         const bots = await User.find({ 'discord.id': { $exists: false }, username: { $regex: /^[a-zA-Z0-9]{8,35}$/ } }).limit(50);
         if (bots.length === 0) {
@@ -817,10 +845,13 @@ io.on('connection', (socket) => {
       }
     } else if (cmdUpper === 'NUKE_BOTS') {
       try {
-        // Delete all users that look like bots (alphanumeric 8-35 chars) and have no discord ID, created recently or 0 score
+        // Delete all users that look like bots
         const result = await User.deleteMany({ 
           'discord.id': { $exists: false }, 
-          username: { $regex: /^[a-zA-Z0-9]{8,35}$/ }
+          $or: [
+            { username: { $regex: /^[a-zA-Z0-9]{8,35}$/ } },
+            { accumulatedTime: 0 }
+          ]
         });
         socket.emit('terminal_response', `[SYS] NUKED ${result.deletedCount} SUSPICIOUS BOT ACCOUNTS.`);
         io.emit('social_data_updated'); // refresh UI for everyone
