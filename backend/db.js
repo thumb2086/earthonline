@@ -70,6 +70,18 @@ async function migrateOfflineTime() {
         countryCount++;
       }
       
+      // Populate missing bonus points
+      if (u.accumulatedBonusPoints === undefined) {
+        u.accumulatedBonusPoints = 0;
+        changed = true;
+      }
+      
+      // Populate missing recovery key
+      if (!u.recoveryKey) {
+        u.recoveryKey = '未產生';
+        changed = true;
+      }
+      
       if (changed) {
         await u.save();
       }
