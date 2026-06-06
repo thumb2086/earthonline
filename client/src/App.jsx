@@ -1509,12 +1509,6 @@ function EulaScreen({ onAgree }) {
         justifyContent: 'center',
         borderRight: '1px solid rgba(0,0,0,0.1)'
       }}>
-        <div style={{ 
-          background: 'rgba(0,0,0,0.5)', color: 'white', padding: '10px 20px', 
-          borderRadius: '20px', fontSize: '0.9rem', backdropFilter: 'blur(4px)' 
-        }}>
-          請將圖片儲存為 client/public/eula-bg.png
-        </div>
       </div>
 
       {/* Right side Agreement Card */}
