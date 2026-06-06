@@ -1492,22 +1492,22 @@ function AccountInfoModal({ token, onClose, onLogout }) {
 function EulaScreen({ onAgree }) {
   return (
     <div style={{
-      height: '100vh', width: '100vw', background: '#f0f4f8', color: '#2d3748',
+      height: '100vh', width: '100vw', background: 'linear-gradient(135deg, #0a0f1d 0%, #1a2a44 100%)', color: '#2d3748',
       display: 'flex', flexDirection: 'row', alignItems: 'stretch', justifyContent: 'center',
       fontFamily: '"Microsoft JhengHei", "Segoe UI", sans-serif', boxSizing: 'border-box'
     }}>
       
-      {/* Left side Image */}
+      {/* Left side Image (Transparent, blending in) */}
       <div style={{
         flex: '1 1 50%',
-        backgroundImage: 'url(/eula-bg.png)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundImage: 'url(/eula-bg-transparent.png)',
+        backgroundSize: 'contain',
+        backgroundPosition: 'center right',
         backgroundRepeat: 'no-repeat',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRight: '1px solid rgba(0,0,0,0.1)'
+        padding: '40px'
       }}>
       </div>
 
@@ -1516,14 +1516,14 @@ function EulaScreen({ onAgree }) {
         flex: '1 1 50%',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
+        justifyContent: 'flex-start',
+        padding: '20px 40px',
         overflowY: 'auto'
       }}>
         <div style={{
-          maxWidth: '650px', width: '100%', background: '#ffffff',
-          borderTop: '6px solid #4299e1', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
-          padding: '40px', borderRadius: '12px'
+          maxWidth: '650px', width: '100%', background: 'rgba(255, 255, 255, 0.95)',
+          borderTop: '6px solid #4299e1', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+          padding: '40px', borderRadius: '16px', backdropFilter: 'blur(10px)'
         }}>
           <h1 style={{ color: '#2b6cb0', textAlign: 'center', marginBottom: '10px', fontSize: '2.2rem', fontWeight: 'bold' }}>
             ✧ 歡迎來到「地球在線」大家庭 ✧
