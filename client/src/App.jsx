@@ -67,8 +67,7 @@ function LoginGateway({ onLogin }) {
       
       if (isRegister) {
         alert(`註冊成功！\n【請務必保存您的恢復金鑰】\n${data.recoveryKey}\n\n如果您忘記密碼，這是唯一找回帳號的方式！`);
-        setIsRegister(false);
-        setPassword('');
+        onLogin(data.token, data.username);
       } else {
         onLogin(data.token, data.user.username);
       }
@@ -611,28 +610,8 @@ function Dashboard({ token, onLogout }) {
     return (remaining / totalLifespan) * 100;
   };
 
-  // Group nodes into a global pixel grid
-  const gridSize = 3; // 3x3 degrees per pixel block
-  const gridBlocks = {};
+  // Render nodes directly as dots without clustering
 
-  nodes.forEach(node => {
-    const gridLat = Math.floor(node.lat / gridSize) * gridSize;
-    const gridLon = Math.floor(node.lon / gridSize) * gridSize;
-    const gridId = `${gridLat},${gridLon}`;
-    
-    if (!gridBlocks[gridId]) {
-      gridBlocks[gridId] = {
-        lat: gridLat,
-        lon: gridLon,
-        count: 0,
-        users: [],
-        rawNodes: []
-      };
-    }
-    gridBlocks[gridId].count += 1;
-    gridBlocks[gridId].users.push(node.username);
-    gridBlocks[gridId].rawNodes.push(node);
-  });
 
   // Global Event Banner Component
   const GlobalEventBanner = () => {
@@ -787,17 +766,22 @@ function Dashboard({ token, onLogout }) {
                 <div>
                   <div style={{color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 'bold'}}>{boundDiscord.username}</div>
                   <div style={{color: 'var(--text-secondary)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                <Activity size={16} /> 累計在線時間 (Total Online Time)
-              </div>
+                    <LinkIcon size={14} color="var(--accent-color)" /> 已連結 Discord
+                  </div>
                 </div>
               </div>
             ) : (
-              <div>
-                <div style={{color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 'bold'}}>{myNode?.username}</div>
-                <div style={{marginTop: '10px'}}>
-                  <a href="#" onClick={(e) => { e.preventDefault(); setShowDiscordModal(true); }} className="discord-link">
-                    <LinkIcon size={14} /> 連結 Discord 帳號
-                  </a>
+              <div style={{display: 'flex', alignItems: 'center', gap: '15px', marginTop: '10px'}}>
+                <div style={{width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)'}}>
+                  <User size={24} color="var(--text-secondary)" />
+                </div>
+                <div>
+                  <div style={{color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 'bold'}}>{myNode?.username}</div>
+                  <div style={{marginTop: '5px'}}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setShowDiscordModal(true); }} className="discord-link" style={{fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 8px', background: 'rgba(88, 101, 242, 0.2)', color: '#5865F2', borderRadius: '4px', textDecoration: 'none'}}>
+                      <LinkIcon size={14} /> 立即連結 Discord
+                    </a>
+                  </div>
                 </div>
               </div>
             )}
@@ -931,63 +915,26 @@ function Dashboard({ token, onLogout }) {
               />
             )}
             
-            {/* Grid Pixel Blocks or Individual Points */}
-            {Object.values(gridBlocks).map(block => {
-              if (block.count >= 3) {
-                // High density: Colored Block
-                const intensity = Math.min(0.3 + (block.count * 0.1), 0.95);
-                const blockColor = block.count >= 10 ? '#ff4444' : (block.count >= 5 ? '#ffaa00' : 'var(--accent-color)');
-                return (
-                  <Rectangle
-                    key={`rect-${block.lat}-${block.lon}`}
-                    bounds={[
-                      [block.lat, block.lon],
-                      [block.lat + gridSize, block.lon + gridSize]
-                    ]}
-                    pathOptions={{ 
-                      color: blockColor, 
-                      fillColor: blockColor, 
-                      fillOpacity: intensity,
-                      weight: 1
-                    }}
-                  >
-                    <Popup>
-                      <div style={{ fontFamily: 'var(--font-sans)' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>熱區座標 [{block.lat}, {block.lon}]</div>
-                        <div style={{ color: blockColor, fontWeight: 'bold', margin: '5px 0' }}>
-                          高密度聚集: {block.count} 個節點
-                        </div>
-                        <div style={{ fontSize: '0.8rem' }}>
-                          包含: {block.users.slice(0, 5).join(', ')}
-                          {block.count > 5 ? ' ...等' : ''}
-                        </div>
-                      </div>
-                    </Popup>
-                  </Rectangle>
-                );
-              } else {
-                // Low density: Individual Points
-                return block.rawNodes.map(node => (
-                  <CircleMarker
-                    key={`node-${node.id}`}
-                    center={[node.lat, node.lon]}
-                    radius={8}
-                    pathOptions={{ 
-                      color: '#ffffff', 
-                      fillColor: '#ff3b30', 
-                      fillOpacity: 1.0,
-                      weight: 2
-                    }}
-                  >
-                    <Popup>
-                      <div style={{ fontFamily: 'var(--font-sans)' }}>
-                        使用者: {node.username}
-                      </div>
-                    </Popup>
-                  </CircleMarker>
-                ));
-              }
-            })}
+            {/* Individual Points */}
+            {nodes.map(node => (
+              <CircleMarker
+                key={`node-${node.id}`}
+                center={[node.lat, node.lon]}
+                radius={node.id === myNode?.id ? 10 : 8}
+                pathOptions={{ 
+                  color: '#ffffff', 
+                  fillColor: node.id === myNode?.id ? 'var(--accent-color)' : '#ff3b30', 
+                  fillOpacity: 1.0,
+                  weight: 2
+                }}
+              >
+                <Popup>
+                  <div style={{ fontFamily: 'var(--font-sans)' }}>
+                    使用者: {node.username} {node.id === myNode?.id && '(您)'}
+                  </div>
+                </Popup>
+              </CircleMarker>
+            ))}
           </MapContainer>
 
           {/* Bottom Console Log Module */}
