@@ -160,6 +160,26 @@ function LoginGateway({ onLogin }) {
   );
 }
 
+function MapResizeHandler() {
+  const map = useMap();
+  useEffect(() => {
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    const handleOrientation = () => {
+      setTimeout(() => map.invalidateSize(), 100);
+      setTimeout(() => map.invalidateSize(), 500);
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleOrientation);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleOrientation);
+    };
+  }, [map]);
+  return null;
+}
+
 function MapController({ myNode, mapTheme, setMapTheme }) {
   const map = useMap();
   
@@ -923,6 +943,7 @@ function Dashboard({ token, onLogout }) {
             style={{ height: '100%', width: '100%' }}
             zoomControl={true}
           >
+            <MapResizeHandler />
             <MapController myNode={myNode} mapTheme={mapTheme} setMapTheme={setMapTheme} />
 
             {mapTheme === 'satellite' && (

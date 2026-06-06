@@ -30,7 +30,7 @@ body {
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   width: 100vw;
 }
 
@@ -68,7 +68,7 @@ body {
 .main-content {
   display: flex;
   flex: 1;
-  height: calc(100vh - 50px);
+  height: calc(100dvh - 50px);
 }
 
 /* Left Sidebar - Metrics Terminal */
@@ -83,7 +83,7 @@ body {
   flex-direction: column;
   padding: 15px;
   margin: 15px;
-  height: calc(100vh - 100px);
+  height: calc(100dvh - 100px);
   gap: 20px;
   overflow-y: auto;
 }
