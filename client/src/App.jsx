@@ -559,7 +559,7 @@ function Dashboard({ token, onLogout }) {
     const fetchLeaderboard = async () => {
       try {
         const baseUrl = API_URL.replace(/\/$/, '');
-        const res = await fetch(`${baseUrl}/api/leaderboard`);
+        const res = await fetch(`${baseUrl}/api/leaderboard`, { cache: 'no-store' });
         if (res.ok) setLeaderboard(await res.json());
       } catch(err) {}
     };
