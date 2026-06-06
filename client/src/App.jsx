@@ -456,7 +456,7 @@ function Dashboard({ token, onLogout }) {
   const [sortMode, setSortMode] = useState('points');
   const [currentEvent, setCurrentEvent] = useState(null);
 
-  const [bgmEnabled, setBgmEnabled] = useState(false);
+  const [bgmEnabled, setBgmEnabled] = useState(true);
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -787,10 +787,10 @@ function Dashboard({ token, onLogout }) {
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div className="system-stats" style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
             <div style={{display: 'flex', alignItems: 'center'}}>
-              <span style={{color: 'var(--text-secondary)'}}>實時連線人數: <strong style={{color: 'var(--accent-color)'}}>{globalStats.activeUsers}</strong></span>
+              <span style={{color: 'var(--text-secondary)'}}>連線: <strong style={{color: 'var(--accent-color)'}}>{globalStats.activeUsers}</strong></span>
             </div>
             <div style={{display: 'flex', alignItems: 'center'}}>
-              <span style={{color: 'var(--text-secondary)'}}>地球總人口: <strong style={{color: 'var(--text-primary)'}}>{globalStats.totalPopulation}</strong></span>
+              <span style={{color: 'var(--text-secondary)'}}>總人口: <strong style={{color: 'var(--text-primary)'}}>{globalStats.totalPopulation}</strong></span>
             </div>
             {!isConnected && <span style={{color: 'var(--danger-color)', fontWeight: 'bold'}}>[已斷線]</span>}
           </div>

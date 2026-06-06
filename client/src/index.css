@@ -596,3 +596,9 @@ body {
   font-weight: bold;
   font-size: 13px;
 }
+
+@media (max-width: 1000px) {
+  .system-stats {
+    display: none !important;
+  }
+}
