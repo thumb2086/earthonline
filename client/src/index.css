@@ -185,29 +185,56 @@ body {
   bottom: 20px;
   left: 20px;
   right: 20px;
-  padding: 10px 15px;
+  padding: 12px 18px;
   z-index: 1000;
-  max-height: 150px;
+  max-height: 180px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: rgba(10, 15, 25, 0.8) !important;
+  border: 1px solid rgba(0, 210, 255, 0.15) !important;
+  border-top: 2px solid var(--accent-color) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(0, 210, 255, 0.05) !important;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
 }
 
 .log-header {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  border-bottom: 1px dashed var(--border-color);
-  padding-bottom: 5px;
-  margin-bottom: 5px;
+  font-size: 0.85rem;
+  color: var(--accent-color);
+  font-weight: bold;
   text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgba(0, 210, 255, 0.3);
 }
 
 .log-content {
-  font-size: 0.75rem;
-  line-height: 1.4;
+  font-size: 0.8rem;
+  line-height: 1.6;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  color: #a0aec0;
+  padding-right: 5px;
+}
+
+/* Custom Scrollbar for Hacker Console */
+.log-content::-webkit-scrollbar {
+  width: 6px;
+}
+.log-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+.log-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 210, 255, 0.3);
+  border-radius: 3px;
+}
+.log-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 210, 255, 0.8);
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.8);
 }
 
 .blink {

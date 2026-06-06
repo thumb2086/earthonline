@@ -357,7 +357,30 @@ function Dashboard({ token, onLogout }) {
   const [sortMode, setSortMode] = useState('points');
   const [currentEvent, setCurrentEvent] = useState(null);
   
+  // Terminal State
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [terminalHistory, setTerminalHistory] = useState(['Earth Online Terminal v1.0.1', 'Type "help" for a list of available commands.']);
+  const [terminalInput, setTerminalInput] = useState('');
+  const terminalEndRef = useRef(null);
+
+  // Global keydown listener for Terminal
   useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === '`' || e.key === '~') {
+        e.preventDefault();
+        setIsTerminalOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  // Scroll terminal to bottom
+  useEffect(() => {
+    if (terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [terminalHistory, isTerminalOpen]);
     const fetchLeaderboard = async () => {
       try {
         const baseUrl = API_URL.replace(/\/$/, '');
@@ -452,6 +475,10 @@ function Dashboard({ token, onLogout }) {
 
     s.on('global_event_ended', () => {
       setCurrentEvent(null);
+    });
+
+    s.on('terminal_response', (msg) => {
+      setTerminalHistory(prev => [...prev, msg]);
     });
 
     s.on('all_nodes', (data) => {
@@ -590,8 +617,67 @@ function Dashboard({ token, onLogout }) {
       : 'inset 0 0 80px rgba(255, 65, 108, 0.4)';
   };
 
+  const handleTerminalSubmit = (e) => {
+    e.preventDefault();
+    if (!terminalInput.trim()) return;
+    
+    const cmd = terminalInput.trim();
+    setTerminalHistory(prev => [...prev, `> ${cmd}`]);
+    setTerminalInput('');
+
+    const lowerCmd = cmd.toLowerCase();
+    if (lowerCmd === 'help') {
+      setTerminalHistory(prev => [...prev, 'Available commands: help, ping, whoami, clear, sysinfo']);
+    } else if (lowerCmd === 'ping') {
+      setTerminalHistory(prev => [...prev, 'Pong! Latency: 12ms']);
+    } else if (lowerCmd === 'whoami') {
+      setTerminalHistory(prev => [...prev, `Node Identity: ${myNode?.username || 'UNKNOWN'}`]);
+    } else if (lowerCmd === 'clear') {
+      setTerminalHistory([]);
+    } else if (lowerCmd === 'sysinfo') {
+      setTerminalHistory(prev => [...prev, 'Earth Online Core - 256TB Quantum RAM, Geo-Distributed Matrix Active.']);
+    } else {
+      // Forward to backend for secret codes
+      if (socket) {
+        socket.emit('terminal_command', { command: cmd });
+      } else {
+        setTerminalHistory(prev => [...prev, '[ERROR] NOT CONNECTED TO CORE.']);
+      }
+    }
+  };
+
   return (
     <div className="app-container" style={{ boxShadow: getEventGlow(), transition: 'box-shadow 1s ease-in-out' }}>
+      {/* Terminal Overlay */}
+      {isTerminalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '50vh',
+          background: 'rgba(0, 0, 0, 0.9)', borderBottom: '2px solid #0f0',
+          color: '#0f0', fontFamily: 'monospace', padding: '20px', zIndex: 9999,
+          display: 'flex', flexDirection: 'column', boxSizing: 'border-box'
+        }}>
+          <div style={{ flex: 1, overflowY: 'auto', marginBottom: '10px' }}>
+            {terminalHistory.map((line, i) => (
+              <div key={i} style={{ wordBreak: 'break-all', marginBottom: '4px' }}>{line}</div>
+            ))}
+            <div ref={terminalEndRef} />
+          </div>
+          <form onSubmit={handleTerminalSubmit} style={{ display: 'flex', gap: '10px' }}>
+            <span>></span>
+            <input 
+              type="text" 
+              value={terminalInput}
+              onChange={e => setTerminalInput(e.target.value)}
+              autoFocus
+              style={{
+                flex: 1, background: 'transparent', border: 'none', color: '#0f0', 
+                fontFamily: 'monospace', outline: 'none', fontSize: '1rem'
+              }}
+            />
+          </form>
+        </div>
+      )}
+
       <CountdownBanner />
       <GlobalEventBanner />
       {/* Header Panel */}
@@ -848,14 +934,14 @@ function Dashboard({ token, onLogout }) {
           </MapContainer>
 
           {/* Bottom Console Log Module */}
-          <div className="bottom-log-console floating-panel">
+          <div className="bottom-log-console">
             <div className="log-header" style={{display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-color)'}}>
               <Activity size={16} /> 系統即時通知 (System Event Log)
             </div>
             <div className="log-content">
               {logs.map((log, i) => (
-                <div key={i} style={{ color: log.includes('警告') ? 'var(--danger-color)' : 'var(--text-main)', marginTop: '4px' }}>
-                  {log}
+                <div key={i} style={{ color: log.includes('警告') ? 'var(--danger-color)' : 'inherit', marginTop: '4px', display: 'flex', gap: '8px' }}>
+                  <span style={{color: 'var(--accent-color)', opacity: 0.7}}>&gt;</span> <span>{log}</span>
                 </div>
               ))}
             </div>
