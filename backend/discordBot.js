@@ -32,7 +32,7 @@ client.login(TOKEN).catch(err => {
 function updateBotPresence(onlineCount) {
   if (!isBotReady) return;
   client.user.setPresence({
-    activities: [{ name: `🌍 Global Server | 📡 Nodes: ${onlineCount}` }],
+    activities: [{ name: `🌍 全球伺服器 | 📡 在線節點: ${onlineCount}` }],
     status: 'online',
   });
 }
