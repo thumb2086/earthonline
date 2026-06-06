@@ -70,11 +70,11 @@ client.on('interactionCreate', async interaction => {
       
       // Draw Text
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 45px "Segoe UI", sans-serif';
+      ctx.font = 'bold 45px "Microsoft JhengHei", "Segoe UI", sans-serif';
       ctx.fillText(dbUser.username, 220, 110);
       
       // Server text
-      ctx.font = '20px "Segoe UI", sans-serif';
+      ctx.font = '20px "Microsoft JhengHei", "Segoe UI", sans-serif';
       ctx.fillStyle = '#00d2ff';
       ctx.fillText(`[ ${dbUser.country === 'UNKNOWN' ? '全球' : dbUser.country} 伺服器節點 ]`, 220, 150);
       
@@ -84,20 +84,20 @@ client.on('interactionCreate', async interaction => {
       ctx.fillRect(490, 200, 250, 120);
       
       // Metrics Text
-      ctx.font = '22px "Segoe UI", sans-serif';
+      ctx.font = '22px "Microsoft JhengHei", "Segoe UI", sans-serif';
       ctx.fillStyle = '#a0aec0';
       ctx.fillText('累計在線時間', 240, 240);
       
-      ctx.font = 'bold 36px "Segoe UI", sans-serif';
+      ctx.font = 'bold 36px "Microsoft JhengHei", "Segoe UI", sans-serif';
       ctx.fillStyle = '#ffffff';
       const hours = ((dbUser.accumulatedTime || 0) / 3600000).toFixed(1);
       ctx.fillText(`${hours} 小時`, 240, 290);
       
-      ctx.font = '22px "Segoe UI", sans-serif';
+      ctx.font = '22px "Microsoft JhengHei", "Segoe UI", sans-serif';
       ctx.fillStyle = '#a0aec0';
       ctx.fillText('累計掛機點數', 510, 240);
       
-      ctx.font = 'bold 36px "Segoe UI", sans-serif';
+      ctx.font = 'bold 36px "Microsoft JhengHei", "Segoe UI", sans-serif';
       ctx.fillStyle = '#ffcc00';
       ctx.fillText(`${(dbUser.accumulatedBonusPoints || 0).toFixed(0)} PT`, 510, 290);
       
