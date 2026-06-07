@@ -45,13 +45,8 @@ async function sendDiscordWebhook(message) {
   }
 }
 
-// Daily world flux report scheduling
-setInterval(() => {
-  const currentTotal = globalProduction;
-  const compression = calculateSocialCompression(connectedUsers.size);
-  const msg = `📊 **【每日世界通量報告】**\n目前全球掛機總產出：\`${currentTotal.toLocaleString()} 單位\`\n社會總壓迫常數：\`${compression} Ω\`\n當前真實連線節點數：\`${connectedUsers.size}\``;
-  sendDiscordWebhook(msg);
-}, 24 * 60 * 60 * 1000); // Once a day
+// Daily world flux report (runs after regions are initialized)
+// Moved inside region setup to access correct scope
 
 // Auth Endpoints
 apiRouter.post('/register', async (req, res, next) => {
@@ -399,6 +394,24 @@ apiRouter.get('/leaderboard', async (req, res) => {
   }
 });
 
+apiRouter.get('/global/stats', async (req, res, next) => {
+  try {
+    const region = req.params.region || 'asia';
+    const pop = await db.getRegionPopulation(region);
+    const state = regionStates[region] || regionStates['asia'];
+    res.json({
+      totalActiveUsers: state ? state.activeUsers : 0,
+      totalPopulation: pop,
+      globalProduction: state ? state.globalProduction : 0,
+      socialCompression: state ? state.socialCompression : '1.000',
+      multiplier: state ? state.multiplier : 1.0
+    });
+  } catch (err) {
+    console.error('[SYS] /global/stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch global stats' });
+  }
+});
+
 app.use('/api/:region', apiRouter);
 
 const path = require('path');
@@ -431,28 +444,7 @@ const regionStates = {
   eu: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' }
 };
 
-apiRouter.get('/global/stats', async (req, res, next) => {
-  try {
-  try {
-    const pop = await db.getRegionPopulation(req.params.region);
-    let globalStats = {
-      totalActiveUsers: 0,
-      totalPopulation: pop,
-      regions: {}
-    };
-    regions.forEach(r => {
-      globalStats.totalActiveUsers += regionStates[r].activeUsers;
-      globalStats.regions[r] = {
-        activeUsers: regionStates[r].activeUsers,
-        multiplier: regionStates[r].multiplier
-      };
-    });
-    res.json(globalStats);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch global stats' });
-  }
-  } catch (err) { next(err); }
-});
+
 
 
 
