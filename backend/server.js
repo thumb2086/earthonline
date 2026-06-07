@@ -606,11 +606,46 @@ regions.forEach(regionName => {
 
     if (state.connectedUsers.size > 0) {
       const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
-      const bonusPoints = state.multiplier > 1.0 ? 2 * (state.multiplier - 1.0) : 0;
-      await User.updateMany(
-        { username: { $in: usernames } },
-        { $inc: { accumulatedTime: 2000, accumulatedBonusPoints: bonusPoints } }
-      );
+      const baseBonus = state.multiplier > 1.0 ? 2 * (state.multiplier - 1.0) : 0;
+      
+      const users = await User.find({ username: { $in: usernames } });
+      const updates = [];
+      for (let user of users) {
+        let userBonus = baseBonus;
+        let isDead = false;
+
+        // Health decay logic
+        if (user.health > 0) {
+          if (user.activeBuffs && user.activeBuffs.get('firewall') > Date.now()) {
+            // Protected
+          } else {
+            const decay = state.multiplier * 0.1; // Base decay per 2s
+            user.health = Math.max(0, user.health - decay);
+          }
+        }
+        
+        if (user.health <= 0) isDead = true;
+
+        if (user.activeBuffs && user.activeBuffs.get('overclock') > Date.now()) {
+          userBonus = Math.max(1, userBonus * 2);
+        }
+
+        if (!isDead) {
+          user.accumulatedTime += 2000;
+          user.accumulatedBonusPoints += userBonus;
+        }
+
+        updates.push({
+          updateOne: {
+            filter: { username: user.username },
+            update: { $set: { health: user.health, accumulatedTime: user.accumulatedTime, accumulatedBonusPoints: user.accumulatedBonusPoints } }
+          }
+        });
+      }
+      
+      if (updates.length > 0) {
+        await User.bulkWrite(updates);
+      }
     }
     
     state.activeUsers = state.connectedUsers.size;
@@ -652,6 +687,96 @@ regions.forEach(regionName => {
   // Handle Ping
   socket.on('ping', () => {
     socket.emit('pong');
+  });
+
+  socket.on('sync_user', async () => {
+    if (!socket.user) return;
+    const dbUser = await db.findUserByUsername(socket.user.username);
+    if (dbUser) {
+      socket.emit('user_state_update', {
+        health: dbUser.health,
+        pts: dbUser.accumulatedBonusPoints,
+        activeBuffs: dbUser.activeBuffs ? Object.fromEntries(dbUser.activeBuffs) : {},
+        inventory: dbUser.inventory ? Object.fromEntries(dbUser.inventory) : {}
+      });
+    }
+  });
+
+  socket.on('buy_item', async (itemId) => {
+    if (!socket.user) return;
+    try {
+      const user = await User.findOne({ username: socket.user.username });
+      if (!user) return;
+      
+      const shopItems = {
+        'liquid_nitrogen': { cost: 200, effect: 'health', value: 50 },
+        'quantum_cooler': { cost: 500, effect: 'health', value: 100 },
+        'overclock_chip': { cost: 1500, effect: 'buff', type: 'overclock', duration: 3600000 },
+        'firewall': { cost: 1000, effect: 'buff', type: 'firewall', duration: 1800000 },
+        'generator': { cost: 800, effect: 'revive', value: 20 },
+        'neon_strip': { cost: 3000, effect: 'cosmetic' },
+        'flash_drive': { cost: 500, effect: 'random' }
+      };
+      
+      const item = shopItems[itemId];
+      if (!item || user.accumulatedBonusPoints < item.cost) {
+        socket.emit('buy_result', { success: false, message: 'PT 不足或道具不存在！' });
+        return;
+      }
+      
+      user.accumulatedBonusPoints -= item.cost;
+      let message = `成功購買 ${itemId}！`;
+      
+      if (item.effect === 'health') {
+        if (user.health <= 0) {
+          socket.emit('buy_result', { success: false, message: '伺服器已死機，無法使用冷卻模組！請使用備用發電機。' });
+          return;
+        }
+        user.health = Math.min(100, user.health + item.value);
+      } else if (item.effect === 'buff') {
+        if (!user.activeBuffs) user.activeBuffs = new Map();
+        user.activeBuffs.set(item.type, Date.now() + item.duration);
+      } else if (item.effect === 'revive') {
+        if (user.health > 0) {
+          socket.emit('buy_result', { success: false, message: '伺服器運作正常，不需要發電機！' });
+          return;
+        }
+        user.health = item.value;
+      } else if (item.effect === 'cosmetic') {
+        if (!user.inventory) user.inventory = new Map();
+        user.inventory.set(itemId, (user.inventory.get(itemId) || 0) + 1);
+        message = '已獲得霓虹燈管！';
+      } else if (item.effect === 'random') {
+        const rand = Math.random();
+        if (rand < 0.3) {
+          user.accumulatedTime += 86400 * 1000;
+          message = '大吉！獲得 1 天生存時間！';
+        } else if (rand < 0.6) {
+          user.accumulatedBonusPoints += 2000;
+          message = '中吉！獲得 2000 PT！';
+        } else if (rand < 0.9) {
+          user.accumulatedBonusPoints += 500;
+          message = '小吉！回本 500 PT！';
+        } else {
+          user.health = Math.max(0, user.health - 50);
+          message = '大凶！抽到電腦病毒，健康度 -50！';
+        }
+      }
+      
+      await user.save();
+      socket.emit('buy_result', { success: true, message, health: user.health, pts: user.accumulatedBonusPoints });
+      
+      socket.emit('user_state_update', {
+        health: user.health,
+        pts: user.accumulatedBonusPoints,
+        activeBuffs: user.activeBuffs ? Object.fromEntries(user.activeBuffs) : {},
+        inventory: user.inventory ? Object.fromEntries(user.inventory) : {}
+      });
+      
+    } catch (err) {
+      console.error(err);
+      socket.emit('buy_result', { success: false, message: '系統錯誤' });
+    }
   });
 
   socket.on('authenticate', async (data) => {

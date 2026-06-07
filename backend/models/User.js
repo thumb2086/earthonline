@@ -21,7 +21,10 @@ const userSchema = new mongoose.Schema({
   redeemedCodes: { type: [String], default: [] },
   friends: { type: [String], default: [] },
   friendRequests: { type: [String], default: [] },
-  homeRegion: { type: String, default: 'asia' }
+  homeRegion: { type: String, default: 'asia' },
+  health: { type: Number, default: 100 },
+  inventory: { type: Map, of: Number, default: {} },
+  activeBuffs: { type: Map, of: Number, default: {} }
 });
 
 module.exports = mongoose.model('User', userSchema);
