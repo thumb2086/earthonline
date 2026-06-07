@@ -1599,60 +1599,60 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
     }}>
       <div className="modal-content" onClick={e => e.stopPropagation()} style={{
-        width: '450px', background: '#0a0f19', borderRadius: '12px', padding: '30px',
-        border: '1px solid var(--accent-color)', boxShadow: '0 0 30px rgba(0, 210, 255, 0.2)',
+        width: '480px', background: 'rgba(18, 20, 25, 0.95)', borderRadius: '16px', padding: '35px',
+        border: '1px solid rgba(255, 255, 255, 0.08)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(16px)',
         fontFamily: 'var(--font-sans)', color: 'var(--text-main)', position: 'relative'
       }}>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px dashed var(--accent-color)', paddingBottom: '10px'}}>
-          <h2 style={{margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--accent-color)', fontSize: '1.5rem'}}>
-            <User size={24} /> 節點帳號中心
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', paddingBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.06)'}}>
+          <h2 style={{margin: 0, display: 'flex', alignItems: 'center', gap: '12px', color: '#f8fafc', fontSize: '1.4rem', fontWeight: '700'}}>
+            <User size={22} color="#3b82f6" /> 帳號設定與安全
           </h2>
           <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
             {!window.electronAPI && (
-              <a href="https://earthonline.onrender.com/downloads/EarthOnlineSetup.exe" style={{display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.85rem', color: '#00ffaa', textDecoration: 'none', background: 'rgba(0, 255, 170, 0.1)', padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(0, 255, 170, 0.3)'}}>
+              <a href="https://earthonline.onrender.com/downloads/EarthOnlineSetup.exe" style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#10b981', textDecoration: 'none', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', fontWeight: '600'}}>
                 📥 下載專屬電腦版
               </a>
             )}
-            <X size={24} style={{cursor: 'pointer', color: 'var(--text-secondary)'}} onClick={onClose} />
+            <X size={20} style={{cursor: 'pointer', color: '#64748b', transition: 'color 0.2s'}} onClick={onClose} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = '#64748b'} />
           </div>
         </div>
         
-        {error ? <div style={{color: 'var(--danger-color)'}}>{error}</div> : !info ? <div style={{color: 'var(--text-secondary)'}}>資料同步中...</div> : (
-          <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-              <span style={{color: 'var(--text-secondary)'}}>代號 (SUBJECT ID)</span>
-              <strong style={{color: 'var(--text-main)'}}>{info.username}</strong>
+        {error ? <div style={{color: '#ef4444', padding: '15px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px'}}>{error}</div> : !info ? <div style={{color: '#94a3b8', textAlign: 'center', padding: '30px 0'}}>讀取帳戶資訊中...</div> : (
+          <div style={{display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.95rem'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)'}}>
+              <span style={{color: '#94a3b8'}}>代號 (Subject ID)</span>
+              <strong style={{color: '#f8fafc'}}>{info.username}</strong>
             </div>
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-              <span style={{color: 'var(--text-secondary)'}}>連線建立日 (JOINED)</span>
-              <strong style={{color: 'var(--text-main)'}}>{new Date(info.createdAt).toLocaleDateString()}</strong>
+            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)'}}>
+              <span style={{color: '#94a3b8'}}>連線建立日 (Joined)</span>
+              <strong style={{color: '#f8fafc'}}>{new Date(info.createdAt).toLocaleDateString()}</strong>
             </div>
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-              <span style={{color: 'var(--text-secondary)'}}>累積生存時間</span>
-              <strong style={{color: 'var(--text-main)'}}>{(info.accumulatedTime / 3600).toFixed(1)} 小時</strong>
+            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)'}}>
+              <span style={{color: '#94a3b8'}}>累積生存時間</span>
+              <strong style={{color: '#f8fafc'}}>{(info.accumulatedTime / 3600).toFixed(1)} 小時</strong>
             </div>
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-              <span style={{color: 'var(--text-secondary)'}}>榮譽點數 (PT)</span>
-              <strong style={{color: 'var(--accent-color)'}}>{info.accumulatedBonusPoints.toLocaleString()}</strong>
+            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)'}}>
+              <span style={{color: '#94a3b8'}}>榮譽點數 (PT)</span>
+              <strong style={{color: '#3b82f6'}}>{info.accumulatedBonusPoints.toLocaleString()}</strong>
             </div>
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-              <span style={{color: 'var(--text-secondary)'}}>Discord 通訊協定</span>
-              <strong style={{color: info.discord && info.discord.username ? '#5865F2' : 'var(--danger-color)'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0'}}>
+              <span style={{color: '#94a3b8'}}>Discord 通訊協定</span>
+              <strong style={{color: info.discord && info.discord.username ? '#5865F2' : '#94a3b8'}}>
                 {info.discord && info.discord.username ? info.discord.username : '未綁定'}
               </strong>
             </div>
-            
-            <div style={{marginTop: '20px', padding: '15px', background: 'rgba(255, 59, 48, 0.1)', border: '1px solid var(--danger-color)', borderRadius: '8px'}}>
-              <div style={{color: 'var(--danger-color)', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+            <div style={{marginTop: '25px', padding: '20px', background: 'rgba(239, 68, 68, 0.05)', borderLeft: '4px solid #ef4444', borderRadius: '0 8px 8px 0'}}>
+              <div style={{color: '#ef4444', fontWeight: '600', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px'}}>
                 <ShieldCheck size={18} /> 專屬恢復金鑰 (Recovery Key)
               </div>
-              <p style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px'}}>
-                警告：如果您遺失密碼，這是【唯一】能找回帳號的憑證，請勿洩漏給任何人。
+              <p style={{fontSize: '0.85rem', color: '#94a3b8', marginBottom: '15px', lineHeight: '1.5'}}>
+                如果您遺失密碼，這是【唯一】能找回帳號的憑證，請妥善保管並勿洩漏給他人。
               </p>
               <div style={{display: 'flex', gap: '10px'}}>
                 {info.recoveryKey === '未產生' ? (
-                  <button className="terminal-btn" style={{flex: 1, padding: '10px', background: 'rgba(255, 59, 48, 0.2)', color: 'var(--danger-color)', borderColor: 'var(--danger-color)'}} onClick={handleGenerateKey}>
-                    立即為老帳號生成專屬金鑰
+                  <button style={{flex: 1, padding: '10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s'}} onClick={handleGenerateKey} onMouseOver={e => e.currentTarget.style.background = '#dc2626'} onMouseOut={e => e.currentTarget.style.background = '#ef4444'}>
+                    生成專屬金鑰
                   </button>
                 ) : (
                   <>
@@ -1660,10 +1660,9 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
                       type={showKey ? "text" : "password"} 
                       value={info.recoveryKey} 
                       readOnly 
-                      className="terminal-input"
-                      style={{flex: 1, letterSpacing: showKey ? '1px' : '3px'}}
+                      style={{flex: 1, letterSpacing: showKey ? '1px' : '3px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', padding: '10px', borderRadius: '6px', outline: 'none'}}
                     />
-                    <button className="terminal-btn" style={{padding: '0 15px', background: 'rgba(255, 59, 48, 0.2)', color: 'var(--danger-color)', borderColor: 'var(--danger-color)'}} onClick={() => setShowKey(!showKey)}>
+                    <button style={{padding: '0 15px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'}} onClick={() => setShowKey(!showKey)} onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'} onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}>
                       {showKey ? '隱藏' : '顯示'}
                     </button>
                   </>
@@ -1672,46 +1671,46 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
             </div>
 
             {/* Email Binding Section */}
-            <div style={{marginTop: '10px', padding: '15px', background: 'rgba(0, 255, 170, 0.1)', border: '1px solid rgba(0, 255, 170, 0.3)', borderRadius: '8px'}}>
-              <div style={{color: '#00ffaa', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+            <div style={{marginTop: '15px', padding: '20px', background: 'rgba(16, 185, 129, 0.05)', borderLeft: '4px solid #10b981', borderRadius: '0 8px 8px 0'}}>
+              <div style={{color: '#10b981', fontWeight: '600', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px'}}>
                 <ShieldCheck size={18} /> 安全信箱綁定
               </div>
-              <p style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px'}}>
-                綁定信箱可獲得額外的帳號保護，若遺失密碼可透過信箱找回。
+              <p style={{fontSize: '0.85rem', color: '#94a3b8', marginBottom: '15px', lineHeight: '1.5'}}>
+                綁定信箱可獲得額外的帳號保護，若遺失密碼可透過信箱快速找回。
               </p>
               {info.isEmailVerified ? (
-                <div style={{display: 'flex', alignItems: 'center', gap: '10px', color: '#00ffaa'}}>
-                  <span>✅ 已綁定：{info.email}</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '10px 15px', borderRadius: '6px'}}>
+                  <CheckCircle size={16} /> <span style={{fontWeight: '500'}}>已綁定：{info.email}</span>
                 </div>
               ) : info.email ? (
                 <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
-                  <span style={{color: '#ffcc00', flex: 1}}>⏳ 等待驗證：{info.email}</span>
-                  <button className="terminal-btn" style={{padding: '5px 15px', background: 'rgba(0, 255, 170, 0.2)', color: '#00ffaa', borderColor: '#00ffaa'}} onClick={handleSendVerify} disabled={isSendingVerify}>
-                    {isSendingVerify ? '發送中...' : '重新發送驗證信'}
+                  <span style={{color: '#f59e0b', flex: 1, background: 'rgba(245,158,11,0.1)', padding: '10px', borderRadius: '6px'}}>⏳ 等待驗證：{info.email}</span>
+                  <button style={{padding: '10px 15px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer'}} onClick={handleSendVerify} disabled={isSendingVerify}>
+                    {isSendingVerify ? '發送中...' : '重發驗證信'}
                   </button>
                 </div>
               ) : (
                 <div style={{display: 'flex', gap: '10px'}}>
                   <input 
                     type="email" 
-                    placeholder="輸入您的電子郵件..." 
+                    placeholder="輸入電子郵件..." 
                     value={emailInput} 
                     onChange={e => setEmailInput(e.target.value)} 
-                    className="terminal-input"
-                    style={{flex: 1}}
+                    style={{flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', padding: '10px 15px', borderRadius: '6px', outline: 'none'}}
                   />
-                  <button className="terminal-btn" style={{padding: '0 15px', background: 'rgba(0, 255, 170, 0.2)', color: '#00ffaa', borderColor: '#00ffaa'}} onClick={handleSendVerify} disabled={isSendingVerify}>
-                    {isSendingVerify ? '發送中...' : '發送驗證'}
+                  <button style={{padding: '0 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s'}} onClick={handleSendVerify} disabled={isSendingVerify} onMouseOver={e => e.currentTarget.style.background = '#059669'} onMouseOut={e => e.currentTarget.style.background = '#10b981'}>
+                    {isSendingVerify ? '發送中...' : '綁定'}
                   </button>
                 </div>
               )}
             </div>
 
-            <div style={{marginTop: '10px', padding: '15px', border: '1px dashed var(--danger-color)', borderRadius: '8px', textAlign: 'center'}}>
+            <div style={{marginTop: '25px', textAlign: 'center'}}>
               <button 
-                className="terminal-btn" 
-                style={{background: 'transparent', color: 'var(--danger-color)', border: 'none', textDecoration: 'underline', padding: '5px'}} 
+                style={{background: 'transparent', color: '#64748b', border: 'none', padding: '8px 16px', fontSize: '0.85rem', cursor: 'pointer', transition: 'color 0.2s'}} 
                 onClick={handleDeleteAccount}
+                onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                onMouseOut={e => e.currentTarget.style.color = '#64748b'}
               >
                 刪除帳號 (無法恢復)
               </button>
