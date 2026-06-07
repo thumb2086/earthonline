@@ -1216,6 +1216,7 @@ function Dashboard({ token, onLogout, region }) {
               <Server size={16} /> 網路連線狀態 (Network)
             </div>
             <div style={{fontSize: '0.85rem', color: 'var(--text-secondary)'}}>
+              連線延遲 (Ping): {ping} ms<br/>
               上傳 (Uplink): {Math.floor(Math.random()*500 + 100)} KB/s<br/>
               下載 (Downlink): {Math.floor(Math.random()*1500 + 500)} KB/s<br/>
               封包遺失 (Loss): 0.00%
