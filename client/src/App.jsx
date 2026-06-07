@@ -17,14 +17,7 @@ function LoginGateway({ onLogin }) {
   const [password, setPassword] = useState('');
   const [recoveryKey, setRecoveryKey] = useState('');
   const [region, setRegion] = useState('asia');
-  const [language, setLanguage] = useState('zh');
-
-  // Change language automatically based on region on first load
-  useEffect(() => {
-    setLanguage(region === 'asia' ? 'zh' : 'en');
-  }, [region]);
-
-  const t = (key) => getTranslation(language, key);
+  
   
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -518,6 +511,7 @@ function CountdownBanner() {
 
 
 const DonateBanner = () => {
+  const { t, language, setLanguage } = useLanguage();
   return (
     <div className="floating-panel" style={{ padding: '15px 20px', background: 'rgba(255, 65, 108, 0.1)', border: '1px solid #ff416c', width: '100%', marginTop: '15px' }}>
       <div style={{ fontSize: '0.9rem', color: '#ff416c', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
@@ -868,6 +862,7 @@ function Dashboard({ token, onLogout, region }) {
 
   // Global Event Banner Component
   const GlobalEventBanner = () => {
+  const { t, language, setLanguage } = useLanguage();
     const [timeLeft, setTimeLeft] = useState('');
 
     useEffect(() => {
