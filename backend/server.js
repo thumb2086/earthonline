@@ -403,7 +403,7 @@ const regionStates = {
   eu: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' }
 };
 
-app.get('/api/global/stats', async (req, res) => {
+apiRouter.get('/global/stats', async (req, res) => {
   try {
     const pop = await db.getTotalPopulation();
     let globalStats = {
@@ -454,8 +454,9 @@ regions.forEach(regionName => {
   }, 2 * 60 * 60 * 1000);
 
   setInterval(async () => {
-    const pop = await db.getTotalPopulation();
-    const isBoosted = state.connectedUsers.size >= 5;
+    try {
+      const pop = await db.getTotalPopulation();
+      const isBoosted = state.connectedUsers.size >= 5;
     state.multiplier = isBoosted ? 1.2 : 1.0;
     
     if (state.currentGlobalEvent) {
@@ -506,6 +507,9 @@ regions.forEach(regionName => {
       socialCompression: state.socialCompression,
       multiplier: state.multiplier
     });
+    } catch (err) {
+      console.error('[SYS] Interval error:', err);
+    }
   }, 2000);
 
   nsp.on('connection', (socket) => {
