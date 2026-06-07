@@ -1331,7 +1331,11 @@ function Dashboard({ token, onLogout, region }) {
               })}
               <div ref={logEndRef} />
             </div>
-            <form onSubmit={handleChatSubmit} style={{display: 'flex', borderTop: '1px solid rgba(255,255,255,0.1)', padding: '5px'}}>
+            <form 
+              onSubmit={handleChatSubmit} 
+              onMouseDown={e => e.stopPropagation()} 
+              style={{display: 'flex', borderTop: '1px solid rgba(255,255,255,0.1)', padding: '5px'}}
+            >
               <input 
                 type="text" 
                 value={chatInput}
