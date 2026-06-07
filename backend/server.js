@@ -93,7 +93,8 @@ apiRouter.post('/register', async (req, res, next) => {
     password: hashedPassword,
     registeredAt: Date.now(),
     recoveryKey,
-    registerIp: ip
+    registerIp: ip,
+    homeRegion: req.params.region
   };
   
   await db.createUser(newUser);
@@ -433,7 +434,7 @@ const regionStates = {
 apiRouter.get('/global/stats', async (req, res, next) => {
   try {
   try {
-    const pop = await db.getTotalPopulation();
+    const pop = await db.getRegionPopulation(req.params.region);
     let globalStats = {
       totalActiveUsers: 0,
       totalPopulation: pop,
@@ -484,7 +485,7 @@ regions.forEach(regionName => {
 
   setInterval(async () => {
     try {
-      const pop = await db.getTotalPopulation();
+      const pop = await db.getRegionPopulation(regionName);
       const isBoosted = state.connectedUsers.size >= 5;
     state.multiplier = isBoosted ? 1.2 : 1.0;
     
@@ -605,7 +606,7 @@ regions.forEach(regionName => {
 
       console.log(`[SYS] Node Authenticated: ${user.username} | IP: ${ip} | Region: ${user.country}`);
 
-      const pop = await db.getTotalPopulation();
+      const pop = await db.getRegionPopulation(regionName);
 
       socket.emit('init_data', {
         userId: user.id,

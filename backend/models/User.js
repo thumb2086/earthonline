@@ -17,7 +17,8 @@ const userSchema = new mongoose.Schema({
   recoveryKey: { type: String },
   redeemedCodes: { type: [String], default: [] },
   friends: { type: [String], default: [] },
-  friendRequests: { type: [String], default: [] }
+  friendRequests: { type: [String], default: [] },
+  homeRegion: { type: String, default: 'asia' }
 });
 
 module.exports = mongoose.model('User', userSchema);

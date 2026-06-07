@@ -17,8 +17,8 @@ async function createUser(userData) {
   await user.save();
 }
 
-async function getTotalPopulation() {
-  return await User.countDocuments({});
+async function getRegionPopulation(homeRegion) {
+  return await User.countDocuments({ homeRegion });
 }
 
 async function updateUserDiscord(username, discordData) {
@@ -112,7 +112,7 @@ async function migrateOfflineTime() {
 module.exports = {
   findUserByUsername,
   createUser,
-  getTotalPopulation,
+  getRegionPopulation,
   updateUserDiscord,
   getGlobalProduction,
   migrateOfflineTime
