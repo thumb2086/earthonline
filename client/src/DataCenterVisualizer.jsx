@@ -93,7 +93,7 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
         
         {/* Left Side: Solid Status Panel */}
         <Draggable nodeRef={cardRef} handle=".drag-handle">
-          <div ref={cardRef} className="dc-status-card" style={{ zIndex: 100 }}>
+          <div ref={cardRef} className="dc-status-card" style={{ position: 'absolute', top: '40px', left: '40px', zIndex: 100 }}>
             <div className="dc-card-header drag-handle" style={{ cursor: 'move' }}>
               <Server size={18} color="#3b82f6" />
               <h2>我的雲端伺服器</h2>
