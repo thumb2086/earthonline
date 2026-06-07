@@ -1636,6 +1636,7 @@ function AccountInfoModal({ token, onClose, onLogout }) {
 
 function App() {
   const [token, setToken] = useState(sessionStorage.getItem('eo_token'));
+  const [region, setRegion] = useState(sessionStorage.getItem('eo_region') || 'asia');
   
   useEffect(() => {
     // Cleanup legacy persistent tokens
@@ -1644,13 +1645,18 @@ function App() {
     }
   }, []);
 
-  const handleLogin = (newToken, username) => {
+  const handleLogin = (newToken, username, selectedRegion) => {
     sessionStorage.setItem('eo_token', newToken);
+    if (selectedRegion) {
+      sessionStorage.setItem('eo_region', selectedRegion);
+      setRegion(selectedRegion);
+    }
     setToken(newToken);
   };
 
   const handleLogout = () => {
     sessionStorage.removeItem('eo_token');
+    sessionStorage.removeItem('eo_region');
     setToken(null);
   };
 
