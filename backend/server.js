@@ -4,7 +4,10 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const geoip = require('geoip-lite');
 const dotenv = require('dotenv');
-dotenv.config(); // Load environment variables first
+dotenv.config();
+
+const { createClient } = require('redis');
+const { createAdapter } = require('@socket.io/redis-adapter');
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -439,12 +442,33 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 const server = http.createServer(app);
+
+const SERVER_REGION = process.env.SERVER_REGION || 'DEV';
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+
+const pubClient = createClient({ url: REDIS_URL });
+const subClient = pubClient.duplicate();
+
 const io = new Server(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
   }
 });
+
+Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+  io.adapter(createAdapter(pubClient, subClient));
+  console.log(`[SYS] Connected to Redis. Server Region: ${SERVER_REGION}`);
+});
+
+let regionalStats = {
+  activeUsers: 0,
+  totalPopulation: 0,
+  globalProduction: 0,
+  socialCompression: '1.000',
+  multiplier: 1.0
+};
+
 
 discordBot.setIoInstance(io);
 
@@ -488,28 +512,11 @@ setInterval(async () => {
     } else {
       // Event Active Modifiers
       switch (currentGlobalEvent.type) {
-        case 'QUANTUM_BURST':
-          multiplier = 3.0;
-          break;
-        case 'DATA_GOLD_RUSH':
-          multiplier = 5.0;
-          break;
-        case 'SYSTEM_MAINTENANCE':
-          multiplier = 0.5;
-          break;
-        case 'SATELLITE_ALIGNMENT':
-          multiplier = 1.0 + (connectedUsers.size * 0.1); // Dynamic!
-          break;
-        // SOLAR_STORM does not change multiplier, keeps the boosted logic if >= 5
+        case 'QUANTUM_BURST': multiplier = 3.0; break;
+        case 'DATA_GOLD_RUSH': multiplier = 5.0; break;
+        case 'SYSTEM_MAINTENANCE': multiplier = 0.5; break;
+        case 'SATELLITE_ALIGNMENT': multiplier = 1.0 + (connectedUsers.size * 0.1); break;
       }
-    }
-  }
-      io.emit('global_event_ended', { type: currentGlobalEvent.type });
-      sendDiscordWebhook(`✅ **【事件結束】** ${currentGlobalEvent.type === 'QUANTUM_BURST' ? '量子爆發' : '太陽風暴'} 已結束，系統恢復正常！`);
-      console.log(`[SYS] Global Event Ended: ${currentGlobalEvent.type}`);
-      currentGlobalEvent = null;
-    } else if (currentGlobalEvent.type === 'QUANTUM_BURST') {
-      multiplier = 3.0; // Override multiplier
     }
   }
 
@@ -528,15 +535,55 @@ setInterval(async () => {
   discordBot.updateBotPresence(connectedUsers.size);
   discordBot.updateChannelName(isBoosted);
 
-  // Broadcast global stats to everyone every 2 seconds
-  io.emit('global_stats', {
+  // Sync Stats
+  regionalStats = {
     activeUsers: connectedUsers.size,
     totalPopulation: pop,
     globalProduction: globalProduction,
     socialCompression: calculateSocialCompression(connectedUsers.size),
     multiplier: multiplier
-  });
+  };
+
+  // Broadcast regional stats
+  io.emit('global_stats', regionalStats);
+  
+  // Publish to Redis for global hub
+  if (pubClient.isOpen) {
+    pubClient.set(`region_stats_${SERVER_REGION}`, JSON.stringify(regionalStats));
+  }
 }, 2000);
+
+// Global Hub API Endpoint
+app.get('/api/global/stats', async (req, res) => {
+  if (!pubClient.isOpen) return res.json({ error: 'Redis offline' });
+  
+  try {
+    const regions = ['ASIA', 'US', 'EU'];
+    let globalStats = {
+      totalActiveUsers: 0,
+      totalPopulation: 0,
+      regions: {}
+    };
+
+    for (const r of regions) {
+      const dataStr = await pubClient.get(`region_stats_${r}`);
+      if (dataStr) {
+        const stats = JSON.parse(dataStr);
+        globalStats.totalActiveUsers += stats.activeUsers;
+        // Population is mostly shared DB, just take latest
+        globalStats.totalPopulation = stats.totalPopulation;
+        globalStats.regions[r] = stats;
+      } else {
+        globalStats.regions[r] = { activeUsers: 0, multiplier: 1.0 };
+      }
+    }
+    
+    res.json(globalStats);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch global stats' });
+  }
+});
+
 
 function calculateSocialCompression(userCount) {
   // Mock formula: more users = higher compression index

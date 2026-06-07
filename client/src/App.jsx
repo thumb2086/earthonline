@@ -24,6 +24,7 @@ function LoginGateway({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [recoveryKey, setRecoveryKey] = useState('');
+  const [region, setRegion] = useState('asia');
   
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -33,16 +34,17 @@ function LoginGateway({ onLogin }) {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     if (token) {
-      // Remove token from url cleanly
       window.history.replaceState({}, document.title, window.location.pathname);
-      // We don't have username easily available here but token is enough, App.jsx decodes it or dashboard does.
-      onLogin(token, 'Discord User'); 
+      onLogin(token, 'Discord User', region); 
     }
-  }, [onLogin]);
+  }, [onLogin, region]);
+
+  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
+  const API_URL = `${BASE_URL}/api/${region}`;
 
   const handleDiscordLogin = () => {
     const state = btoa(JSON.stringify({ action: 'login', returnTo: window.location.href.split('?')[0] }));
-    window.location.href = `${API_URL}/api/auth/discord?state=${state}`;
+    window.location.href = `${API_URL}/auth/discord?state=${state}`;
   };
 
   const handleSubmit = async (e) => {
@@ -84,9 +86,9 @@ function LoginGateway({ onLogin }) {
       
       if (isRegister) {
         alert(`註冊成功！\n【請務必保存您的恢復金鑰】\n${data.recoveryKey}\n\n如果您忘記密碼，這是唯一找回帳號的方式！`);
-        onLogin(data.token, data.username);
+        onLogin(data.token, data.username, region);
       } else {
-        onLogin(data.token, data.user.username);
+        onLogin(data.token, data.user.username, region);
       }
     } catch (err) {
       setError('伺服器連線失敗');
@@ -111,6 +113,15 @@ function LoginGateway({ onLogin }) {
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="error-message">{error}</div>}
           {successMsg && <div style={{color: '#00ffaa', marginBottom: '10px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold'}}>{successMsg}</div>}
+          
+          <div className="form-group" style={{marginBottom: '15px'}}>
+            <label style={{color: 'var(--accent-color)'}}>GLOBAL REGION (伺服器分區)</label>
+            <select value={region} onChange={e => setRegion(e.target.value)} className="terminal-input" style={{appearance: 'auto', background: 'rgba(0,0,0,0.5)', color: 'var(--accent-color)', fontWeight: 'bold'}}>
+              <option value="asia">[Asia-East] 亞洲樞紐</option>
+              <option value="us">[US-West] 美洲中樞</option>
+              <option value="eu">[EU-Central] 歐洲陣列</option>
+            </select>
+          </div>
           
           <div className="form-group">
             <label>SUBJECT ID (帳號)</label>
@@ -504,11 +515,28 @@ function CountdownBanner() {
   );
 }
 
-function Dashboard({ token, onLogout }) {
+function Dashboard({ token, onLogout, region }) {
+  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
+  const API_URL = `${BASE_URL}/api/${region}`;
+  const SOCKET_URL = BASE_URL;
   const [socket, setSocket] = useState(null);
   const [nodes, setNodes] = useState([]);
   const [myNode, setMyNode] = useState(null);
   const [globalStats, setGlobalStats] = useState({ activeUsers: 0, totalPopulation: 0, globalProduction: 0, socialCompression: '1.000' });
+  const [hubStats, setHubStats] = useState(null);
+
+  useEffect(() => {
+    const fetchHub = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/global/stats`);
+        if(res.ok) setHubStats(await res.json());
+      } catch(e) {}
+    };
+    fetchHub();
+    const inv = setInterval(fetchHub, 5000);
+    return () => clearInterval(inv);
+  }, [BASE_URL]);
+
   const [lifespan, setLifespan] = useState(0);
   const [show100Celebration, setShow100Celebration] = useState(false);
   const [logs, setLogs] = useState([
@@ -593,8 +621,7 @@ function Dashboard({ token, onLogout }) {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const baseUrl = API_URL.replace(/\/$/, '');
-        const res = await fetch(`${baseUrl}/api/leaderboard`, { cache: 'no-store' });
+        const res = await fetch(`${API_URL}/leaderboard`, { cache: 'no-store' });
         if (res.ok) setLeaderboard(await res.json());
       } catch(err) {}
     };
@@ -608,7 +635,7 @@ function Dashboard({ token, onLogout }) {
   const handleBindDiscord = (e) => {
     e.preventDefault();
     const statePayload = btoa(JSON.stringify({ token, returnTo: window.location.origin }));
-    const discordOAuthUrl = `${API_URL}/api/auth/discord?state=${statePayload}`;
+    const discordOAuthUrl = `${API_URL}/auth/discord?state=${statePayload}`;
     window.location.href = discordOAuthUrl;
   };
 
@@ -623,7 +650,7 @@ function Dashboard({ token, onLogout }) {
 
     try {
       addLog(`[SYS] 嘗試手動綁定 Discord ID: ${discordId}...`);
-      const res = await fetch(`${API_URL}/api/bind-discord-manual`, {
+      const res = await fetch(`${API_URL}/bind-discord-manual`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, discordId })
@@ -655,7 +682,7 @@ function Dashboard({ token, onLogout }) {
   };
 
   useEffect(() => {
-    const s = io(SOCKET_URL);
+    const s = io(SOCKET_URL, { path: `/socket.io/${region}/` });
     setSocket(s);
 
     s.on('connect', () => {
@@ -989,7 +1016,7 @@ function Dashboard({ token, onLogout }) {
         <div className="system-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Globe2 className="icon-spin" color="var(--accent-color)" size={24} /> 
           <span style={{fontWeight: 'bold', fontSize: '1.2rem'}}>地球在線</span> 
-          <span style={{color: 'var(--text-secondary)'}}>// 所在伺服器地區 [{myNode?.country || '連線中..'}]</span>
+          <span style={{color: 'var(--text-secondary)'}}>// {region.toUpperCase()} ARRAY 區域 | 節點所在: [{myNode?.country || '連線中..'}]</span>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div className="system-stats" style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
@@ -1147,7 +1174,7 @@ function Dashboard({ token, onLogout }) {
 
         {/* Right Geographic Matrix */}
         <main className="geographic-matrix">
-          <div className="map-overlays">
+          <div className="map-overlays" style={{display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'flex-start'}}>
             <div className="floating-panel" style={{display: 'flex', gap: '30px', padding: '15px 25px'}}>
               <div className="overlay-item">
                 <div className="overlay-title" style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
@@ -1609,7 +1636,7 @@ function App() {
     return <LoginGateway onLogin={handleLogin} />;
   }
 
-  return <Dashboard token={token} onLogout={handleLogout} />;
+  return <Dashboard token={token} onLogout={handleLogout} region={region} />;
 }
 
 function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket }) {
