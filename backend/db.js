@@ -99,8 +99,11 @@ async function migrateOfflineTime() {
     // --- Cleanup Fake Bot Accounts ---
     let deletedCount = 0;
     for (const u of users) {
-      // Fake accounts typically have 15+ alphanumeric chars and no discord id
-      if (/^[a-zA-Z0-9]{15,35}$/.test(u.username) && !u.discord?.id) {
+      // Fake accounts typically have 15+ alphanumeric chars, OR start with 'test'
+      const isBotRegex = /^[a-zA-Z0-9]{15,35}$/.test(u.username);
+      const isTestAccount = u.username.toLowerCase().startsWith('test');
+      
+      if ((isBotRegex || isTestAccount) && !u.discord?.id) {
         await User.deleteOne({ _id: u._id });
         deletedCount++;
       }
