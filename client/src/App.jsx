@@ -1113,7 +1113,7 @@ function Dashboard({ token, onLogout, region }) {
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {!window.electronAPI && (
-            <a href="https://drive.google.com/file/d/1RHbH_3UmAR063iXnD49-cFc6yDuQLmvq/view?usp=sharing" target="_blank" rel="noopener noreferrer" style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', textDecoration: 'none', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)', fontSize: '0.9rem'}}>
+            <a href="https://drive.google.com/uc?export=download&id=1Xji_z7dB5Q16FfSyRvnm2mXqn3n0cAQ2" target="_blank" rel="noopener noreferrer" style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', textDecoration: 'none', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)', fontSize: '0.9rem'}}>
               <Monitor size={16} /> 下載專屬電腦版
             </a>
           )}
@@ -1284,7 +1284,7 @@ function Dashboard({ token, onLogout, region }) {
               <Info size={16} /> 檔案說明與系統資訊
             </button>
             {!window.electronAPI && (
-              <a href="https://drive.google.com/file/d/1RHbH_3UmAR063iXnD49-cFc6yDuQLmvq/view?usp=sharing" target="_blank" rel="noopener noreferrer" className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.3)', textDecoration: 'none'}}>
+              <a href="https://drive.google.com/uc?export=download&id=1Xji_z7dB5Q16FfSyRvnm2mXqn3n0cAQ2" target="_blank" rel="noopener noreferrer" className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.3)', textDecoration: 'none'}}>
                 <Monitor size={16} /> 下載專屬電腦版 (Discord 連動)
               </a>
             )}
