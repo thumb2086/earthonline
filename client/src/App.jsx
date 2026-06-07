@@ -144,7 +144,7 @@ function LoginGateway({ onLogin }) {
           </div>
           
           <div className="form-group">
-            <label>SUBJECT ID (帳號)</label>
+            <label>SUBJECT ID (帳號 / 信箱)</label>
             <input 
               type="text" 
               value={username} 

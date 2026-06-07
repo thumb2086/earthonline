@@ -106,7 +106,7 @@ apiRouter.post('/login', async (req, res, next) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
   
-  const user = await db.findUserByUsername(username);
+  const user = await db.findUserByUsernameOrEmail(username);
   if (!user) return res.status(404).json({ error: 'User not found' });
   
   const valid = await bcrypt.compare(password, user.password);

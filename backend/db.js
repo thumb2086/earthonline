@@ -11,6 +11,15 @@ async function findUserByUsername(username) {
   return await User.findOne({ username });
 }
 
+async function findUserByUsernameOrEmail(loginId) {
+  return await User.findOne({
+    $or: [
+      { username: loginId },
+      { email: loginId }
+    ]
+  });
+}
+
 async function createUser(userData) {
   const user = new User(userData);
   if (!user.createdAt) user.createdAt = Date.now();
@@ -106,6 +115,7 @@ async function migrateOfflineTime() {
 
 module.exports = {
   findUserByUsername,
+  findUserByUsernameOrEmail,
   createUser,
   getRegionPopulation,
   updateUserDiscord,
