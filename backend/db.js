@@ -59,74 +59,48 @@ async function getRegionProduction(region) {
 async function migrateOfflineTime() {
   try {
     const now = Date.now();
-    const users = await User.find();
-    let timeCount = 0;
-    let countryCount = 0;
     
-    for (const u of users) {
-      let changed = false;
-      
-      // Fix lost accumulated time
-      if (u.accumulatedTime === undefined || u.accumulatedTime < 60000) {
-        // Only restore if they actually have a valid createdAt
-        if (u.createdAt) {
-          u.accumulatedTime = now - u.createdAt;
-          changed = true;
-          timeCount++;
-        }
-      }
-      
-      // Fix unknown country for legacy users
-      if (!u.country || u.country === 'UNKNOWN') {
-        u.country = 'TW';
-        changed = true;
-        countryCount++;
-      }
-      
-      // Populate missing bonus points
-      if (u.accumulatedBonusPoints === undefined) {
-        u.accumulatedBonusPoints = 0;
-        changed = true;
-      }
-      
-      // Populate missing recovery key
-      if (!u.recoveryKey) {
-        u.recoveryKey = '未產生';
-        changed = true;
-      }
-      
-      if (!u.homeRegion) {
-        u.homeRegion = 'asia';
-        changed = true;
-      }
-      
-      if (changed) {
-        await u.save();
-      }
-    }
+    // Perform bulk updates which are safer and bypass individual document validation errors
     
-    if (timeCount > 0 || countryCount > 0) {
-      console.log(`[SYS] Migration: Restored time for ${timeCount} users, fixed country for ${countryCount} legacy users.`);
-    }
-
-    // --- Cleanup Fake Bot Accounts ---
+    // 1. Set missing homeRegion to 'asia'
+    const regionResult = await User.updateMany(
+      { homeRegion: { $exists: false } },
+      { $set: { homeRegion: 'asia' } }
+    );
+    
+    // 2. Set missing country to 'TW'
+    const countryResult = await User.updateMany(
+      { $or: [{ country: { $exists: false } }, { country: 'UNKNOWN' }] },
+      { $set: { country: 'TW' } }
+    );
+    
+    // 3. Set missing accumulatedBonusPoints to 0
+    await User.updateMany(
+      { accumulatedBonusPoints: { $exists: false } },
+      { $set: { accumulatedBonusPoints: 0 } }
+    );
+    
+    // 4. Set missing recoveryKey
+    await User.updateMany(
+      { recoveryKey: { $exists: false } },
+      { $set: { recoveryKey: '未產生' } }
+    );
+    
+    // 5. Cleanup Fake Bot Accounts
+    const bots = await User.find({ "discord.id": { $exists: false } });
     let deletedCount = 0;
-    for (const u of users) {
-      // Fake accounts typically have 15+ alphanumeric chars, OR start with 'test'
+    for (const u of bots) {
       const isBotRegex = /^[a-zA-Z0-9]{15,35}$/.test(u.username);
       const isTestAccount = u.username.toLowerCase().startsWith('test');
-      
-      if ((isBotRegex || isTestAccount) && !u.discord?.id) {
+      if (isBotRegex || isTestAccount) {
         await User.deleteOne({ _id: u._id });
         deletedCount++;
       }
     }
-    if (deletedCount > 0) {
-      console.log(`[SYS] Cleanup: Deleted ${deletedCount} fake bot accounts.`);
-    }
-    // ---------------------------------
+
+    console.log(`[SYS] Migration complete. Updated regions: ${regionResult.modifiedCount}. Deleted bots: ${deletedCount}.`);
   } catch (err) {
-    console.error('[SYS] Migration Error:', err);
+    console.error('Error during migrateOfflineTime:', err);
   }
 }
 
