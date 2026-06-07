@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Globe, Share2, MessageSquare } from 'lucide-react';
+import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Globe, Share2, MessageSquare, Users } from 'lucide-react';
 import './datacenter.css';
 
-export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage }) {
+export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage, onOpenSocial }) {
   // Level Calculation
   const level = useMemo(() => {
     const hours = lifespan / 3600;
@@ -104,14 +104,14 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
 
           {/* Social Links & Github Badge */}
           <div className="dc-social-section">
-            <a href="https://github.com/huchialun9-ctrl/earthonline" target="_blank" rel="noreferrer" className="social-btn github-badge">
+            <a href="https://github.com/huchialun9-ctrl/earthonline.git" target="_blank" rel="noreferrer" className="social-btn github-badge">
               <Globe size={16} /> <span>Star on GitHub</span>
             </a>
             <div className="social-icons">
-              <a href="#" className="social-btn icon-only" title="Discord">
-                <MessageSquare size={16} />
-              </a>
-              <a href="#" className="social-btn icon-only" title="Social">
+              <button onClick={onOpenSocial} className="social-btn" title="社群討論" style={{ cursor: 'pointer' }}>
+                <Users size={16} /> <span>社群討論</span>
+              </button>
+              <a href="https://www.threads.com/@earthonline6?xmt=AQG048ez1j6AMkcDGAG_U01pj1JoVoCFFMvWnZ5MZGYhgfk" target="_blank" rel="noreferrer" className="social-btn icon-only" title="Threads">
                 <Share2 size={16} />
               </a>
             </div>

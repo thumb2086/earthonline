@@ -1284,6 +1284,7 @@ function Dashboard({ token, onLogout, region }) {
             ping={ping}
             onlineCount={globalStats.onlineCount}
             cpuUsage={globalStats.cpuUsage}
+            onOpenSocial={() => setShowSocialModal(true)}
           />
 
           {/* Bottom Console Log Module */}
