@@ -1,0 +1,186 @@
+.dc-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(circle at center, #1a202c 0%, #0f172a 100%);
+}
+
+.dc-status-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  z-index: 100;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 170, 0.2);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.iso-scene {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1500px;
+}
+
+.iso-grid {
+  width: 600px;
+  height: 600px;
+  position: relative;
+  transform: rotateX(60deg) rotateZ(-45deg);
+  transform-style: preserve-3d;
+  background-image: 
+    linear-gradient(rgba(0, 255, 170, 0.15) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(0, 255, 170, 0.15) 2px, transparent 2px);
+  background-size: 60px 60px;
+  border: 2px solid rgba(0, 255, 170, 0.3);
+  box-shadow: 
+    inset 0 0 100px rgba(0, 255, 170, 0.1),
+    0 20px 50px rgba(0,0,0,0.8);
+}
+
+.iso-item {
+  position: absolute;
+  transform-style: preserve-3d;
+}
+
+.cube {
+  position: absolute;
+  transform-style: preserve-3d;
+  transform-origin: center center;
+}
+
+.cube .face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+}
+
+/* Desk Colors */
+.desk-color.top { background: #2a2a35; border: 1px solid #3f3f4e; }
+.desk-color.front { background: #1f1f28; border: 1px solid #3f3f4e; }
+.desk-color.right { background: #18181f; border: 1px solid #3f3f4e; }
+.desk-color.left { background: #18181f; border: 1px solid #3f3f4e; }
+.desk-color.back { background: #1f1f28; border: 1px solid #3f3f4e; }
+
+/* Tower Colors */
+.tower-color.top { background: #333; border: 1px solid #444; }
+.tower-color.front { background: #222; border: 1px solid #444; }
+.tower-color.right { background: #1a1a1a; border: 1px solid #444; }
+.tower-color.left { background: #1a1a1a; border: 1px solid #444; }
+.tower-color.back { background: #222; border: 1px solid #444; }
+
+/* Rack Colors */
+.rack-color.top { background: #111; border: 1px solid #333; box-shadow: inset 0 0 10px #000; }
+.rack-color.front { background: #0a0a0a; border: 1px solid #333; display: flex; flex-direction: column; justify-content: space-evenly; padding: 2px; }
+.rack-color.right { background: #050505; border: 1px solid #333; }
+.rack-color.left { background: #050505; border: 1px solid #333; }
+.rack-color.back { background: #0a0a0a; border: 1px solid #333; }
+
+/* Server Front Leds */
+.rack-front {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  padding: 4px;
+}
+.rack-slot {
+  height: 4px;
+  background: #1a1a1a;
+  border-radius: 1px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+}
+.led {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #00ffaa;
+  box-shadow: 0 0 4px #00ffaa;
+}
+.blink-fast { animation: blink 0.5s infinite alternate; }
+.blink-slow { animation: blink 1.5s infinite alternate; }
+
+@keyframes blink {
+  0% { opacity: 0.2; }
+  100% { opacity: 1; }
+}
+
+/* Laptop */
+.laptop-base {
+  width: 20px;
+  height: 15px;
+  background: #aaa;
+  border-radius: 1px;
+}
+.laptop-screen {
+  width: 20px;
+  height: 15px;
+  background: #111;
+  border: 1px solid #888;
+  transform-origin: bottom left;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.laptop-code {
+  width: 80%;
+  height: 80%;
+  background: repeating-linear-gradient(
+    0deg,
+    #00ffaa,
+    #00ffaa 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  animation: code-scroll 2s linear infinite;
+  background-size: 100% 10px;
+}
+@keyframes code-scroll {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 10px; }
+}
+
+/* Hologram */
+.hologram-base {
+  width: 40px;
+  height: 40px;
+  background: #222;
+  border-radius: 50%;
+  border: 2px solid #00ffaa;
+  box-shadow: 0 0 20px #00ffaa, inset 0 0 10px #00ffaa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+}
+.hologram-globe {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(0, 255, 170, 0.4) 0%, transparent 70%);
+  border: 1px solid rgba(0, 255, 170, 0.8);
+  box-shadow: 0 0 30px rgba(0, 255, 170, 0.6);
+  transform: rotateX(90deg) translateZ(50px);
+  animation: float 4s ease-in-out infinite, spin 10s linear infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: rotateX(90deg) translateZ(40px); }
+  50% { transform: rotateX(90deg) translateZ(60px); }
+}
+@keyframes spin {
+  0% { transform: rotateX(90deg) translateZ(50px) rotateZ(0deg); }
+  100% { transform: rotateX(90deg) translateZ(50px) rotateZ(360deg); }
+}

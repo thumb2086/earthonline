@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Rectangle, CircleMarker, Popup, useMap } from 
 import { io } from 'socket.io-client';
 import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X, Navigation, Star, Clock, Volume2, VolumeX, Coffee, Users, ChevronDown, Zap, Tornado, Coins, Satellite, AlertTriangle, CheckCircle, MapPin, Monitor } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
+import DataCenterVisualizer from './DataCenterVisualizer';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
 
@@ -1403,47 +1404,7 @@ function Dashboard({ token, onLogout, region }) {
               </div>
             </div>
           </div>
-          <div 
-            className="placeholder-dashboard" 
-            style={{
-              height: '100%', 
-              width: '100%', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              flexDirection: 'column',
-              background: 'radial-gradient(circle at center, #1a202c 0%, #0f172a 100%)',
-              position: 'relative',
-              overflow: 'hidden'
-            }}
-          >
-            {/* Grid Pattern */}
-            <div style={{
-              position: 'absolute',
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)',
-              backgroundSize: '40px 40px',
-              pointerEvents: 'none'
-            }}></div>
-            
-            <Server size={64} style={{ color: 'rgba(255, 255, 255, 0.1)', marginBottom: '20px' }} />
-            <h2 style={{ color: 'rgba(255, 255, 255, 0.3)', letterSpacing: '8px', fontWeight: 'normal', margin: 0 }}>SYSTEM DASHBOARD</h2>
-            <div style={{ 
-              marginTop: '15px',
-              padding: '8px 20px',
-              background: 'rgba(0, 255, 170, 0.05)',
-              border: '1px solid rgba(0, 255, 170, 0.2)',
-              borderRadius: '20px',
-              color: '#00ffaa',
-              fontSize: '0.9rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px'
-            }}>
-              <div className="status-dot"></div>
-              區域淨空 - 擴充模組準備中...
-            </div>
-          </div>
+          <DataCenterVisualizer lifespan={lifespan} bonusPoints={myNode?.accumulatedBonusPoints || 0} />
 
           {/* Bottom Console Log Module */}
           <div className="bottom-log-console" style={{display: 'flex', flexDirection: 'column', height: '250px'}}>
