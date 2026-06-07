@@ -13,7 +13,7 @@ const User = require('./models/User'); // Required for updateMany
 const discordBot = require('./discordBot'); // Starts discord bot and cron jobs
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
-const si = require('systeminformation');
+const os = require('os');
 
 // Run offline time migration once on startup
 db.migrateOfflineTime().catch(err => console.error('[SYS] Migration failed:', err));
@@ -549,18 +549,29 @@ regions.forEach(regionName => {
 });
 
 let hardwareStats = { cpu: 0, uplink: 0, downlink: 0 };
-setInterval(async () => {
+setInterval(() => {
   try {
-    const load = await si.currentLoad();
-    const network = await si.networkStats();
-    const defaultNet = network && network.length > 0 ? network[0] : { tx_sec: 0, rx_sec: 0 };
-    hardwareStats.cpu = load.currentLoad;
-    hardwareStats.uplink = Math.floor((defaultNet.tx_sec || 0) / 1024);
-    hardwareStats.downlink = Math.floor((defaultNet.rx_sec || 0) / 1024);
+    const cpus = os.cpus();
+    if (cpus && cpus.length > 0) {
+      let user = 0, nice = 0, sys = 0, idle = 0, irq = 0;
+      for (let cpu in cpus) {
+        user += cpus[cpu].times.user;
+        nice += cpus[cpu].times.nice;
+        sys += cpus[cpu].times.sys;
+        irq += cpus[cpu].times.irq;
+        idle += cpus[cpu].times.idle;
+      }
+      const total = user + nice + sys + idle + irq;
+      const active = user + nice + sys + irq;
+      // Calculate cpu usage % based on current snapshot vs 0 (simplification for instantaneous load)
+      // For a better reading, we would compare previous snapshot to current, but os.loadavg is simpler
+      const cpuUsage = (os.loadavg()[0] / cpus.length) * 100;
+      hardwareStats.cpu = Math.min(100, Math.max(0, cpuUsage));
+    }
   } catch (err) {
     console.error('[SYS] Hardware stat error:', err);
   }
-}, 10000);
+}, 5000);
 
 regions.forEach(regionName => {
   const nsp = io.of(`/${regionName}`);
