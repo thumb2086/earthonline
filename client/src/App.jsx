@@ -1560,6 +1560,8 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
       }
     } catch (err) {
       alert('連線失敗');
+    } finally {
+      setIsSendingVerify(false);
     }
   };
 
