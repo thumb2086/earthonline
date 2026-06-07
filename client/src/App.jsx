@@ -1282,8 +1282,9 @@ function Dashboard({ token, onLogout, region }) {
             lifespan={lifespan} 
             bonusPoints={myNode?.accumulatedBonusPoints || 0} 
             ping={ping}
-            onlineCount={globalStats.onlineCount}
+            onlineCount={globalStats.activeUsers || 0}
             cpuUsage={globalStats.cpuUsage}
+            region={region}
             onOpenSocial={() => setShowSocialModal(true)}
           />
 
