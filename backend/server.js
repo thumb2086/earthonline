@@ -811,6 +811,10 @@ regions.forEach(regionName => {
         lat: geo.ll[0] + (Math.random() - 0.5) * 0.1,
         lon: geo.ll[1] + (Math.random() - 0.5) * 0.1,
         accumulatedTime: dbUser?.accumulatedTime || 0,
+        accumulatedBonusPoints: dbUser?.accumulatedBonusPoints || 0,
+        health: dbUser?.health !== undefined ? dbUser.health : 100,
+        inventory: dbUser?.inventory ? Object.fromEntries(dbUser.inventory) : {},
+        activeBuffs: dbUser?.activeBuffs ? Object.fromEntries(dbUser.activeBuffs) : {},
         createdAt: dbUser?.createdAt || Date.now(),
         connectedAt: Date.now()
       };
@@ -844,6 +848,10 @@ regions.forEach(regionName => {
         lat: user.lat,
         lon: user.lon,
         accumulatedTime: user.accumulatedTime,
+        accumulatedBonusPoints: user.accumulatedBonusPoints,
+        health: user.health,
+        inventory: user.inventory,
+        activeBuffs: user.activeBuffs,
         createdAt: user.createdAt,
         connectedAt: user.connectedAt,
         activeUsers: connectedUsers.size,
