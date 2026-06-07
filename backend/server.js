@@ -390,6 +390,16 @@ apiRouter.get('/leaderboard', async (req, res) => {
 
 app.use('/api/:region', apiRouter);
 
+const path = require('path');
+if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'development') {
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
+      res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+    }
+  });
+}
+
 app.use((err, req, res, next) => {
   console.error('[SYS] Express Error:', err);
   res.status(500).json({ error: 'Internal Server Error' });
