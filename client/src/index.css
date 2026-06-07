@@ -672,9 +672,16 @@ body {
   height: 10px;
 }
 
-.header-dropdown:hover .header-dropdown-content {
+.header-dropdown:hover .header-dropdown-content,
+.header-dropdown.open .header-dropdown-content {
   display: flex;
   flex-direction: column;
+  animation: dropdownFadeIn 0.15s ease;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .dropdown-item {
