@@ -82,6 +82,11 @@ async function migrateOfflineTime() {
         changed = true;
       }
       
+      if (!u.homeRegion) {
+        u.homeRegion = 'asia';
+        changed = true;
+      }
+      
       if (changed) {
         await u.save();
       }
