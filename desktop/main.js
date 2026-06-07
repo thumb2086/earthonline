@@ -30,8 +30,8 @@ async function setActivity(data) {
 rpc.on('ready', () => {
   rpcReady = true;
   setActivity({
-    details: 'Logging in...',
-    state: 'On the main screen'
+    details: '尚未登入 (Not Logged In)',
+    state: '停留於登入閘道口'
   });
 });
 

@@ -257,6 +257,95 @@ function MapLocator({ myNode, locateTrigger }) {
   return null;
 }
 
+function MapOverlay({ onClose, myNode, nodes, initialTheme, onThemeChange }) {
+  const { t } = useLanguage();
+  const [mapTheme, setMapTheme] = useState(initialTheme);
+  const [locateTrigger, setLocateTrigger] = useState(0);
+
+  useEffect(() => {
+    onThemeChange(mapTheme);
+  }, [mapTheme, onThemeChange]);
+
+  return (
+    <div className="modal-overlay" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 9999, display: 'flex', flexDirection: 'column'}}>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.1)'}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+          <Globe2 size={24} color="var(--accent-color)" />
+          <h2 style={{margin: 0, color: 'var(--text-primary)', fontSize: '1.2rem', letterSpacing: '1px'}}>全球伺服器節點地圖</h2>
+        </div>
+        <X size={24} style={{cursor: 'pointer', color: 'var(--text-secondary)'}} onClick={onClose} />
+      </div>
+      
+      <div style={{flex: 1, position: 'relative'}}>
+        <MapContainer 
+          center={[20, 0]} 
+          zoom={2.0} 
+          minZoom={2.0}
+          maxZoom={8.0}
+          maxBounds={[[-90, -180], [90, 180]]}
+          maxBoundsViscosity={1.0}
+          worldCopyJump={false}
+          style={{ height: '100%', width: '100%' }}
+          zoomControl={true}
+        >
+          <MapResizeHandler />
+          <MapLocator myNode={myNode} locateTrigger={locateTrigger} />
+
+          {mapTheme === 'satellite' && (
+            <TileLayer
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            />
+          )}
+          {mapTheme === 'dark' && (
+            <TileLayer
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            />
+          )}
+          {mapTheme === 'street' && (
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; OpenStreetMap contributors'
+            />
+          )}
+          
+          {nodes.filter(n => typeof n.lat === 'number' && typeof n.lon === 'number').map(node => (
+            <CircleMarker
+              key={`node-${node.id}`}
+              center={[node.lat, node.lon]}
+              radius={node.id === myNode?.id ? 10 : 8}
+              pathOptions={{ 
+                color: '#ffffff', 
+                fillColor: node.id === myNode?.id ? 'var(--accent-color)' : '#ff3b30', 
+                fillOpacity: 1.0,
+                weight: 2
+              }}
+            >
+              <Popup>
+                <div style={{ fontFamily: 'var(--font-sans)' }}>
+                  使用者: {node.username} {node.id === myNode?.id && '(您)'}
+                </div>
+              </Popup>
+            </CircleMarker>
+          ))}
+        </MapContainer>
+
+        {/* Map Controls */}
+        <div style={{position: 'absolute', bottom: '20px', right: '20px', zIndex: 1000, display: 'flex', gap: '10px'}}>
+          <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.8)', border: '1px solid var(--accent-color)'}} onClick={() => setLocateTrigger(p => p + 1)}>
+            <Navigation size={14} /> 定位我的節點
+          </button>
+          <div style={{width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 5px'}}></div>
+          <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'satellite' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'satellite' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('satellite')}>{t('衛星')}</button>
+          <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'dark' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'dark' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('dark')}>{t('暗黑')}</button>
+          <button className="terminal-btn" style={{padding: '8px 12px', fontSize: '0.8rem', background: mapTheme === 'street' ? 'var(--accent-color)' : 'rgba(0,0,0,0.6)', color: mapTheme === 'street' ? '#000' : 'var(--text-primary)'}} onClick={() => setMapTheme('street')}>{t('街道')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DocumentationOverlay({ onClose }) {
   const { t, language, setLanguage } = useLanguage();
   const [activeSection, setActiveSection] = useState('overview');
@@ -594,6 +683,7 @@ function Dashboard({ token, onLogout, region }) {
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [mapTheme, setMapTheme] = useState('satellite');
+  const [showMapModal, setShowMapModal] = useState(false);
   const [showManualBind, setShowManualBind] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showAccountInfo, setShowAccountInfo] = useState(false);
@@ -1130,18 +1220,8 @@ function Dashboard({ token, onLogout, region }) {
               選單 (Menu) <ChevronDown size={16} style={{ transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
             </button>
             <div className="header-dropdown-content">
-              <button onClick={() => { setLocateTrigger(prev => prev + 1); setDropdownOpen(false); }} className="dropdown-item">
-                <Navigation size={16} /> 定位我的節點
-              </button>
-              <div style={{width: '100%', height: '1px', background: 'rgba(255,255,255,0.1)', margin: '5px 0'}}></div>
-              <button onClick={() => { setMapTheme('satellite'); setDropdownOpen(false); }} className="dropdown-item" style={{color: mapTheme === 'satellite' ? 'var(--accent-color)' : '#fff'}}>
-                <Satellite size={16} /> 地圖: 衛星
-              </button>
-              <button onClick={() => { setMapTheme('dark'); setDropdownOpen(false); }} className="dropdown-item" style={{color: mapTheme === 'dark' ? 'var(--accent-color)' : '#fff'}}>
-                <Globe2 size={16} /> 地圖: 暗黑
-              </button>
-              <button onClick={() => { setMapTheme('street'); setDropdownOpen(false); }} className="dropdown-item" style={{color: mapTheme === 'street' ? 'var(--accent-color)' : '#fff'}}>
-                <MapPin size={16} /> 地圖: 街道
+              <button onClick={() => { setShowMapModal(true); setDropdownOpen(false); }} className="dropdown-item">
+                <Globe2 size={16} /> 開啟伺服器地圖
               </button>
               <div style={{width: '100%', height: '1px', background: 'rgba(255,255,255,0.1)', margin: '5px 0'}}></div>
               <button onClick={() => { setShowSocialModal(true); setDropdownOpen(false); }} className="dropdown-item">
@@ -1323,60 +1403,47 @@ function Dashboard({ token, onLogout, region }) {
               </div>
             </div>
           </div>
-          <MapContainer 
-            center={[20, 0]} 
-            zoom={2.0} 
-            minZoom={2.0}
-            maxZoom={8.0}
-            maxBounds={[[-90, -180], [90, 180]]}
-            maxBoundsViscosity={1.0}
-            worldCopyJump={false}
-            style={{ height: '100%', width: '100%' }}
-            zoomControl={true}
+          <div 
+            className="placeholder-dashboard" 
+            style={{
+              height: '100%', 
+              width: '100%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              flexDirection: 'column',
+              background: 'radial-gradient(circle at center, #1a202c 0%, #0f172a 100%)',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
           >
-            <MapResizeHandler />
-            <MapLocator myNode={myNode} locateTrigger={locateTrigger} />
-
-            {mapTheme === 'satellite' && (
-              <TileLayer
-                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-              />
-            )}
-            {mapTheme === 'dark' && (
-              <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              />
-            )}
-            {mapTheme === 'street' && (
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; OpenStreetMap contributors'
-              />
-            )}
+            {/* Grid Pattern */}
+            <div style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)',
+              backgroundSize: '40px 40px',
+              pointerEvents: 'none'
+            }}></div>
             
-            {/* Individual Points */}
-            {nodes.filter(n => typeof n.lat === 'number' && typeof n.lon === 'number').map(node => (
-              <CircleMarker
-                key={`node-${node.id}`}
-                center={[node.lat, node.lon]}
-                radius={node.id === myNode?.id ? 10 : 8}
-                pathOptions={{ 
-                  color: '#ffffff', 
-                  fillColor: node.id === myNode?.id ? 'var(--accent-color)' : '#ff3b30', 
-                  fillOpacity: 1.0,
-                  weight: 2
-                }}
-              >
-                <Popup>
-                  <div style={{ fontFamily: 'var(--font-sans)' }}>
-                    使用者: {node.username} {node.id === myNode?.id && '(您)'}
-                  </div>
-                </Popup>
-              </CircleMarker>
-            ))}
-          </MapContainer>
+            <Server size={64} style={{ color: 'rgba(255, 255, 255, 0.1)', marginBottom: '20px' }} />
+            <h2 style={{ color: 'rgba(255, 255, 255, 0.3)', letterSpacing: '8px', fontWeight: 'normal', margin: 0 }}>SYSTEM DASHBOARD</h2>
+            <div style={{ 
+              marginTop: '15px',
+              padding: '8px 20px',
+              background: 'rgba(0, 255, 170, 0.05)',
+              border: '1px solid rgba(0, 255, 170, 0.2)',
+              borderRadius: '20px',
+              color: '#00ffaa',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <div className="status-dot"></div>
+              區域淨空 - 擴充模組準備中...
+            </div>
+          </div>
 
           {/* Bottom Console Log Module */}
           <div className="bottom-log-console" style={{display: 'flex', flexDirection: 'column', height: '250px'}}>
@@ -1582,6 +1649,7 @@ function Dashboard({ token, onLogout, region }) {
       {/* Full Page About Documentation */}
       {showAboutModal && <DocumentationOverlay onClose={() => setShowAboutModal(false)} />}
       {showSocialModal && <SocialModal onClose={() => setShowSocialModal(false)} socialTab={socialTab} setSocialTab={setSocialTab} socialData={socialData} socket={socket} />}
+      {showMapModal && <MapOverlay onClose={() => setShowMapModal(false)} myNode={myNode} nodes={nodes} initialTheme={mapTheme} onThemeChange={setMapTheme} />}
       {showAccountInfo && <AccountInfoModal token={token} apiUrl={API_URL} onClose={() => setShowAccountInfo(false)} onLogout={onLogout} />}
       
       <audio ref={audioRef} src="https://upload.wikimedia.org/wikipedia/commons/4/4b/Ambient_music_-_beautiful_piano.ogg" loop />
