@@ -103,18 +103,16 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
           </div>
 
           {/* Social Links & Github Badge */}
-          <div className="dc-social-section">
-            <a href="https://github.com/huchialun9-ctrl/earthonline.git" target="_blank" rel="noreferrer" className="social-btn github-badge">
-              <GithubIcon size={16} /> <span>Star on GitHub</span>
+          <div className="dc-social-section" style={{ display: 'flex', gap: '20px', justifyContent: 'center', alignItems: 'center' }}>
+            <a href="https://github.com/huchialun9-ctrl/earthonline.git" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.05)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
+              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Github_logo_svg.svg/320px-Github_logo_svg.svg.png" alt="GitHub" style={{ height: '35px', filter: 'invert(1) brightness(0.9)' }} />
             </a>
-            <div className="social-icons">
-              <button onClick={onOpenSocial} className="social-btn" title="社群討論" style={{ cursor: 'pointer' }}>
-                <Users size={16} /> <span>社群討論</span>
-              </button>
-              <a href="https://www.threads.com/@earthonline6?xmt=AQG048ez1j6AMkcDGAG_U01pj1JoVoCFFMvWnZ5MZGYhgfk" target="_blank" rel="noreferrer" className="social-btn icon-only" title="Threads">
-                <ThreadsIcon size={16} />
-              </a>
-            </div>
+            <a href="https://www.threads.com/@earthonline6?xmt=AQG048ez1j6AMkcDGAG_U01pj1JoVoCFFMvWnZ5MZGYhgfk" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.05)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
+              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Threads_%28app%29_logo.svg/120px-Threads_%28app%29_logo.svg.png" alt="Threads" style={{ height: '35px', borderRadius: '8px' }} />
+            </a>
+            <button onClick={onOpenSocial} title="社群討論" style={{ background: '#121419', border: '1px solid #232731', borderRadius: '8px', padding: '8px 12px', color: '#94a3b8', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', height: '35px', fontSize: '0.85rem' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='#f8fafc'; e.currentTarget.style.borderColor='#3b82f6'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='#94a3b8'; e.currentTarget.style.borderColor='#232731'; }}>
+              <Users size={16} /> <span>討論區</span>
+            </button>
           </div>
 
           {/* GitHub Contribution Wall */}
