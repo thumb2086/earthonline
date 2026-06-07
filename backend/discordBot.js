@@ -26,6 +26,15 @@ client.once('ready', async () => {
   console.log(`[SYS] Discord Bot Online: Logged in as ${client.user.tag}`);
   isBotReady = true;
   
+  // Pre-fetch all members to populate cache for leaderboard roles
+  try {
+    const guild = await client.guilds.fetch(GUILD_ID);
+    await guild.members.fetch();
+    console.log(`[SYS] Discord: Fetched ${guild.members.cache.size} members for cache.`);
+  } catch (err) {
+    console.error('[SYS] Discord: Failed to fetch members on startup:', err);
+  }
+  
   // Register Slash Commands
   const rest = new REST({ version: '10' }).setToken(TOKEN);
   try {
