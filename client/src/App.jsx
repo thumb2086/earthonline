@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Rectangle, CircleMarker, Popup, useMap } from 'react-leaflet';
 import { io } from 'socket.io-client';
-import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X, Navigation, Star, Clock, Volume2, VolumeX, Coffee, Users, ChevronDown, Zap, Tornado, Coins, Satellite, AlertTriangle, CheckCircle, MapPin } from 'lucide-react';
+import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X, Navigation, Star, Clock, Volume2, VolumeX, Coffee, Users, ChevronDown, Zap, Tornado, Coins, Satellite, AlertTriangle, CheckCircle, MapPin, Monitor } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
 import 'leaflet/dist/leaflet.css';
 import './index.css';
@@ -1278,6 +1278,11 @@ function Dashboard({ token, onLogout, region }) {
             <button className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}} onClick={() => setShowAboutModal(true)}>
               <Info size={16} /> 檔案說明與系統資訊
             </button>
+            {!window.electronAPI && (
+              <a href="https://earthonline.onrender.com/downloads/EarthOnlineSetup.exe" className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.3)', textDecoration: 'none'}}>
+                <Monitor size={16} /> 下載專屬電腦版 (Discord 連動)
+              </a>
+            )}
           </div>
         </aside>
 
