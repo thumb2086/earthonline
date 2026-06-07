@@ -20,7 +20,6 @@ const client = new Client({
 
 let isBotReady = false;
 
-const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder } = require('discord.js');
 // (We leave the canvas import there but don't use it to avoid changing top lines right now, or we can just ignore it)
 
 client.once('ready', async () => {
