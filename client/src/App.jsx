@@ -1112,6 +1112,11 @@ function Dashboard({ token, onLogout, region }) {
           <span style={{color: 'var(--text-secondary)'}}>// {region.toUpperCase()} ARRAY 區域 | 節點所在: [{myNode?.country || '連線中..'}]</span>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          {!window.electronAPI && (
+            <a href="https://earthonline.onrender.com/downloads/EarthOnlineSetup.exe" className="terminal-btn pulse-border" style={{display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.5)', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold'}}>
+              <Monitor size={16} /> 下載專屬電腦版
+            </a>
+          )}
           <div className="system-stats" style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
             <div style={{display: 'flex', alignItems: 'center'}}>
               <span style={{color: 'var(--text-secondary)'}}>實時上線人數: <strong style={{color: 'var(--accent-color)'}}>{globalStats.activeUsers}</strong></span>
