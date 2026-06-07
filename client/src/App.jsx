@@ -1293,7 +1293,7 @@ function Dashboard({ token, onLogout, region }) {
           />
 
           {/* Bottom Console Log Module */}
-          <Draggable bounds="parent" handle=".log-header">
+          <Draggable handle=".log-header">
             <div className="bottom-log-console" style={{display: 'flex', flexDirection: 'column', height: '250px'}}>
               <div className="log-header" style={{display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-color)', cursor: 'move'}}>
               <Activity size={16} /> 世界頻道 / 系統日誌 (World Chat)
