@@ -528,7 +528,7 @@ regions.forEach(regionName => {
     else if (state.activeUsers > 10000) comp = '0.100';
     state.socialCompression = comp;
     
-    state.globalProduction = state.multiplier;
+    state.globalProduction = await db.getRegionProduction(regionName);
     
     nsp.emit('global_stats', {
       activeUsers: state.activeUsers,

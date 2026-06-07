@@ -43,6 +43,19 @@ async function getGlobalProduction() {
   return result.length > 0 ? Math.floor(result[0].totalProduction / 1000) : 0;
 }
 
+async function getRegionProduction(region) {
+  const result = await User.aggregate([
+    { $match: { homeRegion: region } },
+    {
+      $group: {
+        _id: null,
+        totalProduction: { $sum: "$accumulatedTime" }
+      }
+    }
+  ]);
+  return result.length > 0 ? Math.floor(result[0].totalProduction / 1000) : 0;
+}
+
 async function migrateOfflineTime() {
   try {
     const now = Date.now();
@@ -123,5 +136,6 @@ module.exports = {
   getRegionPopulation,
   updateUserDiscord,
   getGlobalProduction,
+  getRegionProduction,
   migrateOfflineTime
 };
