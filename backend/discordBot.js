@@ -129,9 +129,13 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.login(TOKEN).catch(err => {
-  console.error('[SYS] Discord Bot Login Failed:', err);
-});
+if (TOKEN) {
+  client.login(TOKEN).catch(err => {
+    console.error('[SYS] Discord Bot Login Failed, continuing without bot:', err.message);
+  });
+} else {
+  console.warn('[SYS] DISCORD_BOT_TOKEN not provided, running without Discord integration.');
+}
 
 // Update Bot Status
 let lastPresenceUpdate = 0;
