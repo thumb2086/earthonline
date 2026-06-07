@@ -6,9 +6,6 @@ const geoip = require('geoip-lite');
 const dotenv = require('dotenv');
 dotenv.config();
 
-const { createClient } = require('redis');
-const { createAdapter } = require('@socket.io/redis-adapter');
-
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
@@ -19,63 +16,13 @@ const discordBot = require('./discordBot'); // Starts discord bot and cron jobs
 db.migrateOfflineTime().catch(err => console.error('[SYS] Migration failed:', err));
 
 const app = express();
+const apiRouter = express.Router();
 app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
   res.send('Earth Online Backend Core is running. WebSocket and API endpoints are active.');
 });
-
-// Global Event State
-let currentGlobalEvent = null; // { type: 'QUANTUM_BURST' | 'SOLAR_STORM', endTime: number }
-
-function triggerRandomEvent() {
-  if (currentGlobalEvent) return;
-  
-  const events = ['QUANTUM_BURST', 'SOLAR_STORM', 'DATA_GOLD_RUSH', 'SATELLITE_ALIGNMENT', 'SYSTEM_MAINTENANCE'];
-  const type = events[Math.floor(Math.random() * events.length)];
-  
-  let duration = 60 * 60 * 1000; // default 1 hour
-  if (type === 'QUANTUM_BURST') duration = 2 * 60 * 60 * 1000;
-  if (type === 'SATELLITE_ALIGNMENT') duration = 2 * 60 * 60 * 1000;
-  if (type === 'SYSTEM_MAINTENANCE') duration = 30 * 60 * 1000;
-  if (type === 'DATA_GOLD_RUSH') duration = 15 * 60 * 1000;
-  
-  currentGlobalEvent = {
-    type,
-    endTime: Date.now() + duration
-  };
-  
-  let msg = '';
-  switch(type) {
-    case 'QUANTUM_BURST':
-      msg = '⚡ **【全域事件：量子爆發】** 接下來 2 小時內，全伺服器點數累積速度提升為 **3.0 倍**！';
-      break;
-    case 'SOLAR_STORM':
-      msg = '🌪️ **【全域事件：太陽風暴】** 接下來 1 小時內網路將劇烈波動，期間斷線將被扣除 100 點，撐過去倖存可獲 200 點獎勵！';
-      break;
-    case 'DATA_GOLD_RUSH':
-      msg = '💰 **【全域事件：數據淘金潮】** 短期爆發！接下來 15 分鐘內，全伺服器點數累積速度狂飆至 **5.0 倍**！';
-      break;
-    case 'SATELLITE_ALIGNMENT':
-      msg = '🛰️ **【全域事件：衛星連線最佳化】** 接下來 2 小時內啟動動態倍率，目前在線人數越多，全伺服器產出倍率越高！';
-      break;
-    case 'SYSTEM_MAINTENANCE':
-      msg = '⚠️ **【全域事件：系統維護模式】** 接下來 30 分鐘內伺服器算力降頻 (0.5倍)，但期間保持連線不斷線的節點，結束時可獲 500 點補償金！';
-      break;
-  }
-    
-  sendDiscordWebhook(msg);
-  io.emit('global_event_started', { type, endTime: currentGlobalEvent.endTime });
-  console.log(`[SYS] Global Event Triggered: ${type}`);
-}
-
-// Randomly trigger an event every 2 to 4 hours
-setInterval(() => {
-  if (!currentGlobalEvent && Math.random() < 0.5) {
-    triggerRandomEvent();
-  }
-}, 2 * 60 * 60 * 1000);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'earth_online_secret_key_9988';
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
@@ -109,7 +56,7 @@ setInterval(() => {
 }, 24 * 60 * 60 * 1000); // Once a day
 
 // Auth Endpoints
-app.post('/api/register', async (req, res) => {
+apiRouter.post('/register', async (req, res) => {
   const { username, password } = req.body;
   let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
@@ -155,7 +102,7 @@ app.post('/api/register', async (req, res) => {
   res.json({ success: true, message: 'Registration successful', recoveryKey, token, username });
 });
 
-app.post('/api/login', async (req, res) => {
+apiRouter.post('/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
   
@@ -169,7 +116,7 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true, token, user: { id: user.id, username: user.username } });
 });
 
-app.get('/api/auth/me', async (req, res) => {
+apiRouter.get('/auth/me', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'No token' });
   const token = authHeader.split(' ')[1];
@@ -190,7 +137,7 @@ app.get('/api/auth/me', async (req, res) => {
   }
 });
 
-app.post('/api/auth/generate-recovery-key', async (req, res) => {
+apiRouter.post('/auth/generate-recovery-key', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'No token' });
   const token = authHeader.split(' ')[1];
@@ -212,7 +159,7 @@ app.post('/api/auth/generate-recovery-key', async (req, res) => {
   }
 });
 
-app.post('/api/reset-password', async (req, res) => {
+apiRouter.post('/reset-password', async (req, res) => {
   const { username, recoveryKey, newPassword } = req.body;
   if (!username || !recoveryKey || !newPassword) return res.status(400).json({ error: 'Missing fields' });
   
@@ -228,7 +175,7 @@ app.post('/api/reset-password', async (req, res) => {
   res.json({ success: true, message: 'Password reset successful' });
 });
 
-app.post('/api/auth/delete-account', async (req, res) => {
+apiRouter.post('/auth/delete-account', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'No token' });
   const token = authHeader.split(' ')[1];
@@ -256,7 +203,7 @@ app.post('/api/auth/delete-account', async (req, res) => {
   }
 });
 
-app.post('/api/bind-discord-manual', async (req, res) => {
+apiRouter.post('/bind-discord-manual', async (req, res) => {
   const { token, discordId, username: globalName, avatar: avatarUrl } = req.body;
   if (!token || !discordId) return res.status(400).json({ error: 'Missing token or discordId' });
 
@@ -274,7 +221,7 @@ app.post('/api/bind-discord-manual', async (req, res) => {
   }
 });
 
-app.get('/api/auth/discord', (req, res) => {
+apiRouter.get('/auth/discord', (req, res) => {
   const state = req.query.state;
   if (!state) return res.status(400).send('Missing state');
   
@@ -284,7 +231,7 @@ app.get('/api/auth/discord', (req, res) => {
   res.redirect(discordAuthUrl);
 });
 
-app.get('/api/auth/discord/callback', async (req, res) => {
+apiRouter.get('/auth/discord/callback', async (req, res) => {
   const { code, state, error } = req.query;
   const redirectUri = `${BACKEND_URL}/api/auth/discord/callback`;
 
@@ -396,7 +343,7 @@ app.get('/api/auth/discord/callback', async (req, res) => {
 });
 
 // Leaderboard Endpoint
-app.get('/api/leaderboard', async (req, res) => {
+apiRouter.get('/leaderboard', async (req, res) => {
   try {
     const users = await User.find({}, 'username accumulatedTime accumulatedBonusPoints discord country').lean();
     let leaderboard = users.map(u => {
@@ -441,143 +388,36 @@ app.get('/api/leaderboard', async (req, res) => {
   }
 });
 
+app.use('/api/:region', apiRouter);
+
 const server = http.createServer(app);
 
-const SERVER_REGION = process.env.SERVER_REGION || 'DEV';
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-
-const pubClient = createClient({ url: REDIS_URL });
-const subClient = pubClient.duplicate();
-
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+  cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
-  io.adapter(createAdapter(pubClient, subClient));
-  console.log(`[SYS] Connected to Redis. Server Region: ${SERVER_REGION}`);
-});
-
-let regionalStats = {
-  activeUsers: 0,
-  totalPopulation: 0,
-  globalProduction: 0,
-  socialCompression: '1.000',
-  multiplier: 1.0
+const regions = ['asia', 'us', 'eu'];
+const regionStates = {
+  asia: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' },
+  us: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' },
+  eu: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' }
 };
 
-
-discordBot.setIoInstance(io);
-
-// State
-const connectedUsers = new Map();
-let globalProduction = 0; // Total accumulated idle time (seconds)
-
-// Periodic global calculation
-setInterval(async () => {
-  const now = Date.now();
-  globalProduction = await db.getGlobalProduction();
-  const pop = await db.getTotalPopulation();
-
-  const isBoosted = connectedUsers.size >= 5;
-  let multiplier = isBoosted ? 1.2 : 1.0;
-  
-  // Apply Global Event overrides
-  if (currentGlobalEvent) {
-    if (Date.now() >= currentGlobalEvent.endTime) {
-      // Event Ended
-      if (currentGlobalEvent.type === 'SOLAR_STORM' && connectedUsers.size > 0) {
-        const usernames = Array.from(connectedUsers.values()).map(u => u.username);
-        await User.updateMany({ username: { $in: usernames } }, { $inc: { accumulatedBonusPoints: 200 } }).catch(console.error);
-      } else if (currentGlobalEvent.type === 'SYSTEM_MAINTENANCE' && connectedUsers.size > 0) {
-        const usernames = Array.from(connectedUsers.values()).map(u => u.username);
-        await User.updateMany({ username: { $in: usernames } }, { $inc: { accumulatedBonusPoints: 500 } }).catch(console.error);
-      }
-      
-      io.emit('global_event_ended', { type: currentGlobalEvent.type });
-      let eventName = currentGlobalEvent.type;
-      switch(eventName) {
-        case 'QUANTUM_BURST': eventName = '量子爆發'; break;
-        case 'SOLAR_STORM': eventName = '太陽風暴'; break;
-        case 'DATA_GOLD_RUSH': eventName = '數據淘金潮'; break;
-        case 'SATELLITE_ALIGNMENT': eventName = '衛星連線最佳化'; break;
-        case 'SYSTEM_MAINTENANCE': eventName = '系統維護模式'; break;
-      }
-      sendDiscordWebhook(`✅ **【全域事件結束】** ${eventName} 已結束，系統恢復正常運作！`);
-      console.log(`[SYS] Global Event Ended: ${currentGlobalEvent.type}`);
-      currentGlobalEvent = null;
-    } else {
-      // Event Active Modifiers
-      switch (currentGlobalEvent.type) {
-        case 'QUANTUM_BURST': multiplier = 3.0; break;
-        case 'DATA_GOLD_RUSH': multiplier = 5.0; break;
-        case 'SYSTEM_MAINTENANCE': multiplier = 0.5; break;
-        case 'SATELLITE_ALIGNMENT': multiplier = 1.0 + (connectedUsers.size * 0.1); break;
-      }
-    }
-  }
-
-  // Add base time (2 seconds) and bonus points to online users
-  if (connectedUsers.size > 0) {
-    const usernames = Array.from(connectedUsers.values()).map(u => u.username);
-    const bonusPoints = multiplier > 1.0 ? 2 * (multiplier - 1.0) : 0;
-    
-    await User.updateMany(
-      { username: { $in: usernames } },
-      { $inc: { accumulatedTime: 2000, accumulatedBonusPoints: bonusPoints } }
-    );
-  }
-
-  // Discord Bot Interactions
-  discordBot.updateBotPresence(connectedUsers.size);
-  discordBot.updateChannelName(isBoosted);
-
-  // Sync Stats
-  regionalStats = {
-    activeUsers: connectedUsers.size,
-    totalPopulation: pop,
-    globalProduction: globalProduction,
-    socialCompression: calculateSocialCompression(connectedUsers.size),
-    multiplier: multiplier
-  };
-
-  // Broadcast regional stats
-  io.emit('global_stats', regionalStats);
-  
-  // Publish to Redis for global hub
-  if (pubClient.isOpen) {
-    pubClient.set(`region_stats_${SERVER_REGION}`, JSON.stringify(regionalStats));
-  }
-}, 2000);
-
-// Global Hub API Endpoint
 app.get('/api/global/stats', async (req, res) => {
-  if (!pubClient.isOpen) return res.json({ error: 'Redis offline' });
-  
   try {
-    const regions = ['ASIA', 'US', 'EU'];
+    const pop = await db.getTotalPopulation();
     let globalStats = {
       totalActiveUsers: 0,
-      totalPopulation: 0,
+      totalPopulation: pop,
       regions: {}
     };
-
-    for (const r of regions) {
-      const dataStr = await pubClient.get(`region_stats_${r}`);
-      if (dataStr) {
-        const stats = JSON.parse(dataStr);
-        globalStats.totalActiveUsers += stats.activeUsers;
-        // Population is mostly shared DB, just take latest
-        globalStats.totalPopulation = stats.totalPopulation;
-        globalStats.regions[r] = stats;
-      } else {
-        globalStats.regions[r] = { activeUsers: 0, multiplier: 1.0 };
-      }
-    }
-    
+    regions.forEach(r => {
+      globalStats.totalActiveUsers += regionStates[r].activeUsers;
+      globalStats.regions[r] = {
+        activeUsers: regionStates[r].activeUsers,
+        multiplier: regionStates[r].multiplier
+      };
+    });
     res.json(globalStats);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch global stats' });
@@ -585,25 +425,94 @@ app.get('/api/global/stats', async (req, res) => {
 });
 
 
-function calculateSocialCompression(userCount) {
-  // Mock formula: more users = higher compression index
-  return (1.0 + (userCount * 0.05)).toFixed(3);
-}
 
-// Function to get the real IP
-function getRealIP(socket) {
-  let cfIP = socket.handshake.headers['cf-connecting-ip'];
-  if (cfIP) return cfIP.split(',')[0].trim();
+
+
+regions.forEach(regionName => {
+  const nsp = io.of(`/${regionName}`);
+  const state = regionStates[regionName];
   
-  let forwarded = socket.handshake.headers['x-forwarded-for'];
-  if (forwarded) {
-    // x-forwarded-for can be a comma-separated list, the first one is the real client IP
-    return forwarded.split(',')[0].trim();
+  function triggerRandomEvent() {
+    if (state.currentGlobalEvent) return;
+    const events = ['QUANTUM_BURST', 'SOLAR_STORM', 'DATA_GOLD_RUSH', 'SATELLITE_ALIGNMENT', 'SYSTEM_MAINTENANCE'];
+    const type = events[Math.floor(Math.random() * events.length)];
+    let duration = 60 * 60 * 1000;
+    if (type === 'QUANTUM_BURST') duration = 2 * 60 * 60 * 1000;
+    if (type === 'SATELLITE_ALIGNMENT') duration = 2 * 60 * 60 * 1000;
+    if (type === 'SYSTEM_MAINTENANCE') duration = 30 * 60 * 1000;
+    if (type === 'DATA_GOLD_RUSH') duration = 15 * 60 * 1000;
+    
+    state.currentGlobalEvent = { type, endTime: Date.now() + duration };
+    nsp.emit('global_event_started', { type, endTime: state.currentGlobalEvent.endTime });
+    console.log(`[SYS] ${regionName.toUpperCase()} Global Event Triggered: ${type}`);
   }
-  return socket.handshake.address;
-}
 
-io.on('connection', (socket) => {
+  setInterval(() => {
+    if (!state.currentGlobalEvent && Math.random() < 0.5) {
+      triggerRandomEvent();
+    }
+  }, 2 * 60 * 60 * 1000);
+
+  setInterval(async () => {
+    const pop = await db.getTotalPopulation();
+    const isBoosted = state.connectedUsers.size >= 5;
+    state.multiplier = isBoosted ? 1.2 : 1.0;
+    
+    if (state.currentGlobalEvent) {
+      if (Date.now() >= state.currentGlobalEvent.endTime) {
+        if (state.currentGlobalEvent.type === 'SOLAR_STORM' && state.connectedUsers.size > 0) {
+          const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
+          await User.updateMany({ username: { $in: usernames } }, { $inc: { accumulatedBonusPoints: 200 } }).catch(console.error);
+        } else if (state.currentGlobalEvent.type === 'SYSTEM_MAINTENANCE' && state.connectedUsers.size > 0) {
+          const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
+          await User.updateMany({ username: { $in: usernames } }, { $inc: { accumulatedBonusPoints: 500 } }).catch(console.error);
+        }
+        nsp.emit('global_event_ended', { type: state.currentGlobalEvent.type });
+        state.currentGlobalEvent = null;
+      } else {
+        switch (state.currentGlobalEvent.type) {
+          case 'QUANTUM_BURST': state.multiplier = 3.0; break;
+          case 'DATA_GOLD_RUSH': state.multiplier = 5.0; break;
+          case 'SYSTEM_MAINTENANCE': state.multiplier = 0.5; break;
+          case 'SATELLITE_ALIGNMENT': state.multiplier = 1.0 + (state.connectedUsers.size * 0.1); break;
+        }
+      }
+    }
+
+    if (state.connectedUsers.size > 0) {
+      const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
+      const bonusPoints = state.multiplier > 1.0 ? 2 * (state.multiplier - 1.0) : 0;
+      await User.updateMany(
+        { username: { $in: usernames } },
+        { $inc: { accumulatedTime: 2000, accumulatedBonusPoints: bonusPoints } }
+      );
+    }
+    
+    state.activeUsers = state.connectedUsers.size;
+    
+    // calculate compression logic (simplified to string)
+    let comp = '1.000';
+    if (state.activeUsers > 1000000) comp = '0.001';
+    else if (state.activeUsers > 100000) comp = '0.010';
+    else if (state.activeUsers > 10000) comp = '0.100';
+    state.socialCompression = comp;
+    
+    state.globalProduction = state.multiplier;
+    
+    nsp.emit('global_stats', {
+      activeUsers: state.activeUsers,
+      totalPopulation: pop,
+      globalProduction: state.globalProduction,
+      socialCompression: state.socialCompression,
+      multiplier: state.multiplier
+    });
+  }, 2000);
+
+  nsp.on('connection', (socket) => {
+    const connectedUsers = state.connectedUsers;
+    const io = nsp;
+    let currentGlobalEvent = state.currentGlobalEvent;
+
   // Wait for client to authenticate via token
   // Handle Ping
   socket.on('ping', () => {
@@ -1002,6 +911,7 @@ io.on('connection', (socket) => {
       io.emit('node_disconnected', { id: socket.id });
     }
   });
+});
 });
 
 const PORT = process.env.PORT || 3001;
