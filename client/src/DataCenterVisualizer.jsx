@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Users, MapPin } from 'lucide-react';
 import './datacenter.css';
 
@@ -150,14 +150,15 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
 
           {/* Social Links & Github Badge */}
           <div className="dc-social-section" style={{ display: 'flex', gap: '25px', justifyContent: 'flex-start', alignItems: 'center', marginTop: '20px', padding: '0' }}>
-            <a href="https://github.com/huchialun9-ctrl/earthonline.git" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.1) rotate(-2deg)'} onMouseOut={e => e.currentTarget.style.transform='scale(1) rotate(0)'}>
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Github_logo_svg.svg/320px-Github_logo_svg.svg.png" alt="GitHub" style={{ height: '28px', filter: 'invert(1) brightness(0.9)' }} />
+            <a href="https://github.com/huchialun9-ctrl/earthonline.git" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex', alignItems: 'center', color: '#fff', textDecoration: 'none', gap: '8px' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.1) rotate(-2deg)'} onMouseOut={e => e.currentTarget.style.transform='scale(1) rotate(0)'}>
+              <GithubIcon size={28} />
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'Arial, sans-serif' }}>GitHub</span>
             </a>
-            <a href="https://www.threads.com/@earthonline6?xmt=AQG048ez1j6AMkcDGAG_U01pj1JoVoCFFMvWnZ5MZGYhgfk" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.1) rotate(2deg)'} onMouseOut={e => e.currentTarget.style.transform='scale(1) rotate(0)'}>
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Threads_%28app%29_logo.svg/120px-Threads_%28app%29_logo.svg.png" alt="Threads" style={{ height: '28px', borderRadius: '50%' }} />
+            <a href="https://www.threads.com/@earthonline6?xmt=AQG048ez1j6AMkcDGAG_U01pj1JoVoCFFMvWnZ5MZGYhgfk" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex', alignItems: 'center', color: '#fff', textDecoration: 'none' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.1) rotate(2deg)'} onMouseOut={e => e.currentTarget.style.transform='scale(1) rotate(0)'}>
+              <ThreadsIcon size={28} />
             </a>
-            <button onClick={onOpenSocial} title="社群討論" style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', padding: '0', fontWeight: 'bold' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='#fff'; e.currentTarget.style.textShadow='0 0 8px rgba(59, 130, 246, 0.8)'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='#94a3b8'; e.currentTarget.style.textShadow='none'; }}>
-              <Users size={18} /> <span>討論區</span>
+            <button onClick={onOpenSocial} title="社群討論" style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', padding: '0', fontWeight: 'bold', marginLeft: '10px' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='#fff'; e.currentTarget.style.textShadow='0 0 8px rgba(59, 130, 246, 0.8)'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='#94a3b8'; e.currentTarget.style.textShadow='none'; }}>
+              <Users size={22} /> <span>討論區</span>
             </button>
           </div>
 
@@ -176,7 +177,7 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
 
         {/* Right Side: Visual Area (Infinite Canvas) */}
         <div 
-          className="dc-visual-area" 
+          className="dc-visual-area infinite-canvas" 
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUpOrLeave}
@@ -299,6 +300,14 @@ function GithubIcon({ size = 16 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+    </svg>
+  );
+}
+
+function ThreadsIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 192 192" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.773 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.814C118.893 72.2193 120.854 76.925 121.825 82.8638C114.511 81.6207 106.601 81.2385 98.145 81.7233C74.3247 83.0954 59.0111 96.9879 60.0396 116.292C60.5615 126.084 65.4397 134.508 73.775 140.011C80.8224 144.663 89.899 146.938 99.3323 146.423C111.79 145.74 121.563 140.987 128.381 132.296C133.559 125.696 136.834 117.143 138.28 106.366C144.217 109.949 148.617 114.664 151.047 120.332C155.179 129.967 155.42 145.8 142.501 158.708C131.182 170.016 117.561 174.9 97.1 174.9C74.248 174.9 58.1804 169.507 46.5937 157.818C33.0939 144.212 27.5 123.858 27.5 97.045C27.5 70.2505 33.1257 49.9248 46.6851 36.3789C58.3371 24.7431 74.4533 19.3305 97.351 19.3305C118.665 19.3305 133.882 24.4754 145.474 34.6111C154.215 42.2573 159.297 53.0371 161.409 66.0827L178.118 63.3644C175.297 45.9621 168.324 31.478 156.634 21.2335C141.77 8.35821 122.378 1.99997 97.351 1.99997C70.1652 1.99997 51.0662 8.52844 37.0504 22.518C21.4646 38.0747 14.8333 62.0628 14.8333 97.045C14.8333 132.067 21.4116 156.096 36.9663 171.717C50.9234 185.748 70.0766 192.261 97.1 192.261C122.569 192.261 140.081 185.703 154.512 171.282C171.396 154.408 172.936 131.623 166.757 117.406C162.247 107.031 154.062 97.9406 141.537 88.9883ZM98.4405 129.507C88.0005 130.095 77.1544 125.409 76.6196 115.372C76.2232 107.93 81.9158 99.626 99.0812 98.6368C101.047 98.5234 102.976 98.468 104.871 98.468C111.106 98.468 116.939 99.0737 122.242 100.233C120.264 124.935 108.662 128.946 98.4405 129.507Z"/>
     </svg>
   );
 }
