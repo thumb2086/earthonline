@@ -887,7 +887,7 @@ function Dashboard({ token, onLogout, region }) {
       if (window.electronAPI) {
         window.electronAPI.updatePresence({
           details: `生存時間: ${formatTime(Math.floor(currentLocalLifespan))}`,
-          state: `區域: ${region === 'asia' ? 'Asia' : region === 'us' ? 'US' : 'EU'} | 積分: ${Math.floor(myNode.accumulatedBonusPoints || 0)} PT`,
+          state: `區域: ${region === 'asia' ? 'Asia' : region === 'us' ? 'US' : 'EU'} | 積分: ${Math.floor(currentLocalLifespan + (myNode.accumulatedBonusPoints || 0))} PT`,
           username: myNode.username
         });
       }
