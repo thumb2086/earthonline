@@ -36,7 +36,9 @@ class ErrorBoundary extends React.Component {
 
 import { LanguageProvider } from './LanguageContext';
 
-const initialRegion = sessionStorage.getItem('eo_region') || 'asia';
+let savedRegion;
+try { savedRegion = sessionStorage.getItem('eo_region'); } catch(e) { savedRegion = null; }
+const initialRegion = savedRegion || 'asia';
 
 ReactDOM.createRoot(document.getElementById('app')).render(
   <React.StrictMode>

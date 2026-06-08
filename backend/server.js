@@ -19,7 +19,7 @@ const os = require('os');
 db.migrateOfflineTime().catch(err => console.error('[SYS] Migration failed:', err));
 
 const app = express();
-const apiRouter = express.Router();
+const apiRouter = express.Router({ mergeParams: true });
 app.use(cors());
 app.use(express.json());
 const path = require('path');
@@ -76,7 +76,10 @@ apiRouter.post('/register', async (req, res, next) => {
   if (ip !== '::1' && ip !== '127.0.0.1') {
     try {
       const fetch = (await import('node-fetch')).default;
-      const ipCheck = await fetch(`http://ip-api.com/json/${ip}?fields=proxy,hosting`).then(r => r.json());
+      // Validate IP format before using in URL
+      const ipv4Regex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+      const cleanIp = ipv4Regex.test(ip) ? ip : '0.0.0.0';
+      const ipCheck = await fetch(`http://ip-api.com/json/${cleanIp}?fields=proxy,hosting`).then(r => r.json());
       if (ipCheck.proxy || ipCheck.hosting) {
         return res.status(403).json({ error: '系統偵測到您正在使用 VPN 或代理伺服器，請關閉後再試。' });
       }
@@ -114,7 +117,7 @@ apiRouter.post('/login', async (req, res, next) => {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
   
-  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET);
+  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ success: true, token, user: { id: user.id, username: user.username } });
   } catch (err) { next(err); }
 });
@@ -199,7 +202,8 @@ apiRouter.post('/auth/delete-account', async (req, res, next) => {
     
     await User.deleteOne({ username: user.username });
     
-    const state = regionStates['asia'];
+    const region = req.params.region || 'asia';
+    const state = regionStates[region];
     if (state && state.connectedUsers) {
       const existingEntry = Array.from(state.connectedUsers.entries()).find(([_, u]) => u.username === user.username);
       if (existingEntry) {
@@ -294,7 +298,7 @@ apiRouter.post('/auth/verify-email', async (req, res) => {
     if (!user) return res.status(400).json({ error: 'Invalid or expired verification token' });
 
     user.isEmailVerified = true;
-    user.emailVerificationToken = undefined; // Clear the token
+    user.emailVerificationToken = null; // Clear the token
     await user.save();
 
     res.json({ success: true, message: 'Email verified successfully' });
@@ -346,6 +350,18 @@ app.get('/api/auth/discord/callback', async (req, res) => {
     const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     action = stateData.action || 'bind';
     returnTo = stateData.returnTo;
+    // Validate returnTo to prevent open redirect
+    if (returnTo) {
+      try {
+        const returnUrl = new URL(returnTo);
+        const allowedHosts = ['localhost', 'earthonline.onrender.com', 'earthonline1.pages.dev'];
+        if (!allowedHosts.includes(returnUrl.hostname)) {
+          returnTo = null;
+        }
+      } catch {
+        returnTo = null;
+      }
+    }
     if (action === 'bind') {
       decoded = jwt.verify(stateData.token, JWT_SECRET);
     }
@@ -505,7 +521,7 @@ app.use((req, res, next) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('[SYS] Express Error:', err.message || err);
+  console.error('[SYS] Express Error:', err);
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
@@ -514,6 +530,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
+
+discordBot.setIoInstance(io);
 
 const regions = ['asia', 'us', 'eu'];
 const regionStates = {
@@ -619,6 +637,7 @@ regions.forEach(regionName => {
       const updates = [];
       for (let user of users) {
         let isDead = false;
+        let decay = 0;
 
         // Health decay: ~0.2% per minute total (8+ hours full health)
         // Tick is every 2s => 30 ticks/min => decay per tick = 0.2/30 ≈ 0.00667
@@ -626,17 +645,17 @@ regions.forEach(regionName => {
           if (user.activeBuffs && user.activeBuffs.get('firewall') > Date.now()) {
             // Protected by firewall
           } else {
-            const decay = 0.2 / 30; // 0.2% per minute, distributed over 30 ticks/min
-            user.health = Math.max(0, user.health - decay);
+            decay = 0.2 / 30;
           }
         }
         
         if (user.health <= 0) isDead = true;
 
+        let ptPerTick = 0;
+        let timeEarned = 0;
+
         if (!isDead) {
-          // Base PT per tick: health% * 0.1 → at 100% health = 3 PT/min, at 50% = 1.5 PT/min
-          // 0.1 PT per tick * (health/100) * 30 ticks/min = 3 PT/min at full health
-          let ptPerTick = (user.health / 100) * 0.1;
+          ptPerTick = (user.health / 100) * 0.1;
 
           // Event multiplier bonus
           ptPerTick += eventBonus * 0.05;
@@ -646,16 +665,22 @@ regions.forEach(regionName => {
             ptPerTick *= 2;
           }
 
-          user.accumulatedTime += 2000;
-          user.accumulatedBonusPoints += ptPerTick;
+          timeEarned = 2000;
         }
 
-        updates.push({
-          updateOne: {
-            filter: { username: user.username },
-            update: { $set: { health: user.health, accumulatedTime: user.accumulatedTime, accumulatedBonusPoints: user.accumulatedBonusPoints } }
-          }
-        });
+        const incFields = {};
+        if (decay > 0) incFields.health = -decay;
+        if (ptPerTick > 0) incFields.accumulatedBonusPoints = ptPerTick;
+        if (timeEarned > 0) incFields.accumulatedTime = timeEarned;
+
+        if (Object.keys(incFields).length > 0) {
+          updates.push({
+            updateOne: {
+              filter: { username: user.username },
+              update: { $inc: incFields }
+            }
+          });
+        }
       }
       
       if (updates.length > 0) {
@@ -695,7 +720,7 @@ regions.forEach(regionName => {
 
   nsp.on('connection', (socket) => {
     const connectedUsers = state.connectedUsers;
-    const io = nsp;
+    const nspIo = nsp;
     let currentGlobalEvent = state.currentGlobalEvent;
 
   // Wait for client to authenticate via token
@@ -720,9 +745,6 @@ regions.forEach(regionName => {
   socket.on('buy_item', async (itemId) => {
     if (!socket.user) return;
     try {
-      const user = await User.findOne({ username: socket.user.username });
-      if (!user) return;
-      
       const shopItems = {
         'liquid_nitrogen': { cost: 200, effect: 'health', value: 50 },
         'quantum_cooler': { cost: 500, effect: 'health', value: 100 },
@@ -734,60 +756,76 @@ regions.forEach(regionName => {
       };
       
       const item = shopItems[itemId];
-      if (!item || user.accumulatedBonusPoints < item.cost) {
+      if (!item) {
+        socket.emit('buy_result', { success: false, message: '道具不存在！' });
+        return;
+      }
+      
+      // Atomic: try to deduct cost, fail if insufficient balance
+      const result = await User.findOneAndUpdate(
+        { username: socket.user.username, accumulatedBonusPoints: { $gte: item.cost } },
+        { $inc: { accumulatedBonusPoints: -item.cost } },
+        { new: true }
+      );
+      
+      if (!result) {
         socket.emit('buy_result', { success: false, message: 'PT 不足或道具不存在！' });
         return;
       }
       
-      user.accumulatedBonusPoints -= item.cost;
       let message = `成功購買 ${itemId}！`;
       
       if (item.effect === 'health') {
-        if (user.health <= 0) {
+        if (result.health <= 0) {
+          await User.updateOne({ username: socket.user.username }, { $inc: { accumulatedBonusPoints: item.cost } });
           socket.emit('buy_result', { success: false, message: '伺服器已死機，無法使用冷卻模組！請使用備用發電機。' });
           return;
         }
-        user.health = Math.min(100, user.health + item.value);
+        const newHealth = Math.min(100, result.health + item.value);
+        await User.updateOne({ username: socket.user.username }, { $set: { health: newHealth } });
       } else if (item.effect === 'buff') {
-        if (!user.activeBuffs) user.activeBuffs = new Map();
-        user.activeBuffs.set(item.type, Date.now() + item.duration);
+        await User.updateOne(
+          { username: socket.user.username },
+          { $set: { [`activeBuffs.${item.type}`]: Date.now() + item.duration } }
+        );
       } else if (item.effect === 'revive') {
-        if (user.health > 0) {
+        if (result.health > 0) {
+          await User.updateOne({ username: socket.user.username }, { $inc: { accumulatedBonusPoints: item.cost } });
           socket.emit('buy_result', { success: false, message: '伺服器運作正常，不需要發電機！' });
           return;
         }
-        user.health = item.value;
+        await User.updateOne({ username: socket.user.username }, { $set: { health: item.value } });
       } else if (item.effect === 'cosmetic') {
-        if (!user.inventory) user.inventory = new Map();
-        user.inventory.set(itemId, (user.inventory.get(itemId) || 0) + 1);
+        await User.updateOne(
+          { username: socket.user.username },
+          { $inc: { [`inventory.${itemId}`]: 1 } }
+        );
         message = '已獲得霓虹燈管！';
       } else if (item.effect === 'random') {
         const rand = Math.random();
         if (rand < 0.3) {
-          user.accumulatedTime += 86400 * 1000;
+          await User.updateOne({ username: socket.user.username }, { $inc: { accumulatedTime: 86400 * 1000 } });
           message = '大吉！獲得 1 天生存時間！';
         } else if (rand < 0.6) {
-          user.accumulatedBonusPoints += 2000;
+          await User.updateOne({ username: socket.user.username }, { $inc: { accumulatedBonusPoints: 2000 } });
           message = '中吉！獲得 2000 PT！';
         } else if (rand < 0.9) {
-          user.accumulatedBonusPoints += 500;
+          await User.updateOne({ username: socket.user.username }, { $inc: { accumulatedBonusPoints: 500 } });
           message = '小吉！回本 500 PT！';
         } else {
-          user.health = Math.max(0, user.health - 50);
+          await User.updateOne({ username: socket.user.username }, { $inc: { health: -50 } });
           message = '大凶！抽到電腦病毒，健康度 -50！';
         }
       }
       
-      await user.save();
-      socket.emit('buy_result', { success: true, message, health: user.health, pts: user.accumulatedBonusPoints });
-      
+      const finalUser = await User.findOne({ username: socket.user.username });
+      socket.emit('buy_result', { success: true, message, health: finalUser.health, pts: finalUser.accumulatedBonusPoints });
       socket.emit('user_state_update', {
-        health: user.health,
-        pts: user.accumulatedBonusPoints,
-        activeBuffs: user.activeBuffs ? Object.fromEntries(user.activeBuffs) : {},
-        inventory: user.inventory ? Object.fromEntries(user.inventory) : {}
+        health: finalUser.health,
+        pts: finalUser.accumulatedBonusPoints,
+        activeBuffs: finalUser.activeBuffs ? Object.fromEntries(finalUser.activeBuffs) : {},
+        inventory: finalUser.inventory ? Object.fromEntries(finalUser.inventory) : {}
       });
-      
     } catch (err) {
       console.error(err);
       socket.emit('buy_result', { success: false, message: '系統錯誤' });
@@ -903,18 +941,30 @@ regions.forEach(regionName => {
   });
 
   // Handle World Chat
+  const chatCooldowns = new Map();
   socket.on('send_chat', (data) => {
     const user = connectedUsers.get(socket.id);
     if (!user) return;
     
+    // Rate limit: 1 message per 2 seconds
+    const lastChat = chatCooldowns.get(socket.id);
+    if (lastChat && Date.now() - lastChat < 2000) {
+      return;
+    }
+    chatCooldowns.set(socket.id, Date.now());
+    
     const message = (data.message || '').trim().substring(0, 200); // Max length 200
     if (!message) return;
     
-    io.emit('chat_message', { username: user.username, message: message });
+    nspIo.emit('chat_message', { username: user.username, message: message });
     console.log(`[CHAT] ${user.username}: ${message}`);
     
     // Sync to Discord
-    discordBot.sendChatMessageToDiscord(user.username, message);
+    try {
+      discordBot.sendChatMessageToDiscord(user.username, message);
+    } catch (chatErr) {
+      console.error('[CHAT] Discord bridge error:', chatErr);
+    }
   });
 
   // Friend System Handlers
@@ -971,7 +1021,7 @@ regions.forEach(regionName => {
       // Notify target if online
       for (const [sid, u] of connectedUsers.entries()) {
         if (u.username === targetUsername) {
-          io.to(sid).emit('friend_request_received', { from: user.username });
+          nspIo.to(sid).emit('friend_request_received', { from: user.username });
           break;
         }
       }
@@ -1004,7 +1054,7 @@ regions.forEach(regionName => {
       socket.emit('social_data_updated');
       for (const [sid, u] of connectedUsers.entries()) {
         if (u.username === targetUsername) {
-          io.to(sid).emit('social_data_updated');
+          nspIo.to(sid).emit('social_data_updated');
           break;
         }
       }
@@ -1042,7 +1092,7 @@ regions.forEach(regionName => {
       socket.emit('social_data_updated');
       for (const [sid, u] of connectedUsers.entries()) {
         if (u.username === targetUsername) {
-          io.to(sid).emit('social_data_updated');
+          nspIo.to(sid).emit('social_data_updated');
           break;
         }
       }
@@ -1071,17 +1121,14 @@ regions.forEach(regionName => {
         const dbUser = await User.findOne({ username: user.username });
         if (!dbUser) return;
         
-        const idleTimeSeconds = Math.floor((dbUser.accumulatedTime || 0) / 1000);
-        const totalPoints = idleTimeSeconds + (dbUser.accumulatedBonusPoints || 0);
-        
-        if (totalPoints < BROADCAST_COST) {
-          return socket.emit('terminal_response', `[ERROR] INSUFFICIENT POINTS. BROADCAST REQUIRES ${BROADCAST_COST} PT (CURRENT: ${totalPoints} PT).`);
+        if ((dbUser.accumulatedBonusPoints || 0) < BROADCAST_COST) {
+          return socket.emit('terminal_response', `[ERROR] INSUFFICIENT BONUS POINTS. BROADCAST REQUIRES ${BROADCAST_COST} PT (CURRENT: ${dbUser.accumulatedBonusPoints || 0} PT).`);
         }
         
         await User.updateOne({ username: user.username }, { $inc: { accumulatedBonusPoints: -BROADCAST_COST } });
         user.accumulatedBonusPoints = (user.accumulatedBonusPoints || 0) - BROADCAST_COST;
         
-        io.emit('global_broadcast', { username: user.username, message: message });
+        nspIo.emit('global_broadcast', { username: user.username, message: message });
         socket.emit('terminal_response', `[SUCCESS] BROADCAST TRANSMITTED GLOBALLY. -${BROADCAST_COST} PT.`);
         
         // Log to terminal console
@@ -1097,12 +1144,6 @@ regions.forEach(regionName => {
       }
       return;
     }
-
-    const cmd = cmdUpper;
-    const cheatCodes = {
-      'IDDQD': 10000,
-      'HESOYAM': 5000
-    };
 
     if (cmdUpper === 'REPORT') {
       try {
@@ -1145,6 +1186,11 @@ regions.forEach(regionName => {
         socket.emit('terminal_response', `[ERROR] SCAN FAILED.`);
       }
     } else if (cmdUpper === 'NUKE_BOTS') {
+      // Admin check
+      if (user.username !== '大拇哥科技' && user.username !== 'admin') {
+        socket.emit('terminal_response', '[ERROR] 權限不足：僅管理員可執行此指令。');
+        return;
+      }
       try {
         // Delete all users that look like bots
         const result = await User.deleteMany({ 
@@ -1155,33 +1201,9 @@ regions.forEach(regionName => {
           ]
         });
         socket.emit('terminal_response', `[SYS] NUKED ${result.deletedCount} SUSPICIOUS BOT ACCOUNTS.`);
-        io.emit('social_data_updated'); // refresh UI for everyone
+        nspIo.emit('social_data_updated'); // refresh UI for everyone
       } catch (err) {
         socket.emit('terminal_response', `[ERROR] NUKE FAILED.`);
-      }
-    } else if (cheatCodes[cmd]) {
-      try {
-        const dbUser = await User.findOne({ username: user.username });
-        if (dbUser) {
-          if (dbUser.redeemedCodes && dbUser.redeemedCodes.includes(cmd)) {
-            socket.emit('terminal_response', `[ERROR] CODE '${cmd}' ALREADY REDEEMED.`);
-          } else {
-            const reward = cheatCodes[cmd];
-            await User.updateOne(
-              { username: user.username },
-              { 
-                $push: { redeemedCodes: cmd },
-                $inc: { accumulatedBonusPoints: reward }
-              }
-            );
-            user.accumulatedBonusPoints = (user.accumulatedBonusPoints || 0) + reward; // update cache locally if needed
-            socket.emit('terminal_response', `[SUCCESS] SECRET CODE ACCEPTED. ${reward} PT AWARDED.`);
-            console.log(`[SYS] User ${user.username} redeemed secret code: ${cmd}`);
-          }
-        }
-      } catch (err) {
-        console.error('[SYS] Terminal Command Error:', err);
-        socket.emit('terminal_response', `[ERROR] SYSTEM FAILURE DURING REDEMPTION.`);
       }
     } else {
       socket.emit('terminal_response', `[ERROR] UNKNOWN OR INVALID COMMAND: ${data.command}`);

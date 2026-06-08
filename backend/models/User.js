@@ -27,4 +27,6 @@ const userSchema = new mongoose.Schema({
   activeBuffs: { type: Map, of: Number, default: {} }
 });
 
+userSchema.index({ 'discord.id': 1 });
+
 module.exports = mongoose.model('User', userSchema);
