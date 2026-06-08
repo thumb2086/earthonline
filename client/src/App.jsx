@@ -1549,6 +1549,7 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [isSendingVerify, setIsSendingVerify] = useState(false);
 
@@ -1565,6 +1566,8 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
   }, [token]);
 
   const handleGenerateKey = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
     try {
       const res = await fetch(`${apiUrl}/auth/generate-recovery-key`, {
         method: 'POST',
@@ -1579,6 +1582,8 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
       }
     } catch (err) {
       alert('連線失敗');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -1587,7 +1592,7 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
     if (confirmText !== 'DELETE') return;
 
     try {
-      const res = await fetch(`${API_URL}/auth/delete-account`, {
+      const res = await fetch(`${apiUrl}/auth/delete-account`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -1613,7 +1618,7 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
     
     setIsSendingVerify(true);
     try {
-      const res = await fetch(`${API_URL}/auth/send-verification`, {
+      const res = await fetch(`${apiUrl}/auth/send-verification`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -1677,7 +1682,7 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
             </div>
             <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)'}}>
               <span style={{color: '#94a3b8'}}>榮譽點數 (PT)</span>
-              <strong style={{color: '#3b82f6'}}>{info.accumulatedBonusPoints.toLocaleString()}</strong>
+              <strong style={{color: '#3b82f6'}}>{Number(info.accumulatedBonusPoints || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}</strong>
             </div>
             <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0'}}>
               <span style={{color: '#94a3b8'}}>Discord 通訊協定</span>
@@ -1694,8 +1699,8 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
               </p>
               <div style={{display: 'flex', gap: '10px'}}>
                 {info.recoveryKey === '未產生' ? (
-                  <button style={{flex: 1, padding: '10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s'}} onClick={handleGenerateKey} onMouseOver={e => e.currentTarget.style.background = '#dc2626'} onMouseOut={e => e.currentTarget.style.background = '#ef4444'}>
-                    生成專屬金鑰
+                  <button disabled={isGenerating} style={{flex: 1, padding: '10px', background: isGenerating ? '#94a3b8' : '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: isGenerating ? 'not-allowed' : 'pointer', transition: 'background 0.2s'}} onClick={handleGenerateKey} onMouseOver={e => { if(!isGenerating) e.currentTarget.style.background = '#dc2626'; }} onMouseOut={e => { if(!isGenerating) e.currentTarget.style.background = '#ef4444'; }}>
+                    {isGenerating ? '生成中...' : '生成專屬金鑰'}
                   </button>
                 ) : (
                   <>

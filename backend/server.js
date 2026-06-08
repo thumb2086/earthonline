@@ -155,7 +155,8 @@ apiRouter.post('/auth/generate-recovery-key', async (req, res, next) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     
     if (user.recoveryKey) {
-      return res.status(400).json({ error: 'Recovery key already exists' });
+      // Already exists - just return it so user can view it again
+      return res.json({ success: true, recoveryKey: user.recoveryKey, existed: true });
     }
     
     const recoveryKey = 'EO-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -474,26 +475,6 @@ apiRouter.get('/leaderboard', async (req, res) => {
   }
 });
 
-apiRouter.get('/global/stats', async (req, res, next) => {
-  try {
-    const region = req.params.region || 'asia';
-    const pop = await db.getRegionPopulation(region);
-    const state = regionStates[region] || regionStates['asia'];
-    res.json({
-      totalActiveUsers: state ? state.activeUsers : 0,
-      totalPopulation: pop,
-      globalProduction: state ? state.globalProduction : 0,
-      socialCompression: state ? state.socialCompression : '1.000',
-      multiplier: state ? state.multiplier : 1.0
-    });
-  } catch (err) {
-    console.error('[SYS] /global/stats error:', err);
-    res.status(500).json({ error: 'Failed to fetch global stats' });
-  }
-});
-
-});
-
 app.get('/api/global/stats', async (req, res, next) => {
   try {
     const region = 'asia';
@@ -631,33 +612,42 @@ regions.forEach(regionName => {
 
     if (state.connectedUsers.size > 0) {
       const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
-      const baseBonus = state.multiplier > 1.0 ? 2 * (state.multiplier - 1.0) : 0;
+      // Event multiplier bonus (on top of base)
+      const eventBonus = state.multiplier > 1.0 ? (state.multiplier - 1.0) : 0;
       
       const users = await User.find({ username: { $in: usernames } });
       const updates = [];
       for (let user of users) {
-        let userBonus = baseBonus;
         let isDead = false;
 
-        // Health decay logic
+        // Health decay: ~0.2% per minute total (8+ hours full health)
+        // Tick is every 2s => 30 ticks/min => decay per tick = 0.2/30 ≈ 0.00667
         if (user.health > 0) {
           if (user.activeBuffs && user.activeBuffs.get('firewall') > Date.now()) {
-            // Protected
+            // Protected by firewall
           } else {
-            const decay = state.multiplier * 0.1; // Base decay per 2s
+            const decay = 0.2 / 30; // 0.2% per minute, distributed over 30 ticks/min
             user.health = Math.max(0, user.health - decay);
           }
         }
         
         if (user.health <= 0) isDead = true;
 
-        if (user.activeBuffs && user.activeBuffs.get('overclock') > Date.now()) {
-          userBonus = Math.max(1, userBonus * 2);
-        }
-
         if (!isDead) {
+          // Base PT per tick: health% * 0.1 → at 100% health = 3 PT/min, at 50% = 1.5 PT/min
+          // 0.1 PT per tick * (health/100) * 30 ticks/min = 3 PT/min at full health
+          let ptPerTick = (user.health / 100) * 0.1;
+
+          // Event multiplier bonus
+          ptPerTick += eventBonus * 0.05;
+
+          // Overclock doubles PT
+          if (user.activeBuffs && user.activeBuffs.get('overclock') > Date.now()) {
+            ptPerTick *= 2;
+          }
+
           user.accumulatedTime += 2000;
-          user.accumulatedBonusPoints += userBonus;
+          user.accumulatedBonusPoints += ptPerTick;
         }
 
         updates.push({

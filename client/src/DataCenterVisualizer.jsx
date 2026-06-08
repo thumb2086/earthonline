@@ -116,7 +116,7 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
             <div className="metric-row">
               <ShieldCheck size={16} color="#64748b" />
               <span>PT 信用積分</span>
-              <strong className="data-value">{bonusPoints || 0} PT</strong>
+              <strong className="data-value">{Number(bonusPoints || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} PT</strong>
             </div>
             <div className="metric-row">
               <Cpu size={16} color="#64748b" />

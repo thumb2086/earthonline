@@ -1,119 +1,225 @@
 import React, { useState } from 'react';
-import { X, ShoppingCart, Info, AlertTriangle } from 'lucide-react';
 
 const SHOP_ITEMS = [
-  { id: 'liquid_nitrogen', name: '液態氮冷卻瓶', cost: 200, type: 'health', icon: 'liquid_nitrogen.png', desc: '瞬間恢復 50% 伺服器健康度。' },
-  { id: 'quantum_cooler', name: '量子散熱塔', cost: 500, type: 'health', icon: 'quantum_cooler.png', desc: '恢復 100% 健康度。' },
-  { id: 'overclock_chip', name: '實驗性超頻晶片', cost: 1500, type: 'buff', icon: 'overclock_chip.png', desc: '1 小時內，PT 獲取速度加倍。' },
-  { id: 'firewall', name: '實體防火牆模組', cost: 1000, type: 'buff', icon: 'firewall.png', desc: '30 分鐘內，免疫因過熱造成的健康度衰減。' },
-  { id: 'generator', name: '備用柴油發電機', cost: 800, type: 'revive', icon: 'generator.png', desc: '若伺服器因 0% 健康度死機，可強制重啟並恢復 20% 健康度。' },
-  { id: 'neon_strip', name: 'RGB 霓虹燈管', cost: 3000, type: 'cosmetic', icon: 'neon_strip.png', desc: '純裝飾，解鎖隨機的賽博龐克背景燈光！' },
-  { id: 'flash_drive', name: '神祕的隨身碟', cost: 500, type: 'random', icon: 'flash_drive.png', desc: '抽獎盲盒！可能開出大量時間/PT，也可能開出電腦病毒！' }
+  { id: 'liquid_nitrogen',  name: '液態氮冷卻瓶',    cost: 200,  type: 'health',   icon: 'liquid_nitrogen.png',  desc: '瞬間恢復 50% 伺服器健康度。' },
+  { id: 'quantum_cooler',   name: '量子散熱塔',      cost: 500,  type: 'health',   icon: 'quantum_cooler.png',   desc: '恢復 100% 健康度。' },
+  { id: 'overclock_chip',   name: '實驗性超頻晶片',  cost: 1500, type: 'buff',     icon: 'overclock_chip.png',   desc: '1 小時內，PT 獲取速度加倍。' },
+  { id: 'firewall',         name: '實體防火牆模組',  cost: 1000, type: 'buff',     icon: 'firewall.png',         desc: '30 分鐘內，免疫因過熱造成的健康度衰減。' },
+  { id: 'generator',        name: '備用柴油發電機',  cost: 800,  type: 'revive',   icon: 'generator.png',        desc: '若伺服器因 0% 健康度死機，可強制重啟並恢復 20% 健康度。' },
+  { id: 'neon_strip',       name: 'RGB 霓虹燈管',    cost: 3000, type: 'cosmetic', icon: 'neon_strip.png',       desc: '純裝飾，解鎖隨機的賽博龐克背景燈光！' },
+  { id: 'flash_drive',      name: '神祕的隨身碟',    cost: 500,  type: 'random',   icon: 'flash_drive.png',      desc: '抽獎盲盒！可能開出大量時間/PT，也可能開出電腦病毒！' }
 ];
+
+const TYPE_COLOR = {
+  health:   { border: '#00ff41', label: '#00ff41', bg: 'rgba(0,255,65,0.08)' },
+  buff:     { border: '#a855f7', label: '#a855f7', bg: 'rgba(168,85,247,0.08)' },
+  revive:   { border: '#38bdf8', label: '#38bdf8', bg: 'rgba(56,189,248,0.08)' },
+  cosmetic: { border: '#f472b6', label: '#f472b6', bg: 'rgba(244,114,182,0.08)' },
+  random:   { border: '#fbbf24', label: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
+};
 
 export default function ShopModal({ onClose, pts, onBuy }) {
   const [buying, setBuying] = useState(null);
 
-  const handleBuy = async (item) => {
+  const handleBuy = (item) => {
+    if (buying) return;
     setBuying(item.id);
     onBuy(item.id);
-    setTimeout(() => {
-      setBuying(null);
-    }, 800); // Wait a bit for the socket roundtrip so user sees feedback
+    setTimeout(() => setBuying(null), 900);
   };
 
+  const formattedPts = Number(pts || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
+
   return (
-    <div className="modal-overlay">
-      <div className="modal-content shop-modal" style={{ maxWidth: '600px', backgroundColor: '#0f172a', border: '1px solid #334155' }}>
-        <button 
-          onClick={onClose} 
-          style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', zIndex: 10 }}
-        >
-          <X size={24} />
-        </button>
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#38bdf8', marginBottom: '20px' }}>
-          <ShoppingCart size={24} /> 黑市終端商城
-        </h2>
-        
-        <div style={{ padding: '15px', backgroundColor: 'rgba(56, 189, 248, 0.1)', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>目前可用信用點數</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {pts?.toLocaleString() || 0} PT
-            </div>
-          </div>
-          <AlertTriangle size={24} color="#f59e0b" style={{ opacity: 0.5 }} />
+    <div style={S.overlay}>
+      <div style={S.window}>
+        {/* Title bar */}
+        <div style={S.titleBar}>
+          <span style={S.dot('#ff5f57')} />
+          <span style={S.dot('#febc2e')} />
+          <span style={S.dot('#28c840')} />
+          <span style={S.titleText}>black_market_terminal — bash</span>
+          <button style={S.closeBtn} onClick={onClose}>✕</button>
         </div>
 
-        <div className="shop-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '10px' }}>
-          {SHOP_ITEMS.map(item => {
+        {/* Prompt header */}
+        <div style={S.promptBox}>
+          <div style={S.promptLine}>
+            <span style={{color:'#64748b'}}>root@earth-online</span>
+            <span style={{color:'#475569'}}>:</span>
+            <span style={{color:'#3b82f6'}}>~/market</span>
+            <span style={{color:'#64748b'}}>$ </span>
+            <span style={{color:'#e2e8f0'}}>ls --items --wallet</span>
+          </div>
+          <div style={S.walletLine}>
+            <span style={{color:'#64748b'}}>// WALLET: </span>
+            <span style={{color:'#00ff41', fontWeight:'bold', textShadow:'0 0 8px rgba(0,255,65,0.5)'}}>{formattedPts} PT</span>
+            <span style={{color:'#334155', marginLeft:'auto', fontSize:'11px'}}>
+              掛機收益：約 3 pt/min（100% 血量）
+            </span>
+          </div>
+        </div>
+
+        {/* Item list */}
+        <div style={S.itemList}>
+          {SHOP_ITEMS.map((item, i) => {
             const canAfford = (pts || 0) >= item.cost;
+            const isActive = buying === item.id;
+            const tc = TYPE_COLOR[item.type] || TYPE_COLOR.random;
             return (
-              <div key={item.id} style={{
-                border: '1px solid #1e293b',
-                borderRadius: '8px',
-                padding: '12px',
-                backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative'
-              }}>
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                  <img 
-                    src={`/assets/items/${item.icon}`} 
-                    alt={item.name}
-                    style={{ width: '48px', height: '48px', imageRendering: 'pixelated', backgroundColor: '#020617', borderRadius: '4px', border: '1px solid #334155', padding: '4px' }}
-                  />
-                  <div>
-                    <h3 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: '#e2e8f0' }}>{item.name}</h3>
-                    <span style={{ 
-                      fontSize: '0.75rem', 
-                      padding: '2px 6px', 
-                      borderRadius: '4px',
-                      backgroundColor: item.type === 'health' ? '#14532d' : 
-                                       item.type === 'buff' ? '#701a75' : 
-                                       item.type === 'random' ? '#b45309' : '#1e3a8a',
-                      color: item.type === 'health' ? '#86efac' : 
-                             item.type === 'buff' ? '#f5d0fe' : 
-                             item.type === 'random' ? '#fcd34d' : '#bfdbfe'
-                    }}>
-                      {item.type.toUpperCase()}
-                    </span>
-                  </div>
+              <div key={item.id} style={S.itemRow(canAfford, tc)}>
+                {/* Index + icon */}
+                <span style={S.idx}>{String(i + 1).padStart(2, '0')}</span>
+                <img
+                  src={`/assets/items/${item.icon}`}
+                  alt={item.name}
+                  style={S.icon(tc)}
+                />
+                {/* Info */}
+                <div style={S.info}>
+                  <div style={S.itemName(canAfford)}>{item.name}</div>
+                  <div style={S.itemDesc}>{item.desc}</div>
                 </div>
-                
-                <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '0 0 12px 0', flexGrow: 1, display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                  <Info size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
-                  {item.desc}
-                </p>
-                
-                <button 
-                  onClick={() => handleBuy(item)}
-                  disabled={!canAfford || buying === item.id}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    fontWeight: 'bold',
-                    cursor: canAfford ? 'pointer' : 'not-allowed',
-                    backgroundColor: buying === item.id ? '#10b981' : canAfford ? '#3b82f6' : '#334155',
-                    color: canAfford ? '#ffffff' : '#94a3b8',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {buying === item.id ? '購買中...' : `${item.cost} PT`}
-                </button>
+                {/* Type badge */}
+                <span style={S.badge(tc)}>[{item.type}]</span>
+                {/* Cost + buy */}
+                <div style={S.buyBox}>
+                  <span style={S.cost(canAfford)}>{item.cost} pt</span>
+                  <button
+                    style={S.buyBtn(canAfford, isActive)}
+                    disabled={!canAfford || !!buying}
+                    onClick={() => handleBuy(item)}
+                  >
+                    {isActive ? 'EXEC...' : 'BUY'}
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
+
+        {/* Footer */}
+        <div style={S.footer}>
+          <span style={{color:'#334155'}}>─────────────────────────────────────────────────────</span>
+          <span style={{color:'#475569', fontSize:'11px'}}>按 [ESC] 或點擊右上角關閉</span>
+        </div>
       </div>
-      <style dangerouslySetInnerHTML={{__html: `
-        .shop-grid::-webkit-scrollbar { width: 6px; }
-        .shop-grid::-webkit-scrollbar-track { background: #0f172a; }
-        .shop-grid::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-      `}} />
     </div>
   );
 }
+
+const S = {
+  overlay: {
+    position: 'fixed', inset: 0,
+    background: 'rgba(0,0,0,0.75)',
+    backdropFilter: 'blur(6px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 9999,
+    fontFamily: '"Courier New", Courier, monospace',
+  },
+  window: {
+    width: '90%', maxWidth: '780px',
+    background: '#0a0e17',
+    border: '1px solid #1e293b',
+    boxShadow: '0 0 0 1px #0f172a, 0 25px 60px rgba(0,0,0,0.8)',
+    display: 'flex', flexDirection: 'column',
+    maxHeight: '90vh',
+  },
+  titleBar: {
+    background: '#161d2e',
+    borderBottom: '1px solid #1e293b',
+    padding: '10px 16px',
+    display: 'flex', alignItems: 'center', gap: '8px',
+    userSelect: 'none',
+  },
+  dot: (color) => ({
+    width: 12, height: 12, borderRadius: '50%', background: color, display: 'inline-block',
+  }),
+  titleText: {
+    flex: 1, textAlign: 'center', fontSize: '12px', color: '#475569', letterSpacing: '0.5px',
+  },
+  closeBtn: {
+    background: 'none', border: 'none', color: '#475569', cursor: 'pointer',
+    fontSize: '14px', padding: '0 4px', lineHeight: 1,
+    transition: 'color 0.15s',
+  },
+  promptBox: {
+    padding: '12px 20px',
+    borderBottom: '1px solid #1e293b',
+    fontSize: '13px',
+  },
+  promptLine: {
+    display: 'flex', gap: '2px', marginBottom: '6px',
+  },
+  walletLine: {
+    display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px',
+  },
+  itemList: {
+    overflowY: 'auto',
+    padding: '8px 0',
+    flex: 1,
+  },
+  itemRow: (canAfford, tc) => ({
+    display: 'flex', alignItems: 'center', gap: '14px',
+    padding: '10px 20px',
+    borderLeft: `3px solid ${canAfford ? tc.border : '#1e293b'}`,
+    background: canAfford ? tc.bg : 'transparent',
+    transition: 'background 0.15s',
+    cursor: canAfford ? 'default' : 'not-allowed',
+    opacity: canAfford ? 1 : 0.45,
+  }),
+  idx: {
+    color: '#334155', fontSize: '11px', minWidth: '22px', letterSpacing: '1px',
+  },
+  icon: (tc) => ({
+    width: 40, height: 40,
+    imageRendering: 'pixelated',
+    background: '#050a12',
+    border: `1px solid ${tc.border}`,
+    padding: '4px',
+    boxSizing: 'border-box',
+    flexShrink: 0,
+  }),
+  info: {
+    flex: 1, minWidth: 0,
+  },
+  itemName: (canAfford) => ({
+    color: canAfford ? '#e2e8f0' : '#475569',
+    fontWeight: 'bold', fontSize: '14px',
+    marginBottom: '2px',
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  }),
+  itemDesc: {
+    color: '#475569', fontSize: '11px', lineHeight: '1.4',
+  },
+  badge: (tc) => ({
+    color: tc.label, fontSize: '10px', letterSpacing: '1px',
+    border: `1px solid ${tc.border}`,
+    padding: '2px 6px', flexShrink: 0,
+    background: tc.bg,
+  }),
+  buyBox: {
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px',
+    flexShrink: 0,
+  },
+  cost: (canAfford) => ({
+    color: canAfford ? '#94a3b8' : '#334155', fontSize: '12px',
+  }),
+  buyBtn: (canAfford, isActive) => ({
+    background: isActive ? '#1e293b' : canAfford ? '#00ff41' : '#1e293b',
+    color: isActive ? '#00ff41' : canAfford ? '#000' : '#334155',
+    border: `1px solid ${canAfford ? '#00ff41' : '#1e293b'}`,
+    padding: '4px 14px',
+    fontFamily: '"Courier New", Courier, monospace',
+    fontWeight: 'bold', fontSize: '12px',
+    cursor: canAfford && !isActive ? 'pointer' : 'not-allowed',
+    letterSpacing: '1px',
+    transition: 'all 0.15s',
+  }),
+  footer: {
+    padding: '10px 20px',
+    borderTop: '1px solid #1e293b',
+    display: 'flex', flexDirection: 'column', gap: '4px',
+    fontSize: '11px',
+  },
+};
