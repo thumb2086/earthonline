@@ -908,7 +908,8 @@ regions.forEach(regionName => {
         return;
       }
 
-      socket.emit('buy_result', { success: true, message: `✅ 已購買「${itemId}」並存入背包！` });
+      const itemNames = { liquid_nitrogen: '液態氮冷卻模組', quantum_cooler: '量子冷卻器', overclock_chip: '超頻晶片', firewall: '防火牆', generator: '備用發電機', neon_strip: '霓虹燈管', flash_drive: '隨身碟' };
+      socket.emit('buy_result', { success: true, message: `✅ 已購買「${itemNames[itemId] || itemId}」並存入背包！` });
       socket.emit('user_state_update', {
         pts: result.accumulatedBonusPoints,
         inventory: result.inventory ? Object.fromEntries(result.inventory) : {}

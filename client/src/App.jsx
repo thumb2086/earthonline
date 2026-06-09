@@ -229,8 +229,8 @@ function LoginGateway({ onLogin }) {
             </select>
           </div>
 
-          <div style={{textAlign: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(255,200,0,0.08)', borderRadius: '6px', border: '1px solid rgba(255,200,0,0.2)'}}>
-            <span style={{color: '#fbbf24', fontSize: '0.85rem'}}>⚠️ 帳號登入暫時關閉，請使用 Discord 快速登入</span>
+          <div style={{textAlign: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(0,255,170,0.08)', borderRadius: '6px', border: '1px solid rgba(0,255,170,0.2)'}}>
+            <span style={{color: '#00ffaa', fontSize: '0.85rem'}}>🌐 帳號/密碼 或 Discord 均可登入</span>
           </div>
 
           <button 
@@ -392,7 +392,7 @@ function DocumentationOverlay({ onClose }) {
                   前往 GitHub 下載桌面版
                 </a>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
-                  開發者請在專案根目錄下執行 <code>cd desktop-client && npm start</code> 啟動。
+                  開發者請在專案根目錄下執行 <code>cd desktop && npm start</code> 啟動。
                 </div>
               </div>
             </div>
@@ -599,7 +599,7 @@ function Dashboard({ token, onLogout, region }) {
       try {
         const res = await fetch(`${BASE_URL}/api/global/stats`);
         if(res.ok) setHubStats(await res.json());
-      } catch(e) {}
+      } catch(e) { console.error('[HUB] Failed to fetch hub stats:', e); }
     };
     fetchHub();
     const inv = setInterval(fetchHub, 5000);
@@ -800,7 +800,7 @@ function Dashboard({ token, onLogout, region }) {
       try {
         const res = await fetch(`${API_URL}/leaderboard`, { cache: 'no-store' });
         if (res.ok) setLeaderboard(await res.json());
-      } catch(err) {}
+      } catch(err) { console.error('[LB] Failed to fetch leaderboard:', err); }
     };
     fetchLeaderboard();
     const intv = setInterval(fetchLeaderboard, 5000);

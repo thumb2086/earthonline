@@ -20,7 +20,7 @@ services:
       - SERVER_REGION=ASIA
       - PORT=3001
       - REDIS_URL=redis://redis:6379
-      - MONGO_URI=mongodb://mongo:27017/earthonline
+      - MONGODB_URI=mongodb://mongo:27017/earthonline
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - JWT_SECRET=${JWT_SECRET:-earth_online_secret_key_9988}
     depends_on:
@@ -36,7 +36,7 @@ services:
       - SERVER_REGION=US
       - PORT=3001
       - REDIS_URL=redis://redis:6379
-      - MONGO_URI=mongodb://mongo:27017/earthonline
+      - MONGODB_URI=mongodb://mongo:27017/earthonline
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - JWT_SECRET=${JWT_SECRET:-earth_online_secret_key_9988}
     depends_on:
@@ -52,7 +52,7 @@ services:
       - SERVER_REGION=EU
       - PORT=3001
       - REDIS_URL=redis://redis:6379
-      - MONGO_URI=mongodb://mongo:27017/earthonline
+      - MONGODB_URI=mongodb://mongo:27017/earthonline
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - JWT_SECRET=${JWT_SECRET:-earth_online_secret_key_9988}
     depends_on:

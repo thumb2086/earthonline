@@ -1,8 +1,6 @@
-const { Client, GatewayIntentBits, REST, Routes, AttachmentBuilder, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder } = require('discord.js');
 const cron = require('node-cron');
 const User = require('./models/User');
-const { createCanvas, loadImage } = require('canvas');
-
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = '1512345209005015101';
 const VOICE_CHANNEL_ID = '1512595434588209324';
@@ -19,8 +17,6 @@ const client = new Client({
 });
 
 let isBotReady = false;
-
-// (We leave the canvas import there but don't use it to avoid changing top lines right now, or we can just ignore it)
 
 client.once('ready', async () => {
   console.log(`[SYS] Discord Bot Online: Logged in as ${client.user.tag}`);

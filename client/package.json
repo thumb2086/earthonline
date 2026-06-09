@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "electron/main.cjs",
+  "main": "index.html",
   "scripts": {
     "dev:electron": "concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
     "dev": "vite",
