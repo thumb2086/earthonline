@@ -283,16 +283,164 @@ body {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: radial-gradient(ellipse at center, rgba(180,220,255,0.2) 0%, rgba(200,230,255,0.08) 50%, transparent 80%);
   pointer-events: none;
+  transition: background 1.5s ease;
+}
+
+.snoopy-day {
+  background: linear-gradient(180deg, #87CEEB 0%, #B0E0E6 30%, #E0F7FA 60%, #90EE90 85%, #228B22 100%);
+}
+
+.snoopy-night {
+  background: linear-gradient(180deg, #0a0e2a 0%, #1a1a4e 30%, #0d0d2b 60%, #1a1a2e 85%, #0a0a15 100%);
 }
 
 .snoopy-bg-deco {
   position: absolute;
   inset: 0;
+  pointer-events: none;
+}
+
+.snoopy-day .snoopy-bg-deco {
   background-image:
-    radial-gradient(circle at 20% 80%, rgba(255,215,0,0.06) 0%, transparent 30%),
-    radial-gradient(circle at 80% 20%, rgba(255,200,230,0.08) 0%, transparent 30%);
+    radial-gradient(circle at 80% 15%, rgba(255,215,0,0.15) 0%, transparent 25%),
+    radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 20%),
+    radial-gradient(circle at 50% 90%, rgba(34,139,34,0.1) 0%, transparent 40%);
+}
+
+.snoopy-night .snoopy-bg-deco {
+  background-image:
+    radial-gradient(circle at 75% 10%, rgba(255,255,200,0.1) 0%, transparent 20%),
+    radial-gradient(circle at 20% 20%, rgba(200,200,255,0.05) 0%, transparent 15%),
+    radial-gradient(circle at 40% 85%, rgba(100,100,150,0.08) 0%, transparent 30%);
+}
+
+/* Day/Night decorations */
+.snoopy-day .snoopy-sun {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  top: 5%;
+  right: 12%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #FFE066, #FFB300);
+  box-shadow: 0 0 40px rgba(255,200,0,0.4), 0 0 80px rgba(255,200,0,0.2);
+  animation: sunGlow 4s ease-in-out infinite;
+}
+
+@keyframes sunGlow {
+  0%, 100% { box-shadow: 0 0 40px rgba(255,200,0,0.4), 0 0 80px rgba(255,200,0,0.2); }
+  50% { box-shadow: 0 0 60px rgba(255,200,0,0.6), 0 0 120px rgba(255,200,0,0.3); }
+}
+
+.snoopy-night .snoopy-moon-bg {
+  position: absolute;
+  width: 45px;
+  height: 45px;
+  top: 6%;
+  right: 15%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #FFFDE7, #FFF9C4);
+  box-shadow: 0 0 30px rgba(255,255,200,0.3), 0 0 60px rgba(255,255,200,0.1);
+  animation: moonGlow 5s ease-in-out infinite;
+}
+
+.snoopy-night .snoopy-moon-bg::after {
+  content: '';
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  top: -5px;
+  left: 8px;
+  border-radius: 50%;
+  background: #1a1a4e;
+}
+
+@keyframes moonGlow {
+  0%, 100% { box-shadow: 0 0 30px rgba(255,255,200,0.3), 0 0 60px rgba(255,255,200,0.1); }
+  50% { box-shadow: 0 0 50px rgba(255,255,200,0.5), 0 0 90px rgba(255,255,200,0.2); }
+}
+
+/* Night stars */
+.snoopy-night .snoopy-stars {
+  position: absolute;
+  inset: 0;
+}
+
+.snoopy-night .sstar {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #fff;
+  border-radius: 50%;
+  animation: starTwinkle 2s ease-in-out infinite alternate;
+}
+
+@keyframes starTwinkle {
+  0% { opacity: 0.3; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Day clouds */
+.snoopy-day .snoopy-clouds {
+  position: absolute;
+  inset: 0;
+}
+
+.snoopy-day .scloud {
+  position: absolute;
+  background: rgba(255,255,255,0.6);
+  border-radius: 50px;
+  animation: cloudDrift 20s linear infinite;
+}
+
+.snoopy-day .scloud::before,
+.snoopy-day .scloud::after {
+  content: '';
+  position: absolute;
+  background: rgba(255,255,255,0.6);
+  border-radius: 50%;
+}
+
+.snoopy-day .scloud-1 { width: 80px; height: 25px; top: 10%; left: -10%; animation-duration: 25s; }
+.snoopy-day .scloud-1::before { width: 35px; height: 35px; top: -18px; left: 15px; }
+.snoopy-day .scloud-1::after { width: 25px; height: 25px; top: -12px; left: 40px; }
+
+.snoopy-day .scloud-2 { width: 60px; height: 20px; top: 18%; left: -10%; animation-duration: 30s; animation-delay: 5s; }
+.snoopy-day .scloud-2::before { width: 28px; height: 28px; top: -14px; left: 10px; }
+.snoopy-day .scloud-2::after { width: 20px; height: 20px; top: -10px; left: 30px; }
+
+.snoopy-day .scloud-3 { width: 100px; height: 30px; top: 25%; left: -10%; animation-duration: 35s; animation-delay: 10s; }
+.snoopy-day .scloud-3::before { width: 40px; height: 40px; top: -20px; left: 20px; }
+.snoopy-day .scloud-3::after { width: 30px; height: 30px; top: -15px; left: 50px; }
+
+@keyframes cloudDrift {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(120vw); }
+}
+
+/* Day grass */
+.snoopy-day .snoopy-grass {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 12%;
+  background: linear-gradient(0deg, #228B22, #32CD32, transparent);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Night ground */
+.snoopy-night .snoopy-ground {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 10%;
+  background: linear-gradient(0deg, #0a1a0a, #0d0d2b, transparent);
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* Base Snoopy */

@@ -22,6 +22,19 @@ function LoginGateway({ onLogin }) {
   const [recoveryKey, setRecoveryKey] = useState('');
   const [region, setRegion] = useState('asia');
   
+  const [isDaytime, setIsDaytime] = useState(() => {
+    const h = new Date().getHours();
+    return h >= 6 && h < 18;
+  });
+
+  useEffect(() => {
+    const check = () => {
+      const h = new Date().getHours();
+      setIsDaytime(h >= 6 && h < 18);
+    };
+    const intv = setInterval(check, 60000);
+    return () => clearInterval(intv);
+  }, []);
   
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -121,8 +134,36 @@ function LoginGateway({ onLogin }) {
     <div className="login-gateway">
       <div className="login-box">
         {/* Snoopy Animations */}
-        <div className="snoopy-container">
-          <div className="snoopy-bg-deco"></div>
+        <div className={`snoopy-container ${isDaytime ? 'snoopy-day' : 'snoopy-night'}`}>
+          <div className="snoopy-bg-deco">
+            {isDaytime ? (
+              <>
+                <div className="snoopy-sun"></div>
+                <div className="snoopy-clouds">
+                  <div className="scloud scloud-1"></div>
+                  <div className="scloud scloud-2"></div>
+                  <div className="scloud scloud-3"></div>
+                </div>
+                <div className="snoopy-grass"></div>
+              </>
+            ) : (
+              <>
+                <div className="snoopy-moon-bg"></div>
+                <div className="snoopy-stars">
+                  {Array.from({ length: 30 }, (_, i) => (
+                    <div key={i} className="sstar" style={{
+                      left: `${Math.random() * 100}%`,
+                      top: `${Math.random() * 40}%`,
+                      animationDelay: `${Math.random() * 3}s`,
+                      width: `${1 + Math.random() * 3}px`,
+                      height: `${1 + Math.random() * 3}px`,
+                    }} />
+                  ))}
+                </div>
+                <div className="snoopy-ground"></div>
+              </>
+            )}
+          </div>
 
           {/* Helper: renderSnoopy creates a Snoopy character */}
           {[
