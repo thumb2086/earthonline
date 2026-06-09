@@ -504,11 +504,11 @@ app.get('/api/auth/discord/callback', async (req, res) => {
 apiRouter.get('/leaderboard', async (req, res) => {
   try {
     const users = await User.find({}, 'username accumulatedTime accumulatedBonusPoints discord country').lean();
-    let leaderboard = users.map(u => {
+    let leaderboard = await Promise.all(users.map(async u => {
       const idleTimeSeconds = Math.floor((u.accumulatedTime || 0) / 1000);
       const points = idleTimeSeconds + (u.accumulatedBonusPoints || 0);
       const discordId = u.discord?.id || '無';
-      const realRole = discordId !== '無' ? discordBot.getHighestRole(discordId) : '';
+      const realRole = discordId !== '無' ? await discordBot.getHighestRole(discordId) : '';
 
       return {
         username: u.username,
@@ -520,7 +520,7 @@ apiRouter.get('/leaderboard', async (req, res) => {
         points: points,
         role: realRole || ''
       };
-    });
+    }));
     // Fake roles removed
 
     // Sort by points descending
