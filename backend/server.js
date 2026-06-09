@@ -899,6 +899,7 @@ regions.forEach(regionName => {
         socketId: socket.id,
         id: decoded.id,
         username: decoded.username,
+        role: dbUser?.role || 'user',
         discordProfile: dbUser?.discord || null,
         ip: ip,
         ipObfuscated: obfuscateIp(ip),
