@@ -5,10 +5,15 @@
   "observability": {
     "enabled": true
   },
+  "main": "src/index.js",
   "assets": {
-    "directory": "client"
+    "directory": "client/dist",
+    "binding": "ASSETS"
   },
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  "build": {
+    "command": "cd client && npm install && npm run build"
+  }
 }
