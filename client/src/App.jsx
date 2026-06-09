@@ -1155,12 +1155,6 @@ function Dashboard({ token, onLogout, region }) {
     }, 1000);
   };
 
-  // Show ad revive modal when health reaches 0
-  useEffect(() => {
-    if (myNode?.health !== undefined && myNode.health <= 0) {
-      setShowAdRevive(true);
-    }
-  }, [myNode?.health]);
 
   const handleTerminalSubmit = (e) => {
     e.preventDefault();
@@ -1389,15 +1383,6 @@ function Dashboard({ token, onLogout, region }) {
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '5px', textAlign: 'right' }}>
               {Math.floor(calculateHealthPercentage(lifespan))}%
             </div>
-            {calculateHealthPercentage(lifespan) <= 0 && (
-              <button onClick={() => setShowAdRevive(true)} style={{
-                width: '100%', marginTop: '10px', padding: '8px', background: 'var(--accent-color)',
-                color: '#000', border: 'none', borderRadius: '4px', fontWeight: 'bold',
-                cursor: 'pointer', fontSize: '0.85rem'
-              }}>
-                📺 看廣告復活伺服器
-              </button>
-            )}
           </div>
 
           <div className="metric-group">
@@ -1691,7 +1676,7 @@ function Dashboard({ token, onLogout, region }) {
       {/* Full Page About Documentation */}
       {showAboutModal && <DocumentationOverlay onClose={() => setShowAboutModal(false)} />}
       {showSocialModal && <SocialModal onClose={() => setShowSocialModal(false)} socialTab={socialTab} setSocialTab={setSocialTab} socialData={socialData} socket={socket} />}
-      {showShopModal && <ShopModal onClose={() => setShowShopModal(false)} pts={myNode?.accumulatedBonusPoints} onBuy={(id) => { if (socket?.connected) { socket.emit('buy_item', id); } else { alert('連線未就緒，無法購買'); } }} />}
+      {showShopModal && <ShopModal onClose={() => setShowShopModal(false)} pts={myNode?.accumulatedBonusPoints} onBuy={(id) => { if (socket?.connected) { socket.emit('buy_item', id); } else { alert('連線未就緒，無法購買'); } }} onAdRevive={() => setShowAdRevive(true)} adReviveRemaining={adReviveRemaining} />}
 
       {showAccountInfo && <AccountInfoModal token={token} apiUrl={API_URL} onClose={() => setShowAccountInfo(false)} onLogout={onLogout} />}
 

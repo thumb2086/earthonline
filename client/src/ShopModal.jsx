@@ -11,14 +11,14 @@ const SHOP_ITEMS = [
 ];
 
 const TYPE_COLOR = {
-  health:   { border: 'var(--accent-color)', label: 'var(--accent-color)', bg: 'rgba(0,255,65,0.08)' },
+  health:   { border: '#00ff41', label: '#00ff41', bg: 'rgba(0,255,65,0.08)' },
   buff:     { border: '#a855f7', label: '#a855f7', bg: 'rgba(168,85,247,0.08)' },
   revive:   { border: '#38bdf8', label: '#38bdf8', bg: 'rgba(56,189,248,0.08)' },
   cosmetic: { border: '#f472b6', label: '#f472b6', bg: 'rgba(244,114,182,0.08)' },
   random:   { border: '#fbbf24', label: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
 };
 
-export default function ShopModal({ onClose, pts, onBuy }) {
+export default function ShopModal({ onClose, pts, onBuy, onAdRevive, adReviveRemaining }) {
   const [buying, setBuying] = useState(null);
 
   const handleBuy = (item) => {
@@ -45,16 +45,16 @@ export default function ShopModal({ onClose, pts, onBuy }) {
         {/* Prompt header */}
         <div style={S.promptBox}>
           <div style={S.promptLine}>
-            <span style={{color:'var(--text-dim)'}}>root@earth-online</span>
-            <span style={{color:'var(--text-dim)'}}>:</span>
+            <span style={{color:'#64748b'}}>root@earth-online</span>
+            <span style={{color:'#64748b'}}>:</span>
             <span style={{color:'#3b82f6'}}>~/market</span>
-            <span style={{color:'var(--text-dim)'}}>$ </span>
-            <span style={{color:'var(--text-color)'}}>ls --items --wallet</span>
+            <span style={{color:'#64748b'}}>$ </span>
+            <span style={{color:'#e2e8f0'}}>ls --items --wallet</span>
           </div>
           <div style={S.walletLine}>
-            <span style={{color:'var(--text-dim)'}}>// WALLET: </span>
-            <span style={{color:'var(--accent-color)', fontWeight:'bold', textShadow:'0 0 8px rgba(0,255,65,0.5)'}}>{formattedPts} PT</span>
-            <span style={{color:'var(--text-dim)', marginLeft:'auto', fontSize:'11px'}}>
+            <span style={{color:'#64748b'}}>// WALLET: </span>
+            <span style={{color:'#00ff41', fontWeight:'bold', textShadow:'0 0 8px rgba(0,255,65,0.5)'}}>{formattedPts} PT</span>
+            <span style={{color:'#64748b', marginLeft:'auto', fontSize:'11px'}}>
               掛機收益：約 3 pt/min（100% 血量）
             </span>
           </div>
@@ -98,10 +98,26 @@ export default function ShopModal({ onClose, pts, onBuy }) {
           })}
         </div>
 
+        {/* Ad revive section */}
+        {adReviveRemaining > 0 && (
+          <div style={{padding: '12px 20px', borderTop: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(0,255,65,0.03)'}}>
+            <span style={{fontSize: '20px'}}>📺</span>
+            <div style={{flex: 1}}>
+              <div style={{color: '#e2e8f0', fontWeight: 'bold', fontSize: '13px'}}>免費廣告復活</div>
+              <div style={{color: '#64748b', fontSize: '11px'}}>觀看 15 秒廣告即可免費復活伺服器（今日剩餘 {adReviveRemaining} 次）</div>
+            </div>
+            <button onClick={() => { onAdRevive(); onClose(); }} style={{
+              background: '#00ff41', color: '#000', border: 'none', padding: '8px 16px',
+              borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer',
+              fontFamily: '"Courier New", Courier, monospace',
+            }}>觀看廣告</button>
+          </div>
+        )}
+
         {/* Footer */}
         <div style={S.footer}>
-          <span style={{color:'var(--text-dim)'}}>─────────────────────────────────────────────────────</span>
-          <span style={{color:'var(--text-dim)', fontSize:'11px'}}>按 [ESC] 或點擊右上角關閉</span>
+          <span style={{color:'#64748b'}}>─────────────────────────────────────────────────────</span>
+          <span style={{color:'#64748b', fontSize:'11px'}}>按 [ESC] 或點擊右上角關閉</span>
         </div>
       </div>
     </div>
@@ -111,7 +127,7 @@ export default function ShopModal({ onClose, pts, onBuy }) {
 const S = {
   overlay: {
     position: 'fixed', inset: 0,
-    background: 'var(--bg-color)',
+    background: '#0a0e17',
     backdropFilter: 'blur(6px)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 9999,
@@ -119,14 +135,14 @@ const S = {
   },
   window: {
     width: '90%', maxWidth: '780px',
-    background: 'var(--bg-color)',
+    background: '#0a0e17',
     border: '1px solid #1e293b',
     boxShadow: '0 0 0 1px #0f172a, 0 25px 60px rgba(0,0,0,0.8)',
     display: 'flex', flexDirection: 'column',
     maxHeight: '90vh',
   },
   titleBar: {
-    background: 'var(--surface-color)',
+    background: '#161d2e',
     borderBottom: '1px solid #1e293b',
     padding: '10px 16px',
     display: 'flex', alignItems: 'center', gap: '8px',
@@ -136,10 +152,10 @@ const S = {
     width: 12, height: 12, borderRadius: '50%', background: color, display: 'inline-block',
   }),
   titleText: {
-    flex: 1, textAlign: 'center', fontSize: '12px', color: 'var(--text-dim)', letterSpacing: '0.5px',
+    flex: 1, textAlign: 'center', fontSize: '12px', color: '#64748b', letterSpacing: '0.5px',
   },
   closeBtn: {
-    background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer',
+    background: 'none', border: 'none', color: '#64748b', cursor: 'pointer',
     fontSize: '14px', padding: '0 4px', lineHeight: 1,
     transition: 'color 0.15s',
   },
@@ -162,14 +178,14 @@ const S = {
   itemRow: (canAfford, tc) => ({
     display: 'flex', alignItems: 'center', gap: '14px',
     padding: '10px 20px',
-    borderLeft: `3px solid ${canAfford ? tc.border : 'var(--border-color)'}`,
+    borderLeft: `3px solid ${canAfford ? tc.border : '#1e293b'}`,
     background: canAfford ? tc.bg : 'transparent',
     transition: 'background 0.15s',
     cursor: canAfford ? 'default' : 'not-allowed',
     opacity: canAfford ? 1 : 0.45,
   }),
   idx: {
-    color: 'var(--text-dim)', fontSize: '11px', minWidth: '22px', letterSpacing: '1px',
+    color: '#64748b', fontSize: '11px', minWidth: '22px', letterSpacing: '1px',
   },
   icon: (tc) => ({
     width: 40, height: 40,
@@ -184,13 +200,13 @@ const S = {
     flex: 1, minWidth: 0,
   },
   itemName: (canAfford) => ({
-    color: canAfford ? 'var(--text-color)' : 'var(--text-dim)',
+    color: canAfford ? '#e2e8f0' : '#64748b',
     fontWeight: 'bold', fontSize: '14px',
     marginBottom: '2px',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   }),
   itemDesc: {
-    color: 'var(--text-dim)', fontSize: '11px', lineHeight: '1.4',
+    color: '#64748b', fontSize: '11px', lineHeight: '1.4',
   },
   badge: (tc) => ({
     color: tc.label, fontSize: '10px', letterSpacing: '1px',
@@ -203,12 +219,12 @@ const S = {
     flexShrink: 0,
   },
   cost: (canAfford) => ({
-    color: canAfford ? 'var(--text-dim)' : 'var(--text-dim)', fontSize: '12px',
+    color: canAfford ? '#64748b' : '#64748b', fontSize: '12px',
   }),
   buyBtn: (canAfford, isActive) => ({
-    background: isActive ? 'var(--border-color)' : canAfford ? 'var(--accent-color)' : 'var(--border-color)',
-    color: isActive ? 'var(--accent-color)' : canAfford ? '#000' : 'var(--text-dim)',
-    border: `1px solid ${canAfford ? 'var(--accent-color)' : 'var(--border-color)'}`,
+    background: isActive ? '#1e293b' : canAfford ? '#00ff41' : '#1e293b',
+    color: isActive ? '#00ff41' : canAfford ? '#000' : '#64748b',
+    border: `1px solid ${canAfford ? '#00ff41' : '#1e293b'}`,
     padding: '4px 14px',
     fontFamily: '"Courier New", Courier, monospace',
     fontWeight: 'bold', fontSize: '12px',
