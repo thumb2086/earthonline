@@ -329,14 +329,14 @@ body {
   position: absolute;
   width: 80px;
   height: 28px;
-  background: var(--text-dim);
+  background: var(--accent-color);
   border-radius: 0;
   image-rendering: pixelated;
-  opacity: 0.25;
+  opacity: 0.18;
   box-shadow: 
-    20px -10px 0 var(--text-dim),
-    40px 0 0 var(--text-dim),
-    60px -5px 0 var(--text-dim);
+    20px -10px 0 var(--accent-color),
+    40px 0 0 var(--accent-color),
+    60px -5px 0 var(--accent-color);
   animation: floatLoginCloud linear infinite;
 }
 
@@ -350,21 +350,21 @@ body {
   top: 35%; left: -120px;
   animation-duration: 30s;
   animation-delay: 5s;
-  opacity: 0.2;
+  opacity: 0.14;
 }
 
 .login-cloud:nth-child(3) {
   top: 65%; left: -80px;
   animation-duration: 22s;
   animation-delay: 10s;
-  opacity: 0.22;
+  opacity: 0.15;
 }
 
 .login-cloud:nth-child(4) {
   top: 80%; left: -140px;
   animation-duration: 28s;
   animation-delay: 15s;
-  opacity: 0.18;
+  opacity: 0.12;
 }
 
 @keyframes floatLoginCloud {
