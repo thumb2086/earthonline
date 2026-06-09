@@ -1141,7 +1141,7 @@ function Dashboard({ token, onLogout, region }) {
               <span style={{color: '#64748b'}}>上線人數:</span> <strong style={{color: 'var(--success-color)'}}>{globalStats.activeUsers}</strong>
             </div>
             <div style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
-              <span style={{color: '#64748b'}}>{t('總人口')}:</span> <strong style={{color: '#e2e8f0'}}>{globalStats.totalPopulation}</strong>
+              <span style={{color: 'var(--text-dim)'}}>{t('總人口')}:</span> <strong style={{color: 'var(--text-color)'}}>{globalStats.totalPopulation}</strong>
             </div>
             {!isConnected && <span style={{color: 'var(--danger-color)', fontWeight: 'bold'}}>[已斷線]</span>}
           </div>
@@ -1329,7 +1329,7 @@ function Dashboard({ token, onLogout, region }) {
                 </div>
                 <div className="overlay-value">{formatTime(globalStats.globalProduction)}</div>
               </div>
-              <div style={{width: '1px', background: '#1e293b'}}></div>
+              <div style={{width: '1px', background: 'var(--border-color)'}}></div>
               <div className="overlay-item">
                 <div className="overlay-title" style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
                   <Server size={16} /> 伺服器即時負載
@@ -1338,7 +1338,7 @@ function Dashboard({ token, onLogout, region }) {
                   {globalStats.totalPopulation > 0 ? ((globalStats.activeUsers / globalStats.totalPopulation) * 100).toFixed(1) : 0}%
                 </div>
               </div>
-              <div style={{width: '1px', background: '#1e293b'}}></div>
+              <div style={{width: '1px', background: 'var(--border-color)'}}></div>
               <div className="overlay-item">
                 <div className="overlay-title" style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
                   <Network size={16} /> 連線延遲 (Ping)
@@ -1422,8 +1422,8 @@ function Dashboard({ token, onLogout, region }) {
         }}>
           <div className="modal-content" style={{
             maxWidth: '900px', width: '90%', maxHeight: '85vh', overflowY: 'auto',
-            background: '#0a0f19', borderRadius: '12px', padding: '30px',
-            border: '1px solid rgba(0,255,204,0.3)', boxShadow: '0 0 40px rgba(0,255,204,0.1)'
+            background: 'var(--surface-color)', borderRadius: '12px', padding: '30px',
+            border: '1px solid var(--border-color)', boxShadow: '0 0 40px rgba(0,255,204,0.1)'
           }} onClick={e => e.stopPropagation()}>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '25px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px', flexWrap: 'wrap', gap: '15px'}}>
               <h2 style={{margin: 0, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem'}}>

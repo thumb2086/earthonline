@@ -111,6 +111,7 @@ export function ThemeProvider({ children }) {
     root.style.setProperty('--bg-color', t.bg);
     root.style.setProperty('--bg-light', t.bgLight);
     root.style.setProperty('--surface-color', t.surface);
+    root.style.setProperty('--panel-bg', t.surface);
     root.style.setProperty('--text-color', t.text);
     root.style.setProperty('--text-dim', t.textDim);
     root.style.setProperty('--border-color', t.border);
@@ -121,7 +122,6 @@ export function ThemeProvider({ children }) {
     root.style.setProperty('--text-primary', t.text);
     root.style.setProperty('--text-secondary', t.textDim);
     root.style.setProperty('--text-main', t.text);
-    root.style.setProperty('--accent-hover', t.accentHover);
   }, [currentTheme]);
 
   return (
