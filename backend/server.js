@@ -847,19 +847,136 @@ regions.forEach(regionName => {
         return;
       }
       
-      // Atomic: try to deduct cost, fail if insufficient balance
+      // ── 購買後統一存入背包，不立即套用 ──────────────────────────────
+      // Atomic deduct PT
       const result = await User.findOneAndUpdate(
         { username: socket.user.username, accumulatedBonusPoints: { $gte: item.cost } },
-        { $inc: { accumulatedBonusPoints: -item.cost } },
+        { $inc: { accumulatedBonusPoints: -item.cost, [`inventory.${itemId}`]: 1 } },
         { new: true }
       );
-      
+
       if (!result) {
-        socket.emit('buy_result', { success: false, message: 'PT 不足或道具不存在！' });
+        socket.emit('buy_result', { success: false, message: 'PT 不足！' });
         return;
       }
-      
-      let message = `成功購買 ${itemId}！`;
+
+      socket.emit('buy_result', { success: true, message: `✅ 已購買「${itemId}」並存入背包！` });
+      socket.emit('user_state_update', {
+        pts: result.accumulatedBonusPoints,
+        inventory: result.inventory ? Object.fromEntries(result.inventory) : {}
+      });
+    } catch (err) {
+      console.error(err);
+      socket.emit('buy_result', { success: false, message: '系統錯誤' });
+    }
+  });
+
+  // ── 使用背包道具 ──────────────────────────────────────────────────────────
+  socket.on('use_item', async (itemId) => {
+    if (!socket.user) return;
+    try {
+      const shopItems = {
+        'liquid_nitrogen': { effect: 'health', value: 50 },
+        'quantum_cooler':  { effect: 'health', value: 100 },
+        'overclock_chip':  { effect: 'buff',   type: 'overclock', duration: 3600000 },
+        'firewall':        { effect: 'buff',   type: 'firewall',  duration: 1800000 },
+        'generator':       { effect: 'revive', value: 20 },
+        'neon_strip':      { effect: 'cosmetic' },
+        'flash_drive':     { effect: 'random' }
+      };
+
+      const item = shopItems[itemId];
+      if (!item) { socket.emit('use_item_result', { success: false, message: '道具不存在！' }); return; }
+
+      // 原子扣除背包數量
+      const userBefore = await User.findOneAndUpdate(
+        { username: socket.user.username, [`inventory.${itemId}`]: { $gte: 1 } },
+        { $inc: { [`inventory.${itemId}`]: -1 } },
+        { new: false } // 拿舊值判斷
+      );
+      if (!userBefore) {
+        socket.emit('use_item_result', { success: false, message: '背包中沒有此道具！' });
+        return;
+      }
+
+      // 清除數量歸零的 key
+      const oldCount = userBefore.inventory?.get(itemId) || 0;
+      if (oldCount <= 1) {
+        await User.updateOne({ username: socket.user.username }, { $unset: { [`inventory.${itemId}`]: '' } });
+      }
+
+      // 套用效果
+      let message = '';
+      let extraUpdate = null;
+
+      if (item.effect === 'health') {
+        const dbUser = await User.findOne({ username: socket.user.username });
+        if (dbUser.health <= 0) {
+          // 退回背包
+          await User.updateOne({ username: socket.user.username }, { $inc: { [`inventory.${itemId}`]: 1 } });
+          socket.emit('use_item_result', { success: false, message: '伺服器已死機，無法使用冷卻模組！請先用備用發電機。' });
+          return;
+        }
+        const newHealth = Math.min(100, dbUser.health + item.value);
+        extraUpdate = { $set: { health: newHealth } };
+        message = `❤️ 健康度恢復 +${item.value}%（現在 ${Math.floor(newHealth)}%）`;
+
+      } else if (item.effect === 'buff') {
+        const expiry = Date.now() + item.duration;
+        extraUpdate = { $set: { [`activeBuffs.${item.type}`]: expiry } };
+        const minLabel = Math.floor(item.duration / 60000);
+        message = item.type === 'overclock'
+          ? `⚡ PT 收益 ×2.0 倍，持續 ${minLabel} 分鐘！`
+          : `🛡️ 防火牆啟動，${minLabel} 分鐘內免疫衰減！`;
+
+      } else if (item.effect === 'revive') {
+        const dbUser = await User.findOne({ username: socket.user.username });
+        if (dbUser.health > 0) {
+          await User.updateOne({ username: socket.user.username }, { $inc: { [`inventory.${itemId}`]: 1 } });
+          socket.emit('use_item_result', { success: false, message: '伺服器仍在運作，不需要發電機！' });
+          return;
+        }
+        extraUpdate = { $set: { health: item.value } };
+        message = `🔋 伺服器強制重啟！健康度恢復至 ${item.value}%`;
+
+      } else if (item.effect === 'cosmetic') {
+        message = '🌈 霓虹燈管已安裝，裝飾效果已套用！';
+
+      } else if (item.effect === 'random') {
+        const rand = Math.random();
+        if (rand < 0.3) {
+          extraUpdate = { $inc: { accumulatedTime: 86400 * 1000 } };
+          message = '🏆 大吉！獲得 1 天生存時間！';
+        } else if (rand < 0.6) {
+          extraUpdate = { $inc: { accumulatedBonusPoints: 2000 } };
+          message = '💰 中吉！獲得 2000 PT！';
+        } else if (rand < 0.9) {
+          extraUpdate = { $inc: { accumulatedBonusPoints: 500 } };
+          message = '🎁 小吉！回本 500 PT！';
+        } else {
+          extraUpdate = { $inc: { health: -50 } };
+          message = '💀 大凶！電腦病毒爆發，健康度 -50%！';
+        }
+      }
+
+      if (extraUpdate) {
+        await User.updateOne({ username: socket.user.username }, extraUpdate);
+      }
+
+      const finalUser = await User.findOne({ username: socket.user.username });
+      socket.emit('use_item_result', { success: true, message });
+      socket.emit('user_state_update', {
+        health: finalUser.health,
+        pts: finalUser.accumulatedBonusPoints,
+        activeBuffs: finalUser.activeBuffs ? Object.fromEntries(finalUser.activeBuffs) : {},
+        inventory: finalUser.inventory ? Object.fromEntries(finalUser.inventory) : {}
+      });
+    } catch (err) {
+      console.error('[SYS] use_item error:', err);
+      socket.emit('use_item_result', { success: false, message: '系統錯誤，請稍後再試。' });
+    }
+  });
+
       
       if (item.effect === 'health') {
         if (result.health <= 0) {
@@ -1300,6 +1417,42 @@ regions.forEach(regionName => {
       if (u.username) users.push(u.username);
     }
     socket.emit('online_users', [...new Set(users)]);
+  });
+
+  // ── 管理員：取得全部玩家名單 ────────────────────────────────────────────
+  socket.on('get_all_players', async () => {
+    const user = connectedUsers.get(socket.id);
+    if (!user) return;
+    try {
+      const dbUser = await User.findOne({ username: user.username }, 'role');
+      if (!dbUser || dbUser.role === 'user') return;
+      const allUsers = await User.find({}, {
+        username: 1, role: 1, country: 1,
+        accumulatedTime: 1, accumulatedBonusPoints: 1,
+        mutedUntil: 1, bannedUntil: 1,
+        createdAt: 1
+      }).sort({ createdAt: -1 }).limit(500).lean();
+
+      const onlineSet = new Set();
+      for (const u of connectedUsers.values()) onlineSet.add(u.username);
+
+      const now = Date.now();
+      const playerList = allUsers.map(u => ({
+        username: u.username,
+        role: u.role || 'user',
+        country: u.country || 'UNKNOWN',
+        accumulatedTime: Math.floor((u.accumulatedTime || 0) / 1000),
+        pts: Math.floor((u.accumulatedTime || 0) / 1000) + (u.accumulatedBonusPoints || 0),
+        online: onlineSet.has(u.username),
+        isMuted: u.mutedUntil && u.mutedUntil > now,
+        isBanned: u.bannedUntil && u.bannedUntil > now,
+        createdAt: u.createdAt
+      }));
+
+      socket.emit('all_players_list', playerList);
+    } catch (err) {
+      console.error('[MOD] get_all_players error:', err);
+    }
   });
 
   // Friend System Handlers
