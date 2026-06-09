@@ -1494,9 +1494,10 @@ function Dashboard({ token, onLogout, region }) {
                     <td style={{
                       padding: '12px 8px', 
                       fontWeight: 'bold',
-                      color: user.role.includes('無業遊民') ? '#F1C40F' : 
-                             user.role.includes('財務自由') ? '#2ECC71' : 
-                             user.role.includes('月光族') ? '#E67E22' : 'var(--text-secondary)'
+                      color: user.role.includes('無業遊民') ? '#F1C40F' :
+       user.role.includes('財務自由') ? '#2ECC71' :
+       user.role.includes('月光族') ? '#E67E22' :
+ 'var(--text-secondary)'
                     }}>
                       {user.role || '平民'}
                     </td>
