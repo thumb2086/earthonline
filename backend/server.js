@@ -396,7 +396,7 @@ app.get('/api/auth/discord/callback', async (req, res) => {
     if (returnTo) {
       try {
         const returnUrl = new URL(returnTo);
-        const allowedHosts = ['localhost', 'earthonline.onrender.com', 'earthonline1.pages.dev'];
+        const allowedHosts = ['localhost', 'earthonline.onrender.com', 'earthonline1.pages.dev', 'earthonline.qzz.io'];
         if (!allowedHosts.includes(returnUrl.hostname)) {
           returnTo = null;
         }
@@ -404,6 +404,7 @@ app.get('/api/auth/discord/callback', async (req, res) => {
         returnTo = null;
       }
     }
+    if (!returnTo) returnTo = '/';
     if (action === 'bind') {
       decoded = jwt.verify(stateData.token, JWT_SECRET);
     }
@@ -481,8 +482,8 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       );
       
       // Redirect to frontend with token in query params
-      const separator = returnTo.includes('?') ? '&' : '?';
-      return res.redirect(`${returnTo}${separator}token=${token}`);
+      const separator = returnTo && returnTo.includes('?') ? '&' : '?';
+      return res.redirect(`${returnTo || '/'}${separator}token=${token}`);
       
     } else {
       // Bind action
