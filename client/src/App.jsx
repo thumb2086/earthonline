@@ -9,8 +9,8 @@ import ShopModal from './ShopModal';
 import BackpackModal from './BackpackModal';
 import './index.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || '';
+const SOCKET_URL = import.meta.env.VITE_API_URL || '';
 
 
 function LoginGateway({ onLogin }) {
@@ -84,7 +84,7 @@ function LoginGateway({ onLogin }) {
     const verifyToken = params.get('verifyToken');
     if (verifyToken) {
       window.history.replaceState({}, document.title, window.location.pathname);
-      const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
+      const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
       fetch(`${BASE_URL}/api/${region}/auth/verify-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,7 +107,7 @@ function LoginGateway({ onLogin }) {
     }
   }, [onLogin, region]);
 
-  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
+  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
   const API_URL = `${BASE_URL}/api/${region}`;
 
   const handleDiscordLogin = () => {
@@ -559,7 +559,7 @@ const DonateBanner = () => {
 
 function Dashboard({ token, onLogout, region }) {
   const { t, language, setLanguage } = useLanguage();
-  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
+  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
   const API_URL = `${BASE_URL}/api/${region}`;
   const SOCKET_URL = BASE_URL;
   const [socket, setSocket] = useState(null);
