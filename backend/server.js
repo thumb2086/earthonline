@@ -58,6 +58,7 @@ process.on('unhandledRejection', (reason) => {
 
 // Heartbeat tracking for disconnect compensation
 const heartbeatTimestamps = new Map();
+const reviveCounts = new Map();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'earth_online_secret_key_9988';
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
@@ -872,6 +873,31 @@ regions.forEach(regionName => {
       console.error(err);
       socket.emit('buy_result', { success: false, message: '系統錯誤' });
     }
+  });
+
+  // Ad revive: restore health after watching an ad
+  socket.on('ad_revive', async () => {
+    if (!socket.user) return;
+    const now = Date.now();
+    const today = new Date().toISOString().substring(0, 10);
+    const adCountKey = `adRevive_${socket.user.username}_${today}`;
+    const count = reviveCounts?.get(adCountKey) || 0;
+    if (count >= 3) {
+      socket.emit('ad_revive_result', { success: false, message: '今日廣告次數已用完（上限 3 次）' });
+      return;
+    }
+    const user = await User.findOne({ username: socket.user.username });
+    if (!user) return;
+    if (user.health > 0) {
+      socket.emit('ad_revive_result', { success: false, message: '伺服器仍在運作，無需復活' });
+      return;
+    }
+    const newHealth = Math.min(100, (user.health || 0) + 50);
+    await User.updateOne({ username: socket.user.username }, { $set: { health: newHealth } });
+    if (!reviveCounts) reviveCounts = new Map();
+    reviveCounts.set(adCountKey, count + 1);
+    socket.emit('ad_revive_result', { success: true, health: newHealth, remaining: 2 - count });
+    socket.emit('user_state_update', { health: newHealth });
   });
 
   socket.on('authenticate', async (data) => {

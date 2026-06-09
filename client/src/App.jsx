@@ -540,6 +540,9 @@ function Dashboard({ token, onLogout, region }) {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [adminTarget, setAdminTarget] = useState('');
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [showAdRevive, setShowAdRevive] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(0);
+  const [adReviveRemaining, setAdReviveRemaining] = useState(3);
   const [globalStats, setGlobalStats] = useState({ activeUsers: 0, totalPopulation: 0, globalProduction: 0, socialCompression: '1.000' });
   const [hubStats, setHubStats] = useState(null);
 
@@ -886,6 +889,15 @@ function Dashboard({ token, onLogout, region }) {
       setOnlineUsers(users);
     });
 
+    s.on('ad_revive_result', (data) => {
+      if (data.success) {
+        addLog(`[SYSTEM] 廣告復活成功！伺服器健康度恢復至 ${data.health}%（今日剩餘 ${data.remaining} 次）`);
+        setAdReviveRemaining(data.remaining);
+      } else {
+        addLog(`[SYSTEM] 廣告復活失敗：${data.message}`);
+      }
+    });
+
     s.on('chat_verification_required', (data) => {
       addLog(`[SYSTEM] ⚠️ ${data.message}`);
       alert('⚠️ ' + data.message);
@@ -1125,6 +1137,28 @@ function Dashboard({ token, onLogout, region }) {
     setAdminTarget('');
   };
 
+  const handleStartAdRevive = () => {
+    if (!socket || adReviveRemaining <= 0) return;
+    setAdCountdown(15);
+    const timer = setInterval(() => {
+      setAdCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          socket.emit('ad_revive');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Show ad revive modal when health reaches 0
+  useEffect(() => {
+    if (myNode?.health !== undefined && myNode.health <= 0) {
+      setShowAdRevive(true);
+    }
+  }, [myNode?.health]);
+
   const handleTerminalSubmit = (e) => {
     e.preventDefault();
     if (!terminalInput.trim()) return;
@@ -1352,6 +1386,15 @@ function Dashboard({ token, onLogout, region }) {
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '5px', textAlign: 'right' }}>
               {Math.floor(calculateHealthPercentage(lifespan))}%
             </div>
+            {calculateHealthPercentage(lifespan) <= 0 && (
+              <button onClick={() => setShowAdRevive(true)} style={{
+                width: '100%', marginTop: '10px', padding: '8px', background: 'var(--accent-color)',
+                color: '#000', border: 'none', borderRadius: '4px', fontWeight: 'bold',
+                cursor: 'pointer', fontSize: '0.85rem'
+              }}>
+                📺 看廣告復活伺服器
+              </button>
+            )}
           </div>
 
           <div className="metric-group">
@@ -1704,6 +1747,56 @@ function Dashboard({ token, onLogout, region }) {
           </div>
         </Draggable>
       </div>
+      )}
+
+      {/* Ad Revive Modal */}
+      {showAdRevive && (
+        <div className="modal-overlay" onClick={() => { if (adCountdown === 0) setShowAdRevive(false); }} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surface-color)', border: '1px solid var(--accent-color)',
+            borderRadius: '12px', padding: '40px', maxWidth: '420px', width: '90%',
+            textAlign: 'center'
+          }}>
+            {adCountdown > 0 ? (
+              <>
+                <div style={{fontSize: '3rem', marginBottom: '20px'}}>📺</div>
+                <div style={{color: 'var(--text-color)', fontSize: '1.1rem', marginBottom: '10px'}}>正在播放廣告...</div>
+                <div style={{color: 'var(--accent-color)', fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '15px'}}>{adCountdown}s</div>
+                <div style={{width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden'}}>
+                  <div style={{width: `${((15 - adCountdown) / 15) * 100}%`, height: '100%', background: 'var(--accent-color)', transition: 'width 1s linear'}} />
+                </div>
+                <div style={{color: 'var(--text-dim)', fontSize: '0.8rem', marginTop: '15px'}}>觀看完整廣告即可免費復活伺服器</div>
+              </>
+            ) : (
+              <>
+                <div style={{fontSize: '3rem', marginBottom: '15px'}}>⚡</div>
+                <div style={{color: 'var(--text-color)', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '8px'}}>伺服器已死機！</div>
+                <div style={{color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '20px'}}>觀看廣告即可免費復活（恢復 50% 健康度）</div>
+                <div style={{color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '20px'}}>今日剩餘次數：{adReviveRemaining} / 3</div>
+                <div style={{display: 'flex', gap: '10px', justifyContent: 'center'}}>
+                  <button onClick={handleStartAdRevive} disabled={adReviveRemaining <= 0} style={{
+                    background: adReviveRemaining > 0 ? 'var(--accent-color)' : 'var(--border-color)',
+                    color: adReviveRemaining > 0 ? '#000' : 'var(--text-dim)',
+                    border: 'none', padding: '12px 30px', borderRadius: '8px',
+                    fontWeight: 'bold', cursor: adReviveRemaining > 0 ? 'pointer' : 'not-allowed',
+                    fontSize: '1rem'
+                  }}>
+                    {adReviveRemaining > 0 ? '▶ 觀看廣告復活' : '今日次數已用完'}
+                  </button>
+                  <button onClick={() => setShowAdRevive(false)} style={{
+                    background: 'transparent', border: '1px solid var(--border-color)',
+                    color: 'var(--text-dim)', padding: '12px 20px', borderRadius: '8px',
+                    cursor: 'pointer', fontSize: '0.9rem'
+                  }}>關閉</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {showThemeMenu && (
