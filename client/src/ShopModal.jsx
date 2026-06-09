@@ -282,7 +282,7 @@ export default function ShopModal({ onClose, pts, onBuy, onAdRevive, adReviveRem
                     disabled={!canAfford || !!buying}
                     onClick={() => handleBuy(selectedItem)}
                   >
-                    {buying === selectedItem.id ? '⏳ 處理中…' : `購買 ${selectedItem.emoji}`}
+                    {buying === selectedItem.id ? '⏳ 處理中…' : '購買'}
                   </button>
                 </div>
               </div>

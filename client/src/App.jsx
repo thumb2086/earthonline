@@ -6,6 +6,7 @@ import { useTheme } from './ThemeContext';
 import Draggable from 'react-draggable';
 import DataCenterVisualizer from './DataCenterVisualizer';
 import ShopModal from './ShopModal';
+import BackpackModal from './BackpackModal';
 import './index.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
@@ -215,7 +216,7 @@ function LoginGateway({ onLogin }) {
           <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '5px'}}>全球節點觀測與管理中心</p>
         </div>
         
-        <form onSubmit={handleSubmit} className="login-form">
+        <form className="login-form">
           {error && <div className="error-message">{error}</div>}
           {successMsg && <div style={{color: '#00ffaa', marginBottom: '10px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold'}}>{successMsg}</div>}
           
@@ -227,96 +228,28 @@ function LoginGateway({ onLogin }) {
               <option value="eu">[EU-Central] 歐洲陣列</option>
             </select>
           </div>
-          
-          <div className="form-group">
-            <label>SUBJECT ID (帳號 / 信箱)</label>
-            <input 
-              type="text" 
-              value={username} 
-              onChange={e => setUsername(e.target.value)} 
-              required 
-              className="terminal-input"
-            />
+
+          <div style={{textAlign: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(255,200,0,0.08)', borderRadius: '6px', border: '1px solid rgba(255,200,0,0.2)'}}>
+            <span style={{color: '#fbbf24', fontSize: '0.85rem'}}>⚠️ 帳號登入暫時關閉，請使用 Discord 快速登入</span>
           </div>
 
-          {isForgot && (
-            <div className="form-group">
-              <label>RECOVERY KEY (恢復金鑰)</label>
-              <input 
-                type="text" 
-                value={recoveryKey} 
-                onChange={e => setRecoveryKey(e.target.value)} 
-                required 
-                className="terminal-input"
-                placeholder="EO-XXXX-XXXX"
-              />
-            </div>
-          )}
-
-          <div className="form-group">
-            <label>{isForgot ? 'NEW ACCESS CODE (新密碼)' : 'ACCESS CODE (密碼)'}</label>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-              required 
-              className="terminal-input"
-            />
-          </div>
-
-          <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
-            <input
-              type="checkbox"
-              id="rememberMe"
-              checked={rememberMe}
-              onChange={e => setRememberMe(e.target.checked)}
-              style={{ accentColor: 'var(--accent-color)', width: '16px', height: '16px', cursor: 'pointer' }}
-            />
-            <label htmlFor="rememberMe" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', cursor: 'pointer' }}>
-              記住帳號
-            </label>
-          </div>
-
-          <button type="submit" className="terminal-btn">
-            {isForgot ? '重置安全授權 (RESET)' : isRegister ? '建立節點連線 (註冊)' : '驗證並接入 (登入)'}
-          </button>
-
-          {!isForgot && (
-            <button 
-              type="button" 
-              onClick={handleDiscordLogin}
-              style={{
-                width: '100%', padding: '12px', background: 'var(--info-color)', color: '#fff',
-                border: 'none', borderRadius: '4px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer',
-                marginTop: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                fontFamily: 'monospace'
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 127.14 96.36" fill="#fff"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a67.59,67.59,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
-              使用 Discord 快速登入
-            </button>
-          )}
-        </form>
-        
-        <div style={{textAlign: 'center', marginTop: '15px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
-          {!isForgot && (
-            <span className="toggle-link" onClick={() => setIsRegister(!isRegister)}>
-              {isRegister ? '>> 返回登入程序' : '>> 申請新節點授權'}
-            </span>
-          )}
-          <span 
-            className="toggle-link" 
-            style={{color: 'var(--danger-color)'}} 
-            onClick={() => {
-              setIsForgot(!isForgot); 
-              if(!isForgot) setIsRegister(false); 
-              setError(''); 
-              setSuccessMsg('');
+          <button 
+            type="button" 
+            onClick={handleDiscordLogin}
+            style={{
+              width: '100%', padding: '14px', background: '#5865F2', color: '#fff',
+              border: 'none', borderRadius: '6px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer',
+              marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+              fontFamily: 'monospace', transition: 'all 0.15s',
+              boxShadow: '0 4px 15px rgba(88,101,242,0.4)',
             }}
+            onMouseOver={e => e.target.style.background = '#4752C4'}
+            onMouseOut={e => e.target.style.background = '#5865F2'}
           >
-            {isForgot ? '>> 返回登入程序' : '>> 遺失安全授權 (忘記密碼)'}
-          </span>
-        </div>
+            <svg width="22" height="22" viewBox="0 0 127.14 96.36" fill="#fff"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a67.59,67.59,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+            使用 Discord 快速登入
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -703,6 +636,7 @@ function Dashboard({ token, onLogout, region }) {
   const [locateTrigger, setLocateTrigger] = useState(0);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [showShopModal, setShowShopModal] = useState(false);
+  const [showBackpack, setShowBackpack] = useState(false);
   const [discordId, setDiscordId] = useState('');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -823,6 +757,7 @@ function Dashboard({ token, onLogout, region }) {
         else if (showAboutModal) setShowAboutModal(false);
         else if (showSocialModal) setShowSocialModal(false);
         else if (showShopModal) setShowShopModal(false);
+        else if (showBackpack) setShowBackpack(false);
         else if (showAccountInfo) setShowAccountInfo(false);
         else if (showThemeMenu) setShowThemeMenu(false);
         else if (showAdminPanel) setShowAdminPanel(false);
@@ -830,7 +765,7 @@ function Dashboard({ token, onLogout, region }) {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [showLeaderboard, showDiscordModal, showAboutModal, showSocialModal, showShopModal, showAccountInfo, showThemeMenu, showAdminPanel]);
+  }, [showLeaderboard, showDiscordModal, showAboutModal, showSocialModal, showShopModal, showAccountInfo, showThemeMenu, showAdminPanel, showBackpack]);
 
   // Scroll terminal to bottom
   useEffect(() => {
@@ -1074,6 +1009,14 @@ function Dashboard({ token, onLogout, region }) {
         addLog(`[SYSTEM] ${data.message}`);
       } else {
         alert('購買失敗: ' + data.message);
+      }
+    });
+
+    s.on('use_item_result', (data) => {
+      if (data.success) {
+        addLog(`[SYSTEM] ${data.message}`);
+      } else {
+        alert(data.message);
       }
     });
 
@@ -1534,6 +1477,10 @@ function Dashboard({ token, onLogout, region }) {
               <button onClick={() => { setShowShopModal(true); setDropdownOpen(false); }} className="dropdown-item" style={{color: '#38bdf8'}}>
                 <ShoppingCart size={16} /> 黑市商城 (Shop)
               </button>
+              <button onClick={() => { setShowBackpack(true); setDropdownOpen(false); }} className="dropdown-item" style={{color: '#22c55e'}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><polyline points="8 8 8 5 16 5 16 8"/><line x1="12" y1="14" x2="12" y2="17"/><line x1="9" y1="14" x2="9" y2="17"/><line x1="15" y1="14" x2="15" y2="17"/></svg>
+                裝備背包 (Backpack)
+              </button>
               <button className="dropdown-item" onClick={() => { setShowThemeMenu(!showThemeMenu); setDropdownOpen(false); }}>
                 <Palette size={16} /> 主題配色 (Themes)
               </button>
@@ -1929,6 +1876,7 @@ function Dashboard({ token, onLogout, region }) {
       {showAboutModal && <DocumentationOverlay onClose={() => setShowAboutModal(false)} />}
       {showSocialModal && <SocialModal onClose={() => setShowSocialModal(false)} socialTab={socialTab} setSocialTab={setSocialTab} socialData={socialData} socket={socket} myNode={myNode} onPmUser={(username) => { setPmTarget(username); setShowPm(true); setShowSocialModal(false); }} />}
       {showShopModal && <ShopModal onClose={() => setShowShopModal(false)} pts={myNode?.accumulatedBonusPoints} onBuy={(id) => { if (socket?.connected) { socket.emit('buy_item', id); } else { alert('連線未就緒，無法購買'); } }} onAdRevive={() => setShowAdRevive(true)} adReviveRemaining={adReviveRemaining} />}
+      {showBackpack && <BackpackModal onClose={() => setShowBackpack(false)} inventory={myNode?.inventory} socket={socket} addLog={addLog} />}
 
       {showAccountInfo && <AccountInfoModal token={token} apiUrl={API_URL} onClose={() => setShowAccountInfo(false)} onLogout={onLogout} />}
 
