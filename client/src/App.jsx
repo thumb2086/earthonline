@@ -574,6 +574,8 @@ function Dashboard({ token, onLogout, region }) {
   const [sessionTime, setSessionTime] = useState(0);
   const sessionStartRef = useRef(null);
   const lifespanBaseRef = useRef(null);
+  const lifespanIntervalRef = useRef(null);
+  const timerStartRef = useRef(null);
   const [show100Celebration, setShow100Celebration] = useState(false);
   const [logs, setLogs] = useState([
     { text: '[SYS] 地球在線連線建立中...', time: new Date().toISOString().substring(11, 19) },
@@ -948,24 +950,21 @@ function Dashboard({ token, onLogout, region }) {
   // Lifespan timer — set base once, never reset
   useEffect(() => {
     if (!myNode || myNode.accumulatedTime === undefined) return;
-    if (lifespanBaseRef.current !== null) return;
+    if (lifespanIntervalRef.current) return;
     lifespanBaseRef.current = (myNode.accumulatedTime || 0) / 1000;
 
-    let currentLocalLifespan = lifespanBaseRef.current;
-    const interval = setInterval(() => {
-      currentLocalLifespan += 1;
-      setLifespan(Math.floor(currentLocalLifespan));
+    setLifespan(Math.floor(lifespanBaseRef.current));
+    lifespanIntervalRef.current = setInterval(() => {
+      setLifespan(prev => prev + 1);
       if (window.electronAPI) {
         window.electronAPI.updatePresence({
-          details: `生存時間: ${formatTime(Math.floor(currentLocalLifespan))}`,
-          state: `區域: ${region === 'asia' ? 'Asia' : region === 'us' ? 'US' : 'EU'} | 積分: ${Math.floor(currentLocalLifespan)} PT`,
+          details: `生存時間: ${formatTime(lifespanBaseRef.current + (Date.now() - timerStartRef.current) / 1000)}`,
+          state: `區域: ${region === 'asia' ? 'Asia' : region === 'us' ? 'US' : 'EU'} | 積分: ${Math.floor(lifespanBaseRef.current + (Date.now() - timerStartRef.current) / 1000)} PT`,
           username: myNode.username
         });
       }
     }, 1000);
-    setLifespan(Math.floor(currentLocalLifespan));
-
-    return () => clearInterval(interval);
+    timerStartRef.current = Date.now();
   }, [myNode]);
 
   // Session timer — counts from the moment user connects
