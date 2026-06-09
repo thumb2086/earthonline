@@ -983,6 +983,18 @@ regions.forEach(regionName => {
         currentGlobalEvent: currentGlobalEvent // Send current event to newly connected users
       });
 
+      // Sync Discord role to in-app role
+      if (dbUser?.discord?.id) {
+        discordBot.getHighestRole(dbUser.discord.id).then(discordRole => {
+          if (!discordRole) return;
+          if (discordRole.includes('地球管理團隊')) {
+            User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } }).catch(console.error);
+          } else if (user.role === 'admin' && !discordRole.includes('地球管理團隊')) {
+            User.updateOne({ username: decoded.username }, { $set: { role: 'user' } }).catch(console.error);
+          }
+        }).catch(() => {});
+      }
+
       if (connectedUsers.size % 10 === 0 && connectedUsers.size > 0) {
         sendDiscordWebhook(`🌐 **【地理節點高載通報】**\n偵測到大量節點湧入，目前全服掛機人數已達 **${connectedUsers.size}** 人！\n來自 \`${user.country}\` 的節點點亮了板塊。`);
       }
