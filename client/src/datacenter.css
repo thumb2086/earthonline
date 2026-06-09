@@ -297,7 +297,7 @@
   background: var(--surface-color);
   color: var(--accent-color);
   border-color: var(--accent-color);
-  box-shadow: 0 0 8px rgba(var(--accent-color), 0.2);
+  box-shadow: 0 0 8px var(--accent-color);
 }
 
 .social-icons {

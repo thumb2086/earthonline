@@ -451,6 +451,7 @@ function DocumentationOverlay({ onClose }) {
 
 function CountdownBanner() {
   const { t, language, setLanguage } = useLanguage();
+  const { themeData } = useTheme();
   const [timeLeft, setTimeLeft] = useState({ d: 0, h: 0, m: 0, s: 0 });
 
   useEffect(() => {
@@ -492,33 +493,34 @@ function CountdownBanner() {
   return (
     <div style={{
       width: '100%',
-      background: 'linear-gradient(90deg, #1B2845, #274060, #335C81)',
-      color: '#fff',
+      background: `linear-gradient(90deg, ${themeData.bg}, ${themeData.surface}, ${themeData.bgLight})`,
+      color: themeData.text,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '10px 20px',
       fontFamily: '"Inter", "Segoe UI", sans-serif',
       boxSizing: 'border-box',
-      borderBottom: '1px solid rgba(255,255,255,0.1)',
+      borderBottom: `1px solid ${themeData.border}`,
       gap: '15px',
       flexWrap: 'wrap',
       flexShrink: 0,
       position: 'relative',
-      zIndex: 50
+      zIndex: 50,
+      isolation: 'isolate'
     }}>
       <div style={{display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.95rem', fontWeight: '600'}}>
-        <span style={{color: '#ffcc00'}}>✧</span> 
-        每週任務結算 — 獲取 <span style={{background: '#ed4245', padding: '2px 6px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold'}}>{t('專屬身分組')}</span> | 距離結算剩餘:
+        <span style={{color: themeData.accent}}>✧</span> 
+        每週任務結算 — 獲取 <span style={{background: themeData.accent, color: themeData.bg, padding: '2px 6px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold'}}>{t('專屬身分組')}</span> | 距離結算剩餘:
       </div>
       <div style={{display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '1rem'}}>
-        <div style={{background: '#f2f3f5', color: '#23272a', padding: '4px 8px', borderRadius: '6px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.d)}</div>
-        <span>:</span>
-        <div style={{background: '#f2f3f5', color: '#23272a', padding: '4px 8px', borderRadius: '6px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.h)}</div>
-        <span>:</span>
-        <div style={{background: '#f2f3f5', color: '#23272a', padding: '4px 8px', borderRadius: '6px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.m)}</div>
-        <span>:</span>
-        <div style={{background: '#f2f3f5', color: '#23272a', padding: '4px 8px', borderRadius: '6px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.s)}</div>
+        <div style={{background: themeData.accent, color: themeData.bg, padding: '4px 8px', borderRadius: '4px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.d)}</div>
+        <span style={{color: themeData.accent}}>:</span>
+        <div style={{background: themeData.accent, color: themeData.bg, padding: '4px 8px', borderRadius: '4px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.h)}</div>
+        <span style={{color: themeData.accent}}>:</span>
+        <div style={{background: themeData.accent, color: themeData.bg, padding: '4px 8px', borderRadius: '4px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.m)}</div>
+        <span style={{color: themeData.accent}}>:</span>
+        <div style={{background: themeData.accent, color: themeData.bg, padding: '4px 8px', borderRadius: '4px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.s)}</div>
       </div>
     </div>
   );
@@ -528,14 +530,14 @@ function CountdownBanner() {
 const DonateBanner = () => {
   const { t, language, setLanguage } = useLanguage();
   return (
-    <div className="floating-panel" style={{ padding: '15px 20px', background: 'rgba(255, 65, 108, 0.1)', border: '1px solid #ff416c', width: '100%', marginTop: '15px' }}>
-      <div style={{ fontSize: '0.9rem', color: '#ff416c', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+    <div className="floating-panel" style={{ padding: '15px 20px', background: 'rgba(255, 65, 108, 0.1)', border: '1px solid var(--danger-color)', width: '100%', marginTop: '15px' }}>
+      <div style={{ fontSize: '0.9rem', color: 'var(--danger-color)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
         <Database size={16} /> 伺服器微服務升級募資計畫
       </div>
       <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '15px', lineHeight: '1.6' }}>
         為了打造真正的全球無上限微服務架構，我們計畫在 Render 上建立硬體分流叢集（包含獨立的 Redis 與三大洲 Web Service）。<br/>
-        <span style={{color: '#38ef7d'}}>優點：</span>{t('真實硬體分流，乘載量無上限。')}<br/>
-        <span style={{color: '#ff416c'}}>缺點：</span>設定較複雜，且 Render 的 Redis 與多台伺服器將產生高昂月費。
+        <span style={{color: 'var(--success-color)'}}>優點：</span>{t('真實硬體分流，乘載量無上限。')}<br/>
+        <span style={{color: 'var(--danger-color)'}}>缺點：</span>設定較複雜，且 Render 的 Redis 與多台伺服器將產生高昂月費。
       </div>
       <a 
         href="https://buymeacoffee.com/lucas1126" 
@@ -543,7 +545,7 @@ const DonateBanner = () => {
         rel="noopener noreferrer"
         style={{
           display: 'inline-flex', alignItems: 'center', gap: '8px',
-          background: '#ff416c', color: '#fff', padding: '8px 15px',
+          background: 'var(--danger-color)', color: '#fff', padding: '8px 15px',
           borderRadius: '4px', textDecoration: 'none', fontSize: '0.8rem', fontWeight: 'bold',
           transition: 'all 0.3s ease'
         }}
@@ -1057,6 +1059,7 @@ function Dashboard({ token, onLogout, region }) {
   // Global Event Banner Component
   const GlobalEventBanner = () => {
   const { t, language, setLanguage } = useLanguage();
+  const { themeData } = useTheme();
     const [timeLeft, setTimeLeft] = useState('');
 
     useEffect(() => {
@@ -1094,27 +1097,27 @@ function Dashboard({ token, onLogout, region }) {
 
     switch(currentEvent.type) {
       case 'QUANTUM_BURST':
-        bgColor = 'linear-gradient(90deg, #00d2ff, #3a7bd5)';
+        bgColor = `linear-gradient(90deg, ${themeData.bg}, ${themeData.accent}33, ${themeData.bg})`;
         icon = <Zap size={18} />;
         text = '【量子爆發】全伺服器點數累積速度 x 3.0 倍！';
         break;
       case 'SOLAR_STORM':
-        bgColor = 'linear-gradient(90deg, #ff416c, #ff4b2b)';
+        bgColor = `linear-gradient(90deg, ${themeData.bg}, ${themeData.danger}33, ${themeData.bg})`;
         icon = <Tornado size={18} />;
         text = '【太陽風暴】網路劇烈波動！期間斷線將扣除 100 點，撐過去可獲 200 點！';
         break;
       case 'DATA_GOLD_RUSH':
-        bgColor = 'linear-gradient(90deg, #fceabb, #f8b500)';
+        bgColor = `linear-gradient(90deg, ${themeData.bg}, ${themeData.warning}33, ${themeData.bg})`;
         icon = <Coins size={18} />;
         text = '【數據淘金潮】短期爆發！全伺服器點數累積速度飆升至 5.0 倍！';
         break;
       case 'SATELLITE_ALIGNMENT':
-        bgColor = 'linear-gradient(90deg, #11998e, #38ef7d)';
+        bgColor = `linear-gradient(90deg, ${themeData.bg}, ${themeData.success}33, ${themeData.bg})`;
         icon = <Satellite size={18} />;
         text = '【衛星連線最佳化】動態倍率啟動，在線人數越多產出越高！';
         break;
       case 'SYSTEM_MAINTENANCE':
-        bgColor = 'linear-gradient(90deg, #8e9eab, #eef2f3)';
+        bgColor = `linear-gradient(90deg, ${themeData.bg}, ${themeData.textDim}33, ${themeData.bg})`;
         icon = <AlertTriangle size={18} />;
         text = '【系統維護模式】算力降頻(0.5倍)，維持連線不斷線可獲補償獎勵！';
         break;
@@ -1124,22 +1127,25 @@ function Dashboard({ token, onLogout, region }) {
       <div style={{
         width: '100%',
         background: bgColor,
-        color: currentEvent.type === 'SYSTEM_MAINTENANCE' || currentEvent.type === 'DATA_GOLD_RUSH' ? '#000' : '#fff',
+        color: themeData.text,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '10px 20px',
         fontFamily: '"Inter", "Segoe UI", sans-serif',
         boxSizing: 'border-box',
-        borderBottom: '1px solid rgba(255,255,255,0.2)',
+        borderBottom: `1px solid ${themeData.border}`,
         fontWeight: 'bold',
         fontSize: '1rem',
-        textShadow: currentEvent.type === 'SYSTEM_MAINTENANCE' || currentEvent.type === 'DATA_GOLD_RUSH' ? 'none' : '0 1px 2px rgba(0,0,0,0.5)',
+        textShadow: `0 1px 2px ${themeData.bg}`,
         animation: 'pulse 2s infinite',
-        flexShrink: 0
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 50,
+        isolation: 'isolate'
       }}>
-        <span style={{ marginRight: '10px', fontSize: '1.2rem' }}>{icon}</span> {text} 
-        <span style={{ marginLeft: '10px', background: 'var(--bg-light)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.9rem', color: currentEvent.type === 'SYSTEM_MAINTENANCE' || currentEvent.type === 'DATA_GOLD_RUSH' ? '#000' : '#fff' }}>{timeLeft}</span>
+        <span style={{ marginRight: '10px', fontSize: '1.2rem', color: themeData.accent }}>{icon}</span> {text} 
+        <span style={{ marginLeft: '10px', background: themeData.accent, color: themeData.bg, padding: '2px 8px', borderRadius: '4px', fontSize: '0.9rem' }}>{timeLeft}</span>
       </div>
     );
   };
@@ -1315,19 +1321,19 @@ function Dashboard({ token, onLogout, region }) {
       {/* Header Panel */}
       <header className="system-header">
         <div className="system-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Globe2 color="#3b82f6" size={24} /> 
+          <Globe2 color="var(--accent-color)" size={24} /> 
           <span style={{fontWeight: '900', fontSize: '1.3rem', letterSpacing: '0'}}>{t('地球在線')}</span> 
-          <span style={{color: '#64748b', fontSize: '0.9rem', marginLeft: '10px'}}>伺服器: {region.toUpperCase()} | 你的位置: {myNode?.country || '連線中..'}</span>
+          <span style={{color: 'var(--text-dim)', fontSize: '0.9rem', marginLeft: '10px'}}>伺服器: {region.toUpperCase()} | 你的位置: {myNode?.country || '連線中..'}</span>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {!window.electronAPI && (
-            <a href="https://drive.google.com/uc?export=download&id=1Xji_z7dB5Q16FfSyRvnm2mXqn3n0cAQ2" target="_blank" rel="noopener noreferrer" style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', background: 'var(--success-color)', color: 'white', border: 'none', borderRadius: '6px', textDecoration: 'none', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)', fontSize: '0.9rem'}}>
+            <a href="https://drive.google.com/uc?export=download&id=1Xji_z7dB5Q16FfSyRvnm2mXqn3n0cAQ2" target="_blank" rel="noopener noreferrer" style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', background: 'var(--surface-color)', color: 'var(--accent-color)', border: '1px solid var(--accent-color)', borderRadius: '6px', textDecoration: 'none', fontWeight: 'bold', fontSize: '0.9rem'}}>
               <Monitor size={16} /> 下載專屬電腦版
             </a>
           )}
           <div className="system-stats" style={{display: 'flex', alignItems: 'center', gap: '15px', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.85rem'}}>
             <div style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
-              <span style={{color: '#64748b'}}>上線人數:</span> <strong style={{color: 'var(--success-color)'}}>{globalStats.activeUsers}</strong>
+              <span style={{color: 'var(--text-dim)'}}>上線人數:</span> <strong style={{color: 'var(--accent-color)'}}>{globalStats.activeUsers}</strong>
             </div>
             <div style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
               <span style={{color: 'var(--text-dim)'}}>{t('總人口')}:</span> <strong style={{color: 'var(--text-color)'}}>{globalStats.totalPopulation}</strong>
@@ -1353,7 +1359,7 @@ function Dashboard({ token, onLogout, region }) {
               <button onClick={() => { setShowSocialModal(true); setDropdownOpen(false); }} className="dropdown-item">
                 <Users size={16} /> 社交網路 (Social)
               </button>
-              <button onClick={() => { setShowShopModal(true); setDropdownOpen(false); }} className="dropdown-item" style={{color: '#38bdf8'}}>
+              <button onClick={() => { setShowShopModal(true); setDropdownOpen(false); }} className="dropdown-item" style={{color: 'var(--accent-color)'}}>
                 <ShoppingCart size={16} /> 黑市商城 (Shop)
               </button>
               <button className="dropdown-item" onClick={() => { setShowThemeMenu(!showThemeMenu); setDropdownOpen(false); }}>
@@ -1440,7 +1446,7 @@ function Dashboard({ token, onLogout, region }) {
               </div>
               <div style={{marginTop: '4px'}}>
                 <span style={{color: 'var(--text-secondary)'}}>本次上線: </span>
-                <strong style={{color: '#00ffaa'}}>{formatTime(sessionTime)}</strong>
+                <strong style={{color: 'var(--accent-color)'}}>{formatTime(sessionTime)}</strong>
               </div>
             </div>
           </div>
@@ -1499,14 +1505,14 @@ function Dashboard({ token, onLogout, region }) {
           </div>
 
           <div style={{ marginTop: 'auto', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(255,215,0,0.1)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)'}} onClick={() => setShowLeaderboard(true)}>
+            <button className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(255,215,0,0.1)', color: 'var(--accent-color)', border: '1px solid var(--accent-color)'}} onClick={() => setShowLeaderboard(true)}>
               <Activity size={16} /> 全球節點排行榜 (Leaderboard)
             </button>
             <button className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}} onClick={() => setShowAboutModal(true)}>
               <Info size={16} /> 檔案說明與系統資訊
             </button>
             {!window.electronAPI && (
-              <a href="https://drive.google.com/uc?export=download&id=1Xji_z7dB5Q16FfSyRvnm2mXqn3n0cAQ2" target="_blank" rel="noopener noreferrer" className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.3)', textDecoration: 'none'}}>
+              <a href="https://drive.google.com/uc?export=download&id=1Xji_z7dB5Q16FfSyRvnm2mXqn3n0cAQ2" target="_blank" rel="noopener noreferrer" className="terminal-btn" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'transparent', color: 'var(--text-dim)', border: '1px solid var(--border-color)', textDecoration: 'none'}}>
                 <Monitor size={16} /> 下載專屬電腦版 (Discord 連動)
               </a>
             )}
@@ -1628,7 +1634,7 @@ function Dashboard({ token, onLogout, region }) {
                   padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
                   width: 'auto', // Override .terminal-btn width: 100%
                   background: sortMode === 'points' ? 'var(--accent-color)' : 'transparent', 
-                  color: sortMode === 'points' ? '#ffffff' : 'var(--text-secondary)',
+                  color: sortMode === 'points' ? 'var(--bg-color)' : 'var(--text-secondary)',
                   border: sortMode === 'points' ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
                   fontWeight: sortMode === 'points' ? 'bold' : 'normal',
                   boxShadow: 'none', borderRadius: '4px'
@@ -1639,7 +1645,7 @@ function Dashboard({ token, onLogout, region }) {
                   padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
                   width: 'auto',
                   background: sortMode === 'time' ? 'var(--accent-color)' : 'transparent', 
-                  color: sortMode === 'time' ? '#ffffff' : 'var(--text-secondary)',
+                  color: sortMode === 'time' ? 'var(--bg-color)' : 'var(--text-secondary)',
                   border: sortMode === 'time' ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
                   fontWeight: sortMode === 'time' ? 'bold' : 'normal',
                   boxShadow: 'none', borderRadius: '4px'
@@ -1665,7 +1671,7 @@ function Dashboard({ token, onLogout, region }) {
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>頭像</th>
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>使用者 ID</th>
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>國家/地區</th>
-                  <th style={{padding: '12px 8px', color: sortMode === 'time' ? '#00ffcc' : 'var(--text-primary)'}}>累積在線時間 {sortMode === 'time' && '▼'}</th>
+                  <th style={{padding: '12px 8px', color: sortMode === 'time' ? 'var(--accent-color)' : 'var(--text-primary)'}}>累積在線時間 {sortMode === 'time' && '▼'}</th>
                   <th style={{padding: '12px 8px', color: sortMode === 'points' ? 'var(--accent-color)' : 'var(--text-primary)'}}>累積點數 {sortMode === 'points' && '▼'}</th>
                   <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>目前 Discord 實際身分組</th>
                 </tr>
@@ -2222,7 +2228,7 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
           </h2>
           <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
             {!window.electronAPI && (
-              <a href="https://earthonline.onrender.com/downloads/EarthOnlineSetup.exe" style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--success-color)', textDecoration: 'none', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', fontWeight: '600'}}>
+              <a href="https://earthonline.onrender.com/downloads/EarthOnlineSetup.exe" style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-dim)', textDecoration: 'none', background: 'transparent', padding: '6px 12px', borderRadius: '8px', fontWeight: '600', border: '1px solid var(--border-color)'}}>
                 📥 下載專屬電腦版
               </a>
             )}
