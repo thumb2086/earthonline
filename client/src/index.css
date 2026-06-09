@@ -278,27 +278,141 @@ body {
   background-image: radial-gradient(circle at center, var(--surface-color) 0%, var(--bg-color) 100%);
 }
 
-/* Rotating Earth Animation */
-.earth-container {
-  width: 150px;
-  height: 150px;
-  margin: 0 auto 20px auto;
-  border-radius: 50%;
-  box-shadow: 
-    inset 16px 0 40px 6px rgba(0,0,0,0.9),
-    inset -3px 0 6px 2px rgba(255,255,255,0.2),
-    0 0 20px rgba(0, 255, 204, 0.4);
-  background-color: #051428;
-  background-image: url('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg');
-  background-repeat: repeat-x;
-  background-size: auto 100%;
-  animation: rotateEarth 20s linear infinite;
-  position: relative;
+/* Advanced Login Animation */
+.anim-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, rgba(0,40,80,0.3) 0%, transparent 70%);
 }
 
-@keyframes rotateEarth {
-  0% { background-position: 0 0; }
-  100% { background-position: 200% 0; }
+.anim-core {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #00ffcc, #0066ff, #003366);
+  box-shadow: 0 0 60px rgba(0,255,204,0.4), 0 0 120px rgba(0,102,255,0.2), 0 0 200px rgba(0,255,204,0.1);
+  animation: corePulse 3s ease-in-out infinite;
+}
+
+@keyframes corePulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+  50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+}
+
+.anim-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  border: 1px solid rgba(0,255,204,0.3);
+  animation: ringExpand 4s ease-out infinite;
+  pointer-events: none;
+}
+
+.anim-ring-1 { width: 160px; height: 160px; margin: -80px; animation-delay: 0s; }
+.anim-ring-2 { width: 240px; height: 240px; margin: -120px; animation-delay: 1.3s; border-color: rgba(0,102,255,0.2); }
+.anim-ring-3 { width: 320px; height: 320px; margin: -160px; animation-delay: 2.6s; border-color: rgba(0,255,204,0.15); }
+
+@keyframes ringExpand {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { opacity: 0.6; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.anim-particle-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.anim-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: #00ffcc;
+  box-shadow: 0 0 6px #00ffcc;
+  animation: particleFloat 5s ease-in-out infinite alternate;
+}
+
+@keyframes particleFloat {
+  0% { transform: translateY(0) translateX(0); opacity: 0.2; }
+  50% { transform: translateY(-30px) translateX(10px); opacity: 0.8; }
+  100% { transform: translateY(0) translateX(-10px); opacity: 0.2; }
+}
+
+.anim-scanline {
+  position: absolute;
+  width: 200%;
+  height: 2px;
+  top: -2px;
+  left: -50%;
+  background: linear-gradient(90deg, transparent, rgba(0,255,204,0.6), transparent);
+  animation: scanMove 4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes scanMove {
+  0% { top: -2px; }
+  100% { top: 102%; }
+}
+
+.anim-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200px;
+  height: 200px;
+  margin: -100px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,255,204,0.15);
+  animation: pulseRingBig 2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes pulseRingBig {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { opacity: 0.5; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.anim-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,204,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,204,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: gridShift 10s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes gridShift {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(20px, 20px); }
+  100% { transform: translate(0, 0); }
+}
+
+.anim-glowing-orb {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  top: 50%;
+  left: 50%;
+  margin: -150px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,255,204,0.06) 0%, transparent 70%);
+  animation: orbRotate 20s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes orbRotate {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.2); }
+  100% { transform: rotate(360deg) scale(1); }
 }
 
 .icon-spin {
@@ -315,6 +429,8 @@ body {
   padding: 40px;
   width: 400px;
   box-shadow: 0 0 20px rgba(0, 255, 204, 0.1);
+  position: relative;
+  z-index: 10;
 }
 
 .form-group {

@@ -120,9 +120,29 @@ function LoginGateway({ onLogin }) {
   return (
     <div className="login-gateway">
       <div className="login-box">
-        {/* Animated Rotating Earth */}
-        <div className="earth-container">
-          <div className="earth-sphere"></div>
+        {/* Advanced Animated Background */}
+        <div className="anim-container">
+          <div className="anim-core"></div>
+          <div className="anim-ring anim-ring-1"></div>
+          <div className="anim-ring anim-ring-2"></div>
+          <div className="anim-ring anim-ring-3"></div>
+          <div className="anim-particle-field">
+            {Array.from({ length: 30 }, (_, i) => (
+              <div key={i} className="anim-particle" style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 5}s`,
+                animationDuration: `${3 + Math.random() * 4}s`,
+                width: `${2 + Math.random() * 4}px`,
+                height: `${2 + Math.random() * 4}px`,
+                opacity: 0.3 + Math.random() * 0.7,
+              }} />
+            ))}
+          </div>
+          <div className="anim-scanline"></div>
+          <div className="anim-pulse-ring"></div>
+          <div className="anim-grid"></div>
+          <div className="anim-glowing-orb"></div>
         </div>
 
         <div style={{textAlign: 'center', marginBottom: '25px', zIndex: 10, position: 'relative'}}>
