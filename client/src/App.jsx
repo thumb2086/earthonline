@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X, Navigation, Star, Clock, Volume2, VolumeX, Coffee, Users, ChevronDown, Zap, Tornado, Coins, Satellite, AlertTriangle, CheckCircle, MapPin, Monitor, ShoppingCart } from 'lucide-react';
+import { Globe2, Server, Activity, User, Network, Link as LinkIcon, ShieldCheck, Info, BookOpen, FileText, Database, Code, X, Navigation, Star, Clock, Volume2, VolumeX, Coffee, Users, ChevronDown, Zap, Tornado, Coins, Satellite, AlertTriangle, CheckCircle, MapPin, Monitor, ShoppingCart, Palette } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
+import { useTheme } from './ThemeContext';
 import Draggable from 'react-draggable';
 import DataCenterVisualizer from './DataCenterVisualizer';
 import ShopModal from './ShopModal';
@@ -570,6 +571,8 @@ function Dashboard({ token, onLogout, region }) {
   const [locateTrigger, setLocateTrigger] = useState(0);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [showShopModal, setShowShopModal] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const { theme, setTheme, themeData: currentThemeData, themes } = useTheme();
   
   const pingStartRef = useRef(0);
   const [socialTab, setSocialTab] = useState('friends'); // 'friends', 'all', 'requests'
@@ -728,8 +731,8 @@ function Dashboard({ token, onLogout, region }) {
       setIsConnected(true);
     });
 
-    s.on('auth_error', () => {
-      alert('授權已過期，請重新登入');
+    s.on('auth_error', (data) => {
+      alert(data?.message || '授權已過期，請重新登入');
       setIsConnected(false);
       onLogout();
     });
@@ -767,10 +770,11 @@ function Dashboard({ token, onLogout, region }) {
     });
 
     s.on('chat_message', (data) => {
+      const adminBadge = data.isAdmin ? ' [管理員]' : '';
       if (data.isDiscord) {
         addLog(`[DC_CHAT] ${data.username}: ${data.message}`);
       } else {
-        addLog(`[CHAT] ${data.username}: ${data.message}`);
+        addLog(`[CHAT]${adminBadge} ${data.username}: ${data.message}`);
       }
     });
 
@@ -1137,6 +1141,9 @@ function Dashboard({ token, onLogout, region }) {
               </button>
               <button onClick={() => { setShowShopModal(true); setDropdownOpen(false); }} className="dropdown-item" style={{color: '#38bdf8'}}>
                 <ShoppingCart size={16} /> 黑市商城 (Shop)
+              </button>
+              <button className="dropdown-item" onClick={() => { setShowThemeMenu(!showThemeMenu); setDropdownOpen(false); }}>
+                <Palette size={16} /> 主題配色 (Themes)
               </button>
               <a href="https://discord.gg/6P6NG49Mus" target="_blank" rel="noreferrer" className="dropdown-item" style={{color: '#5865F2'}} onClick={() => setDropdownOpen(false)}>
                 <svg width="16" height="16" viewBox="0 0 127.14 96.36" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a67.58,67.58,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
@@ -1538,7 +1545,45 @@ function Dashboard({ token, onLogout, region }) {
       {showShopModal && <ShopModal onClose={() => setShowShopModal(false)} pts={myNode?.accumulatedBonusPoints} onBuy={(id) => socket.emit('buy_item', id)} />}
 
       {showAccountInfo && <AccountInfoModal token={token} apiUrl={API_URL} onClose={() => setShowAccountInfo(false)} onLogout={onLogout} />}
-      
+
+      {showThemeMenu && (
+        <div className="modal-overlay" onClick={() => setShowThemeMenu(false)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--surface-color, #161d2e)',
+            border: '1px solid var(--border-color, #1e293b)',
+            borderRadius: '12px', padding: '30px', maxWidth: '500px', width: '90%',
+            color: 'var(--text-color, #e2e8f0)',
+          }}>
+            <h3 style={{ margin: '0 0 20px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Palette size={20} /> 選擇主題配色
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {Object.entries(themes).map(([key, t]) => (
+                <button key={key} onClick={() => { setTheme(key); setShowThemeMenu(false); }} style={{
+                  padding: '16px', borderRadius: '8px', cursor: 'pointer', textAlign: 'center',
+                  background: theme === key ? t.accent : t.surface,
+                  color: theme === key ? '#000' : t.text,
+                  border: theme === key ? `2px solid ${t.accent}` : `1px solid ${t.border}`,
+                  fontWeight: theme === key ? 'bold' : 'normal',
+                  transition: 'all 0.2s',
+                }}>
+                  <div style={{ fontSize: '14px', marginBottom: '8px' }}>{t.name}</div>
+                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: t.accent, display: 'inline-block' }} />
+                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: t.bg, display: 'inline-block', border: '1px solid ' + t.border }} />
+                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: t.text, display: 'inline-block' }} />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <audio ref={audioRef} src="https://upload.wikimedia.org/wikipedia/commons/4/4b/Ambient_music_-_beautiful_piano.ogg" loop />
     </div>
   );

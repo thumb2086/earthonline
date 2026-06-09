@@ -1,13 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@400;600;700&display=swap');
 
 :root {
-  --bg-color: #0d1117;
+  --bg-color: #0a0e17;
+  --bg-light: #0f172a;
   --panel-bg: rgba(22, 27, 34, 0.95);
-  --accent-color: #3b82f6;
+  --accent-color: #00ff41;
+  --accent-hover: #00cc34;
+  --surface-color: #161d2e;
+  --text-color: #e2e8f0;
   --text-primary: #e6edf3;
   --text-secondary: #8b949e;
-  --border-color: #30363d;
-  --danger-color: #f85149;
+  --text-dim: #64748b;
+  --border-color: #1e293b;
+  --danger-color: #ef4444;
+  --warning-color: #f59e0b;
+  --success-color: #10b981;
+  --info-color: #3b82f6;
   --font-mono: 'Nunito', 'Noto Sans TC', sans-serif;
   --font-sans: 'Nunito', 'Noto Sans TC', sans-serif;
 }

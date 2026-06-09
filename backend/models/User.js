@@ -24,7 +24,8 @@ const userSchema = new mongoose.Schema({
   homeRegion: { type: String, default: 'asia' },
   health: { type: Number, default: 100 },
   inventory: { type: Map, of: Number, default: {} },
-  activeBuffs: { type: Map, of: Number, default: {} }
+  activeBuffs: { type: Map, of: Number, default: {} },
+  activeSession: { type: String, default: null }
 });
 
 module.exports = mongoose.model('User', userSchema);
