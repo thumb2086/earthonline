@@ -3,9 +3,27 @@ const User = require('./models/User');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/earthonline';
 
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('[SYS] Database Core Online: MongoDB Connected'))
-  .catch(err => console.error('[SYS] MongoDB Connection Error:', err));
+async function connectDatabase() {
+  try {
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      heartbeatFrequencyMS: 10000,
+    });
+    console.log('[SYS] Database Core Online: MongoDB Connected');
+  } catch (err) {
+    console.error('[SYS] MongoDB Connection Error:', err);
+    console.log('[SYS] Retrying in 5 seconds...');
+    setTimeout(connectDatabase, 5000);
+  }
+}
+
+mongoose.connection.on('disconnected', () => {
+  console.log('[SYS] MongoDB Disconnected. Reconnecting...');
+  setTimeout(connectDatabase, 5000);
+});
+
+// Initialize connection
+connectDatabase();
 
 async function findUserByUsername(username) {
   return await User.findOne({ username });
@@ -31,13 +49,12 @@ async function getRegionPopulation(homeRegion) {
 }
 
 async function updateUserDiscord(username, discordData) {
-  const user = await User.findOne({ username });
-  if (user) {
-    user.discord = discordData;
-    await user.save();
-    return true;
-  }
-  return false;
+  const result = await User.findOneAndUpdate(
+    { username },
+    { $set: { discord: discordData } },
+    { new: true }
+  );
+  return !!result;
 }
 
 async function getGlobalProduction() {
@@ -96,18 +113,15 @@ async function migrateOfflineTime() {
     );
     
     // 5. Cleanup Fake Bot Accounts
-    const bots = await User.find({ "discord.id": { $exists: false } });
-    let deletedCount = 0;
-    for (const u of bots) {
-      const isBotRegex = /^[a-zA-Z0-9]{15,35}$/.test(u.username);
-      const isTestAccount = u.username.toLowerCase().startsWith('test');
-      if (isBotRegex || isTestAccount) {
-        await User.deleteOne({ _id: u._id });
-        deletedCount++;
-      }
-    }
-
-    console.log(`[SYS] Migration complete. Updated regions: ${regionResult.modifiedCount}. Deleted bots: ${deletedCount}.`);
+    const botFilter = {
+      'discord.id': { $exists: false },
+      $or: [
+        { accumulatedTime: 0 },
+        { username: { $regex: /^[a-zA-Z0-9]{15,35}$/ } }
+      ]
+    };
+    const botResult = await User.deleteMany(botFilter);
+    console.log(`[SYS] Migration complete. Updated regions: ${regionResult.modifiedCount}. Deleted bots: ${botResult.deletedCount}.`);
   } catch (err) {
     console.error('Error during migrateOfflineTime:', err);
   }

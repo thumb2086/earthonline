@@ -31,4 +31,6 @@ const userSchema = new mongoose.Schema({
   activeSession: { type: String, default: null }
 });
 
+userSchema.index({ 'discord.id': 1 });
+
 module.exports = mongoose.model('User', userSchema);

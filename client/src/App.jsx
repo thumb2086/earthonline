@@ -8,8 +8,8 @@ import DataCenterVisualizer from './DataCenterVisualizer';
 import ShopModal from './ShopModal';
 import './index.css';
 
-const API_URL = 'https://earthonline.onrender.com';
-const SOCKET_URL = 'https://earthonline.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
 
 
 function LoginGateway({ onLogin }) {
@@ -571,6 +571,7 @@ function Dashboard({ token, onLogout, region }) {
   const [locateTrigger, setLocateTrigger] = useState(0);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [showShopModal, setShowShopModal] = useState(false);
+  const [discordId, setDiscordId] = useState('');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const { theme, setTheme, themeData: currentThemeData, themes } = useTheme();
   
@@ -872,6 +873,7 @@ function Dashboard({ token, onLogout, region }) {
     return () => {
       clearInterval(pingInterval);
       clearInterval(syncInterval);
+      s.removeAllListeners();
       s.disconnect();
     };
   }, [token, onLogout]);
@@ -887,7 +889,7 @@ function Dashboard({ token, onLogout, region }) {
     // Avoid using Date.now() - connectedAt because server time might be different from client time, causing negative values.
     const baseAccumulatedSeconds = (myNode.accumulatedTime || 0) / 1000;
     
-    let currentLocalLifespan = baseAccumulatedSeconds + (myNode.accumulatedBonusPoints || 0);
+    let currentLocalLifespan = baseAccumulatedSeconds;
 
     const interval = setInterval(() => {
       currentLocalLifespan += rate;
@@ -897,7 +899,7 @@ function Dashboard({ token, onLogout, region }) {
       if (window.electronAPI) {
         window.electronAPI.updatePresence({
           details: `生存時間: ${formatTime(Math.floor(currentLocalLifespan))}`,
-          state: `區域: ${region === 'asia' ? 'Asia' : region === 'us' ? 'US' : 'EU'} | 積分: ${Math.floor(currentLocalLifespan + (myNode.accumulatedBonusPoints || 0))} PT`,
+          state: `區域: ${region === 'asia' ? 'Asia' : region === 'us' ? 'US' : 'EU'} | 積分: ${Math.floor(currentLocalLifespan)} PT`,
           username: myNode.username
         });
       }
@@ -1472,7 +1474,7 @@ function Dashboard({ token, onLogout, region }) {
               <tbody>
                 {leaderboard.length === 0 && (
                   <tr>
-                    <td colSpan="6" style={{padding: '20px', textAlign: 'center'}}>載入中或尚無資料...</td>
+                    <td colSpan="7" style={{padding: '20px', textAlign: 'center'}}>載入中或尚無資料...</td>
                   </tr>
                 )}
                 {[...leaderboard].sort((a, b) => sortMode === 'points' ? b.points - a.points : b.idleTime - a.idleTime).map((user, idx) => (
@@ -1560,7 +1562,7 @@ function Dashboard({ token, onLogout, region }) {
       {/* Full Page About Documentation */}
       {showAboutModal && <DocumentationOverlay onClose={() => setShowAboutModal(false)} />}
       {showSocialModal && <SocialModal onClose={() => setShowSocialModal(false)} socialTab={socialTab} setSocialTab={setSocialTab} socialData={socialData} socket={socket} />}
-      {showShopModal && <ShopModal onClose={() => setShowShopModal(false)} pts={myNode?.accumulatedBonusPoints} onBuy={(id) => socket.emit('buy_item', id)} />}
+      {showShopModal && <ShopModal onClose={() => setShowShopModal(false)} pts={myNode?.accumulatedBonusPoints} onBuy={(id) => { if (socket?.connected) { socket.emit('buy_item', id); } else { alert('連線未就緒，無法購買'); } }} />}
 
       {showAccountInfo && <AccountInfoModal token={token} apiUrl={API_URL} onClose={() => setShowAccountInfo(false)} onLogout={onLogout} />}
 

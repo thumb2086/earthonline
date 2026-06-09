@@ -295,24 +295,29 @@ async function sendChatMessageToDiscord(username, message) {
   }
 }
 
-const getHighestRole = (discordId) => {
+async function getHighestRole(discordId) {
   if (!isBotReady || !discordId || discordId === '無') return null;
   try {
     const guild = client.guilds.cache.get(GUILD_ID);
     if (!guild) return null;
-    const member = guild.members.cache.get(discordId);
-    if (!member) return null;
-    
-    // Get highest role excluding @everyone
+    let member = guild.members.cache.get(discordId);
+    if (!member) {
+      try {
+        member = await guild.members.fetch(discordId);
+      } catch {
+        return null;
+      }
+    }
     const roles = member.roles.cache.filter(r => r.name !== '@everyone').sort((a, b) => b.position - a.position);
     if (roles.size > 0) {
       return `【${roles.first().name}】`;
     }
     return null;
   } catch (err) {
+    console.error('[SYS] getHighestRole error:', err);
     return null;
   }
-};
+}
 
 module.exports = {
   updateBotPresence,

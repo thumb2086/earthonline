@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getTranslation } from './i18n';
 
 const LanguageContext = createContext();
@@ -10,7 +10,7 @@ export const LanguageProvider = ({ children, initialRegion }) => {
     setLanguage(initialRegion === 'asia' ? 'zh' : 'en');
   }, [initialRegion]);
 
-  const t = (key) => getTranslation(language, key);
+  const t = useCallback((key) => getTranslation(language, key), [language]);
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t }}>
@@ -19,4 +19,8 @@ export const LanguageProvider = ({ children, initialRegion }) => {
   );
 };
 
-export const useLanguage = () => useContext(LanguageContext);
+export const useLanguage = () => {
+  const ctx = useContext(LanguageContext);
+  if (!ctx) throw new Error('useLanguage must be used within LanguageProvider');
+  return ctx;
+};
