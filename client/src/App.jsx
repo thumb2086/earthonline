@@ -544,6 +544,7 @@ function Dashboard({ token, onLogout, region }) {
   const [adCountdown, setAdCountdown] = useState(0);
   const [adReviveRemaining, setAdReviveRemaining] = useState(3);
   const [currentAd, setCurrentAd] = useState('');
+  const [adPlaying, setAdPlaying] = useState(false);
   const [globalStats, setGlobalStats] = useState({ activeUsers: 0, totalPopulation: 0, globalProduction: 0, socialCompression: '1.000' });
   const [hubStats, setHubStats] = useState(null);
 
@@ -891,9 +892,11 @@ function Dashboard({ token, onLogout, region }) {
     });
 
     s.on('ad_revive_result', (data) => {
+      setAdPlaying(false);
       if (data.success) {
         addLog(`[SYSTEM] 廣告復活成功！伺服器健康度恢復至 ${data.health}%（今日剩餘 ${data.remaining} 次）`);
         setAdReviveRemaining(data.remaining);
+        setShowAdRevive(false);
       } else {
         addLog(`[SYSTEM] 廣告復活失敗：${data.message}`);
       }
@@ -1139,7 +1142,8 @@ function Dashboard({ token, onLogout, region }) {
   };
 
   const handleStartAdRevive = () => {
-    if (!socket || adReviveRemaining <= 0) return;
+    if (!socket || adReviveRemaining <= 0 || adPlaying) return;
+    setAdPlaying(true);
     const ads = ['/ads/zixi_casino.png', '/ads/zixi_app.png'];
     setCurrentAd(ads[Math.floor(Math.random() * ads.length)]);
     setAdCountdown(15);
