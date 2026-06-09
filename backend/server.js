@@ -1022,7 +1022,8 @@ regions.forEach(regionName => {
       
       // Ban check — reject banned users
       if (dbUser && dbUser.bannedUntil && dbUser.bannedUntil > Date.now()) {
-        socket.emit('auth_error', { message: '此帳號已被封鎖，無法登入。' });
+        const remainMin = Math.ceil((dbUser.bannedUntil - Date.now()) / 60000);
+        socket.emit('auth_error', { message: `此帳號已被封鎖，剩餘 ${remainMin} 分鐘後解除。` });
         return;
       }
       
