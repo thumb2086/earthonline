@@ -1525,40 +1525,7 @@ function Dashboard({ token, onLogout, region }) {
             <div ref={logRef} className="bottom-log-console" style={{display: 'flex', flexDirection: 'column'}}>
               <div className="log-header" style={{display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-color)', cursor: 'move'}}>
               <Activity size={16} /> 世界頻道 / 系統日誌 (World Chat)
-              {(myRole === 'admin' || myRole === 'moderator') && (
-                <button onClick={() => setShowAdminPanel(!showAdminPanel)} style={{marginLeft: 'auto', background: showAdminPanel ? 'var(--danger-color)' : 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem'}}>
-                  {showAdminPanel ? '關閉管理' : '⚙ 管理'}
-                </button>
-              )}
             </div>
-            {showAdminPanel && (
-              <div style={{padding: '8px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,0,0,0.05)'}}>
-                <span style={{color: 'var(--danger-color)', fontSize: '0.8rem', fontWeight: 'bold'}}>管理員功能</span>
-                <input type="text" value={adminTarget} onChange={e => setAdminTarget(e.target.value)} placeholder="目標使用者名稱" style={{flex: 1, minWidth: '120px', background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '0.8rem'}} />
-                <select id="muteDuration" defaultValue="5" style={{background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '4px', borderRadius: '4px', fontSize: '0.8rem'}}>
-                  <option value="1">1 分鐘</option>
-                  <option value="5">5 分鐘</option>
-                  <option value="10">10 分鐘</option>
-                  <option value="30">30 分鐘</option>
-                  <option value="60">1 小時</option>
-                  <option value="360">6 小時</option>
-                  <option value="1440">24 小時</option>
-                </select>
-                <button onClick={handleAdminMute} style={{background: 'var(--danger-color)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>禁言</button>
-                <button onClick={handleAdminUnmute} style={{background: 'var(--success-color)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>解禁</button>
-                <button onClick={handleAdminDelete} style={{background: 'var(--warning-color)', border: 'none', color: '#000', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>刪除訊息</button>
-                <select id="banDuration" defaultValue="1440" style={{background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '4px', borderRadius: '4px', fontSize: '0.8rem'}}>
-                  <option value="60">1 小時</option>
-                  <option value="360">6 小時</option>
-                  <option value="1440">24 小時</option>
-                  <option value="4320">3 天</option>
-                  <option value="10080">7 天</option>
-                  <option value="43200">30 天</option>
-                </select>
-                <button onClick={handleAdminBan} style={{background: '#000', border: '1px solid var(--danger-color)', color: 'var(--danger-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>封鎖</button>
-                <button onClick={handleAdminUnban} style={{background: 'var(--success-color)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>解封</button>
-              </div>
-            )}
             <div className="log-content" style={{flex: 1, overflowY: 'auto'}}>
               {logs.map((log, i) => {
                 let logColor = 'inherit';
@@ -1982,21 +1949,25 @@ function Dashboard({ token, onLogout, region }) {
                       <div style={{ marginTop: '24px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', color: '#475569', fontSize: '0.75rem', lineHeight: 1.6 }}>
                         ⚠ 管理員操作不可復原，請謹慎使用。所有操作均會記錄於系統日誌。
                       </div>
+
+                      {/* Give PT */}
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>給予點數 GIVE PT</div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input type="number" value={adminPtsAmount} onChange={e => setAdminPtsAmount(Math.max(0, parseInt(e.target.value) || 0))} min="1" max="100000" placeholder="數量" style={{ width: '100px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', outline: 'none', fontSize: '0.82rem' }} />
+                          <button onClick={handleAdminAddPts} disabled={!adminTarget.trim() || adminPtsAmount <= 0} style={{
+                            background: adminTarget.trim() && adminPtsAmount > 0 ? '#22c55e' : '#334155',
+                            color: adminTarget.trim() && adminPtsAmount > 0 ? '#000' : '#64748b',
+                            border: 'none', padding: '6px 16px', borderRadius: '6px', cursor: adminTarget.trim() && adminPtsAmount > 0 ? 'pointer' : 'not-allowed',
+                            fontSize: '0.82rem', fontWeight: '600'
+                          }}>發送 PT</button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div style={{display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: '12px'}}>
-                <span style={{color: 'var(--text-color)', fontSize: '0.9rem'}}>給予 PT:</span>
-                <input type="number" value={adminPtsAmount} onChange={e => setAdminPtsAmount(Math.max(0, parseInt(e.target.value) || 0))} min="1" max="100000" style={{width: '100px', background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '6px 8px', borderRadius: '4px', outline: 'none', fontSize: '0.9rem'}} />
-                <button onClick={handleAdminAddPts} disabled={!adminTarget.trim() || adminPtsAmount <= 0} style={{
-                  background: adminTarget.trim() && adminPtsAmount > 0 ? 'var(--accent-color)' : 'var(--border-color)',
-                  color: adminTarget.trim() && adminPtsAmount > 0 ? '#000' : 'var(--text-dim)',
-                  border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: adminTarget.trim() && adminPtsAmount > 0 ? 'pointer' : 'not-allowed',
-                  fontSize: '0.85rem', fontWeight: 'bold'
-                }}>發送 PT</button>
-              </div>
             </div>
           </div>
         );
