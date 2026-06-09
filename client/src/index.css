@@ -208,8 +208,8 @@ body {
 .bottom-log-console {
   position: absolute;
   bottom: 20px;
-  left: 20px;
-  right: auto;
+  right: 20px;
+  left: auto;
   width: 350px;
   max-width: calc(100vw - 40px);
   padding: 12px 18px;
