@@ -278,6 +278,7 @@ function LoginGateway({ onLogin }) {
         </div>
 
         <div style={{textAlign: 'center', marginBottom: '25px', zIndex: 10, position: 'relative'}}>
+          <div className="login-earth"></div>
           <h2 style={{fontFamily: 'var(--font-sans)', color: 'var(--text-main)', fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}}>
             <Globe2 className="icon-glow icon-spin" size={32} /> 地球在線
           </h2>

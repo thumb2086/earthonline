@@ -443,6 +443,28 @@ body {
   pointer-events: none;
 }
 
+/* Rotating Earth on Login */
+.login-earth {
+  width: 90px;
+  height: 90px;
+  margin: 0 auto 15px auto;
+  border-radius: 50%;
+  box-shadow:
+    inset 10px 0 25px 4px rgba(0,0,0,0.9),
+    inset -2px 0 4px 1px rgba(255,255,255,0.2),
+    0 0 15px rgba(0, 255, 204, 0.3);
+  background-color: #051428;
+  background-image: url('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg');
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  animation: spinEarth 20s linear infinite;
+}
+
+@keyframes spinEarth {
+  0% { background-position: 0 0; }
+  100% { background-position: 200% 0; }
+}
+
 /* Base Snoopy */
 .snoopy {
   position: absolute;
