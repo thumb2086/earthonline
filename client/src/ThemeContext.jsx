@@ -118,6 +118,10 @@ export function ThemeProvider({ children }) {
     root.style.setProperty('--warning-color', t.warning);
     root.style.setProperty('--success-color', t.success);
     root.style.setProperty('--info-color', t.info);
+    root.style.setProperty('--text-primary', t.text);
+    root.style.setProperty('--text-secondary', t.textDim);
+    root.style.setProperty('--text-main', t.text);
+    root.style.setProperty('--accent-hover', t.accentHover);
   }, [currentTheme]);
 
   return (
