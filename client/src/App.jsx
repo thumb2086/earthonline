@@ -558,6 +558,10 @@ function Dashboard({ token, onLogout, region }) {
     { title: '完整虛擬經濟', lines: ['股票市場・期貨交易・銀行・公司經營', '當舖・玩家交易市場・貸款系統'] },
     { title: '最強鏈上賭場・盡在子熙', lines: ['https://zixi-casino.vercel.app', '可驗證公平・鏈上結算・雙語界面'] },
   ];
+  const AD_LINKS = {
+    '/ads/zixi_casino.png': 'https://zixi-casino.vercel.app/landing',
+    '/ads/zixi_app.png': 'https://zixi-casino.vercel.app/landing',
+  };
   const [globalStats, setGlobalStats] = useState({ activeUsers: 0, totalPopulation: 0, globalProduction: 0, socialCompression: '1.000' });
   const [hubStats, setHubStats] = useState(null);
 
@@ -1988,7 +1992,9 @@ function Dashboard({ token, onLogout, region }) {
             {adCountdown > 0 ? (
               <>
                 <div style={{marginBottom: '12px', borderRadius: '8px', overflow: 'hidden', maxHeight: '360px'}}>
-                  <img src={currentAd} alt="ad" style={{width: '100%', height: 'auto', display: 'block', borderRadius: '8px'}} />
+                  <a href={AD_LINKS[currentAd] || 'https://zixi-casino.vercel.app/landing'} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
+                    <img src={currentAd} alt="ad" style={{width: '100%', height: 'auto', display: 'block', borderRadius: '8px', cursor: 'pointer'}} />
+                  </a>
                 </div>
                 <div style={{color: 'var(--accent-color)', fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '4px', minHeight: '1.8em', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                   {adSlogan?.title || ''}
