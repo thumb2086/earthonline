@@ -25,7 +25,33 @@ app.use(express.json());
 const path = require('path');
 app.use('/downloads', express.static(path.join(__dirname, 'public/downloads')));
 
+// Global error/crash logging
+const fs = require('fs');
+const crashLogPath = path.join(__dirname, 'crash.log');
 
+function writeCrashLog(type, err) {
+  try {
+    const timestamp = new Date().toISOString();
+    const stack = err?.stack || err?.message || String(err);
+    const logEntry = `[${timestamp}] [${type}] ${stack}\n`;
+    fs.appendFileSync(crashLogPath, logEntry);
+  } catch (e) {
+    console.error('[SYS] Failed to write crash log:', e);
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  writeCrashLog('UNCAUGHT_EXCEPTION', err);
+  console.error('[SYS] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  writeCrashLog('UNHANDLED_REJECTION', reason);
+  console.error('[SYS] Unhandled Rejection:', reason);
+});
+
+// Heartbeat tracking for disconnect compensation
+const heartbeatTimestamps = new Map();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'earth_online_secret_key_9988';
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
@@ -656,6 +682,9 @@ regions.forEach(regionName => {
             update: { $set: { health: user.health, accumulatedTime: user.accumulatedTime, accumulatedBonusPoints: user.accumulatedBonusPoints } }
           }
         });
+
+        // Record heartbeat for disconnect compensation
+        heartbeatTimestamps.set(user.username, Date.now());
       }
       
       if (updates.length > 0) {
@@ -853,6 +882,21 @@ regions.forEach(regionName => {
       console.log(`[SYS] Node Authenticated: ${user.username} | IP: ${ip} | Region: ${user.country}`);
 
       const pop = await db.getRegionPopulation(regionName);
+
+      // Disconnect compensation: calculate missed time
+      const lastHeartbeat = heartbeatTimestamps.get(decoded.username);
+      if (lastHeartbeat) {
+        const offlineDuration = Date.now() - lastHeartbeat;
+        if (offlineDuration > 30000 && offlineDuration < 86400000) {
+          const compensatedTime = Math.min(offlineDuration, 4 * 60 * 60 * 1000);
+          await User.updateOne(
+            { username: decoded.username },
+            { $inc: { accumulatedTime: compensatedTime } }
+          );
+          console.log(`[SYS] Disconnect compensation for ${decoded.username}: ${Math.round(compensatedTime/60000)} minutes`);
+        }
+      }
+      heartbeatTimestamps.set(decoded.username, Date.now());
 
       socket.emit('init_data', {
         userId: user.id,
@@ -1215,6 +1259,7 @@ regions.forEach(regionName => {
         console.log(`[SYS] Penalty applied to ${disconnectedUser.username} for Solar Storm disconnect`);
       }
       connectedUsers.delete(socket.id);
+      heartbeatTimestamps.delete(disconnectedUser.username);
       console.log(`[SYS] Node Disconnected: ${socket.id}`);
       io.emit('node_disconnected', { id: socket.id });
     }
