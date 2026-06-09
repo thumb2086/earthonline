@@ -1403,8 +1403,8 @@ function Dashboard({ token, onLogout, region }) {
           />
 
           {/* Bottom Console Log Module */}
-          <Draggable handle=".log-header">
-            <div className="bottom-log-console" style={{display: 'flex', flexDirection: 'column'}}>
+          <Draggable nodeRef={logRef} handle=".log-header">
+            <div ref={logRef} className="bottom-log-console" style={{display: 'flex', flexDirection: 'column'}}>
               <div className="log-header" style={{display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-color)', cursor: 'move'}}>
               <Activity size={16} /> 世界頻道 / 系統日誌 (World Chat)
               {(myRole === 'admin' || myRole === 'moderator') && (
