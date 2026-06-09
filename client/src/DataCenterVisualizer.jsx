@@ -247,11 +247,11 @@ function PixelCloud({ x, y, delay }) {
     <div style={{
       position: 'absolute', left: x, top: y,
       width: '64px', height: '24px',
-      background: 'var(--border-color)',
+      background: 'var(--text-dim)',
       borderRadius: 0,
       imageRendering: 'pixelated',
-      opacity: 0.3,
-      boxShadow: '16px -8px 0 var(--border-color), 32px 0 0 var(--border-color), 48px -4px 0 var(--border-color)',
+      opacity: 0.15,
+      boxShadow: '16px -8px 0 var(--text-dim), 32px 0 0 var(--text-dim), 48px -4px 0 var(--text-dim)',
       animation: `floatPixelCloud ${20 + delay * 3}s linear infinite`,
       animationDelay: `${delay}s`
     }}/>
