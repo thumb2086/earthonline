@@ -963,32 +963,113 @@ regions.forEach(regionName => {
     const user = connectedUsers.get(socket.id);
     if (!user) return;
     
-    // Rate limit: 1 message per 2 seconds
-    const now = Date.now();
-    if (user._lastChat && now - user._lastChat < 2000) return;
-    user._lastChat = now;
-    
-    const message = (data.message || '').trim().substring(0, 200);
+    const message = (data.message || '').trim().substring(0, 200); // Max length 200
     if (!message) return;
     
     // Require Discord binding or email verification to chat
     try {
-      const dbUser = await User.findOne({ username: user.username }, 'discord isEmailVerified');
+      const dbUser = await User.findOne({ username: user.username }, 'discord isEmailVerified role mutedUntil bannedUntil');
       if (!dbUser) return;
       if (!dbUser.discord?.id && !dbUser.isEmailVerified) {
         socket.emit('chat_verification_required', { message: '請先綁定 Discord 或驗證電子郵件後才能使用世界聊天。' });
         return;
       }
+      
+      // Check if user is muted or banned
+      const now = Date.now();
+      if (dbUser.mutedUntil && dbUser.mutedUntil > now) {
+        const remaining = Math.ceil((dbUser.mutedUntil - now) / 60000);
+        socket.emit('chat_muted', { message: `您已被禁言，剩餘 ${remaining} 分鐘。` });
+        return;
+      }
+      if (dbUser.bannedUntil && dbUser.bannedUntil > now) {
+        socket.emit('chat_banned', { message: '您已被禁止使用聊天頻道。' });
+        return;
+      }
+      
+      // Content filtering
+      let filteredMessage = message;
+      let hasFilteredContent = false;
+      for (const word of FILTERED_WORDS) {
+        const regex = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        if (regex.test(filteredMessage)) {
+          hasFilteredContent = true;
+          filteredMessage = filteredMessage.replace(regex, '***');
+        }
+      }
+      
+      io.emit('chat_message', {
+        username: user.username,
+        message: filteredMessage,
+        isAdmin: dbUser.role === 'admin' || dbUser.role === 'moderator',
+        filtered: hasFilteredContent
+      });
+      console.log(`[CHAT] ${user.username}: ${hasFilteredContent ? '(filtered) ' : ''}${filteredMessage}`);
+      
+      // Sync to Discord
+      discordBot.sendChatMessageToDiscord(user.username, filteredMessage);
     } catch (err) {
       console.error('[CHAT] Verification check error:', err);
       return;
     }
-    
-    io.emit('chat_message', { username: user.username, message: message });
-    console.log(`[CHAT] ${user.username}: ${message}`);
-    
-    // Sync to Discord
-    discordBot.sendChatMessageToDiscord(user.username, message);
+  });
+
+  // Moderation: Delete message (moderator+ only)
+  socket.on('mod_delete_message', async (data) => {
+    const user = connectedUsers.get(socket.id);
+    if (!user) return;
+    try {
+      const dbUser = await User.findOne({ username: user.username }, 'role');
+      if (!dbUser || dbUser.role === 'user') return;
+      io.emit('chat_message_deleted', { messageId: data.messageId, modUsername: user.username });
+      console.log(`[MOD] ${user.username} 刪除了一則訊息`);
+    } catch (err) {
+      console.error('[MOD] delete_message error:', err);
+    }
+  });
+
+  // Moderation: Mute user (moderator+ only)
+  socket.on('mod_mute_user', async (data) => {
+    const user = connectedUsers.get(socket.id);
+    if (!user) return;
+    try {
+      const dbUser = await User.findOne({ username: user.username }, 'role');
+      if (!dbUser || dbUser.role === 'user') return;
+      const duration = Math.min(data.duration || 60, 1440); // max 24 hours
+      const targetUser = await User.findOneAndUpdate(
+        { username: data.targetUsername },
+        { $set: { mutedUntil: Date.now() + duration * 60000 } },
+        { new: true }
+      );
+      if (!targetUser) {
+        socket.emit('terminal_response', `[MOD] 找不到使用者 ${data.targetUsername}`);
+        return;
+      }
+      io.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員禁言 ${duration} 分鐘` });
+      // Notify the muted user if online
+      for (const [sid, u] of connectedUsers.entries()) {
+        if (u.username === data.targetUsername) {
+          io.to(sid).emit('chat_muted', { message: `您已被管理員禁言 ${duration} 分鐘。` });
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('[MOD] mute_user error:', err);
+    }
+  });
+
+  // Moderation: Unmute user (moderator+ only)
+  socket.on('mod_unmute_user', async (data) => {
+    const user = connectedUsers.get(socket.id);
+    if (!user) return;
+    try {
+      const dbUser = await User.findOne({ username: user.username }, 'role');
+      if (!dbUser || dbUser.role === 'user') return;
+      await User.updateOne({ username: data.targetUsername }, { $set: { mutedUntil: null } });
+      io.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員解除禁言` });
+    } catch (err) {
+      console.error('[MOD] unmute_user error:', err);
+    }
   });
 
   // Friend System Handlers
