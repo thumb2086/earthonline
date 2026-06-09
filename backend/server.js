@@ -1111,16 +1111,21 @@ regions.forEach(regionName => {
         currentGlobalEvent: currentGlobalEvent // Send current event to newly connected users
       });
 
-      // Sync Discord role to in-app role
+      // Sync Discord role to in-app role — check admin list or Discord guild role
       if (dbUser?.discord?.id) {
-        discordBot.getHighestRole(dbUser.discord.id).then(discordRole => {
-          if (!discordRole) return;
-          if (discordRole.includes('地球管理團隊')) {
-            User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } }).catch(console.error);
-          } else if (user.role === 'admin' && !discordRole.includes('地球管理團隊')) {
-            User.updateOne({ username: decoded.username }, { $set: { role: 'user' } }).catch(console.error);
-          }
-        }).catch(() => {});
+        const adminIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
+        if (adminIds.includes(dbUser.discord.id)) {
+          User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } }).catch(console.error);
+        } else {
+          discordBot.getHighestRole(dbUser.discord.id).then(discordRole => {
+            if (!discordRole) return;
+            if (discordRole.includes('地球管理團隊')) {
+              User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } }).catch(console.error);
+            } else if (user.role === 'admin' && !discordRole.includes('地球管理團隊')) {
+              User.updateOne({ username: decoded.username }, { $set: { role: 'user' } }).catch(console.error);
+            }
+          }).catch(() => {});
+        }
       }
 
       if (connectedUsers.size % 10 === 0 && connectedUsers.size > 0) {
