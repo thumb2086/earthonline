@@ -14,6 +14,8 @@ const discordBot = require('./discordBot'); // Starts discord bot and cron jobs
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const os = require('os');
+const path = require('path');
+const fs = require('fs');
 
 // Filtered words for chat moderation
 const FILTERED_WORDS = ['fuck', 'shit', 'asshole', 'bitch', 'damn', 'cao', '幹', '靠北', '操你媽', 'fucking', 'stupid', 'idiot', 'nigger', 'bastard', 'piss off', 'suck my', 'motherfucker'];
@@ -42,16 +44,13 @@ setInterval(() => {
     if (typeof ts === 'number' && ts < cutoff) heartbeatTimestamps.delete(key);
   }
   for (const [key] of reviveCounts.entries()) {
-    // key format: adRevive_username_YYYY-MM-DD
     const dateStr = key.split('_').pop();
     if (dateStr && dateStr < todayStr) reviveCounts.delete(key);
   }
-  // chatCooldowns are keyed by username; remove entries older than 10s
   const chatCutoff = Date.now() - 10000;
   for (const [key, ts] of chatCooldowns.entries()) {
     if (ts < chatCutoff) chatCooldowns.delete(key);
   }
-  // role cache cleanup
   for (const [id, val] of roleCache.entries()) {
     if (Date.now() - val.ts > ROLE_CACHE_TTL * 10) roleCache.delete(id);
   }
@@ -64,11 +63,9 @@ const app = express();
 const apiRouter = express.Router({ mergeParams: true });
 app.use(cors());
 app.use(express.json());
-const path = require('path');
 app.use('/downloads', express.static(path.join(__dirname, 'public/downloads')));
 
 // Global error/crash logging
-const fs = require('fs');
 const crashLogPath = path.join(__dirname, 'crash.log');
 
 function writeCrashLog(type, err) {
@@ -119,6 +116,7 @@ async function sendDiscordWebhook(message) {
   }
 }
 
+// IP 預設模糊安全防護機制
 function obfuscateIp(ip) {
   if (!ip) return '0.0.0.0';
   const ipv4Match = ip.match(/^(\d{1,3}\.\d{1,3})\.\d{1,3}\.\d{1,3}$/);
@@ -128,177 +126,172 @@ function obfuscateIp(ip) {
   return 'x.x.x.x';
 }
 
-// Daily world flux report (runs after regions are initialized)
-// Moved inside region setup to access correct scope
-
 // Auth Endpoints
 apiRouter.post('/register', async (req, res, next) => {
   try {
-  const { username, password } = req.body;
-  let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
+    const { username, password } = req.body;
+    let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
 
-  if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
-  
-  if (await db.findUserByUsername(username)) {
-    return res.status(400).json({ error: 'Username already exists' });
-  }
-
-  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-  const ipCount = await User.countDocuments({ registerIp: ip, createdAt: { $gt: oneDayAgo } });
-  if (ipCount >= 3 && ip !== '::1' && ip !== '127.0.0.1') {
-    return res.status(400).json({ error: '同一 IP 一天最多只能註冊 3 個帳號。' });
-  }
-
-  // VPN/Proxy Check
-  if (ip !== '::1' && ip !== '127.0.0.1') {
-    try {
-      const fetch = (await import('node-fetch')).default;
-      // Validate IP format before using in URL
-      const ipv4Regex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-      const cleanIp = ipv4Regex.test(ip) ? ip : '0.0.0.0';
-      const ipCheck = await fetch(`http://ip-api.com/json/${cleanIp}?fields=proxy,hosting`).then(r => r.json());
-      if (ipCheck.proxy || ipCheck.hosting) {
-        return res.status(403).json({ error: '系統偵測到您正在使用 VPN 或代理伺服器，請關閉後再試。' });
-      }
-    } catch (err) {
-      console.error('[SYS] IP Check failed:', err);
+    if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
+    
+    if (await db.findUserByUsername(username)) {
+      return res.status(400).json({ error: 'Username already exists' });
     }
-  }
-  
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const recoveryKey = 'EO-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-  const newUser = {
-    id: 'EO-' + Date.now(),
-    username,
-    password: hashedPassword,
-    registeredAt: Date.now(),
-    recoveryKey,
-    registerIp: ip,
-    homeRegion: req.params.region
-  };
-  
-  await db.createUser(newUser);
-  const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ success: true, message: 'Registration successful', recoveryKey, token, username });
+
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const ipCount = await User.countDocuments({ registerIp: ip, createdAt: { $gt: oneDayAgo } });
+    if (ipCount >= 3 && ip !== '::1' && ip !== '127.0.0.1') {
+      return res.status(400).json({ error: '同一 IP 一天最多只能註冊 3 個帳號。' });
+    }
+
+    // VPN/Proxy Check
+    if (ip !== '::1' && ip !== '127.0.0.1') {
+      try {
+        const fetch = (await import('node-fetch')).default;
+        const ipv4Regex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+        const cleanIp = ipv4Regex.test(ip) ? ip : '0.0.0.0';
+        const ipCheck = await fetch(`http://ip-api.com/json/${cleanIp}?fields=proxy,hosting`).then(r => r.json());
+        if (ipCheck.proxy || ipCheck.hosting) {
+          return res.status(403).json({ error: '系統偵測到您正在使用 VPN 或代理伺服器，請關閉後再試。' });
+        }
+      } catch (err) {
+        console.error('[SYS] IP Check failed:', err);
+      }
+    }
+    
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const recoveryKey = 'EO-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    const newUser = {
+      id: 'EO-' + Date.now(),
+      username,
+      password: hashedPassword,
+      registeredAt: Date.now(),
+      recoveryKey,
+      registerIp: ip,
+      homeRegion: req.params.region
+    };
+    
+    await db.createUser(newUser);
+    const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ success: true, message: 'Registration successful', recoveryKey, token, username });
   } catch (err) { next(err); }
 });
 
 apiRouter.post('/login', async (req, res, next) => {
   try {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
-  
-  const user = await db.findUserByUsernameOrEmail(username);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
-  
-  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ success: true, token, user: { id: user.id, username: user.username } });
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
+    
+    const user = await db.findUserByUsernameOrEmail(username);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
+    
+    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ success: true, token, user: { id: user.id, username: user.username } });
   } catch (err) { next(err); }
 });
 
 apiRouter.get('/auth/me', async (req, res, next) => {
   try {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'No token' });
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await db.findUserByUsername(decoded.username);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({
-      username: user.username,
-      createdAt: user.createdAt,
-      accumulatedTime: user.accumulatedTime,
-      accumulatedBonusPoints: user.accumulatedBonusPoints,
-      discord: user.discord,
-      recoveryKey: user.recoveryKey || '未產生',
-      email: user.email,
-      isEmailVerified: user.isEmailVerified
-    });
-  } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token' });
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const user = await db.findUserByUsername(decoded.username);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      res.json({
+        username: user.username,
+        createdAt: user.createdAt,
+        accumulatedTime: user.accumulatedTime,
+        accumulatedBonusPoints: user.accumulatedBonusPoints,
+        discord: user.discord,
+        recoveryKey: user.recoveryKey || '未產生',
+        email: user.email,
+        isEmailVerified: user.isEmailVerified
+      });
+    } catch (err) {
+      res.status(401).json({ error: 'Invalid token' });
+    }
   } catch (err) { next(err); }
 });
 
 apiRouter.post('/auth/generate-recovery-key', async (req, res, next) => {
   try {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'No token' });
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await db.findUserByUsername(decoded.username);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    
-    if (user.recoveryKey) {
-      // Already exists - just return it so user can view it again
-      return res.json({ success: true, recoveryKey: user.recoveryKey, existed: true });
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token' });
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const user = await db.findUserByUsername(decoded.username);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      
+      if (user.recoveryKey) {
+        return res.json({ success: true, recoveryKey: user.recoveryKey, existed: true });
+      }
+      
+      const recoveryKey = 'EO-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+      await User.updateOne({ username: user.username }, { recoveryKey });
+      
+      res.json({ success: true, recoveryKey });
+    } catch (err) {
+      res.status(401).json({ error: 'Invalid token' });
     }
-    
-    const recoveryKey = 'EO-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-    await User.updateOne({ username: user.username }, { recoveryKey });
-    
-    res.json({ success: true, recoveryKey });
-  } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
   } catch (err) { next(err); }
 });
 
 apiRouter.post('/reset-password', async (req, res, next) => {
   try {
-  const { username, recoveryKey, newPassword } = req.body;
-  if (!username || !recoveryKey || !newPassword) return res.status(400).json({ error: 'Missing fields' });
-  
-  const user = await db.findUserByUsername(username);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  
-  if (user.recoveryKey !== recoveryKey) {
-    return res.status(400).json({ error: 'Invalid recovery key' });
-  }
-  
-  const hashedPassword = await bcrypt.hash(newPassword, 10);
-  await User.updateOne({ username }, { password: hashedPassword });
-  res.json({ success: true, message: 'Password reset successful' });
+    const { username, recoveryKey, newPassword } = req.body;
+    if (!username || !recoveryKey || !newPassword) return res.status(400).json({ error: 'Missing fields' });
+    
+    const user = await db.findUserByUsername(username);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    if (user.recoveryKey !== recoveryKey) {
+      return res.status(400).json({ error: 'Invalid recovery key' });
+    }
+    
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await User.updateOne({ username }, { password: hashedPassword });
+    res.json({ success: true, message: 'Password reset successful' });
   } catch (err) { next(err); }
 });
 
 apiRouter.post('/auth/delete-account', async (req, res, next) => {
   try {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'No token' });
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await db.findUserByUsername(decoded.username);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    
-    await User.deleteOne({ username: user.username });
-    
-    const region = req.params.region || 'asia';
-    const state = regionStates[region];
-    if (state && state.connectedUsers) {
-      const existingEntry = Array.from(state.connectedUsers.entries()).find(([_, u]) => u.username === user.username);
-      if (existingEntry) {
-        const [oldSocketId] = existingEntry;
-        const oldSocket = io.sockets.sockets.get(oldSocketId);
-        if (oldSocket) {
-          oldSocket.emit('auth_error', { message: '您的帳號已刪除' });
-          oldSocket.disconnect(true);
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token' });
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const user = await db.findUserByUsername(decoded.username);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      
+      await User.deleteOne({ username: user.username });
+      
+      const region = req.params.region || 'asia';
+      const state = regionStates[region];
+      if (state && state.connectedUsers) {
+        const existingEntry = Array.from(state.connectedUsers.entries()).find(([_, u]) => u.username === user.username);
+        if (existingEntry) {
+          const [oldSocketId] = existingEntry;
+          const oldSocket = io.sockets.sockets.get(oldSocketId);
+          if (oldSocket) {
+            oldSocket.emit('auth_error', { message: '您的帳號已刪除' });
+            oldSocket.disconnect(true);
+          }
+          state.connectedUsers.delete(oldSocketId);
         }
-        state.connectedUsers.delete(oldSocketId);
       }
+      
+      res.json({ success: true, message: 'Account deleted' });
+    } catch (err) {
+      res.status(401).json({ error: 'Invalid token' });
     }
-    
-    res.json({ success: true, message: 'Account deleted' });
-  } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
   } catch (err) { next(err); }
 });
 
@@ -313,10 +306,8 @@ apiRouter.post('/auth/send-verification', async (req, res) => {
     const user = await User.findOne({ username: decoded.username });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Ensure email is valid format
     if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'Invalid email format' });
 
-    // Check if email already in use
     const existingEmail = await User.findOne({ email });
     if (existingEmail && existingEmail.username !== user.username) {
       return res.status(400).json({ error: 'Email already in use' });
@@ -368,7 +359,7 @@ apiRouter.post('/auth/send-verification', async (req, res) => {
 });
 
 apiRouter.post('/auth/verify-email', async (req, res) => {
-  const { token } = req.body; // This is the verificationToken, not the JWT
+  const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'Missing verification token' });
 
   try {
@@ -376,7 +367,7 @@ apiRouter.post('/auth/verify-email', async (req, res) => {
     if (!user) return res.status(400).json({ error: 'Invalid or expired verification token' });
 
     user.isEmailVerified = true;
-    user.emailVerificationToken = null; // Clear the token
+    user.emailVerificationToken = null;
     await user.save();
 
     res.json({ success: true, message: 'Email verified successfully' });
@@ -409,7 +400,6 @@ app.get('/api/auth/discord', (req, res) => {
   if (!state) return res.status(400).send('Missing state');
   
   const redirectUri = `${BACKEND_URL}/api/auth/discord/callback`;
-  
   const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=${state}`;
   res.redirect(discordAuthUrl);
 });
@@ -428,7 +418,6 @@ app.get('/api/auth/discord/callback', async (req, res) => {
     const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     action = stateData.action || 'bind';
     returnTo = stateData.returnTo;
-    // Validate returnTo to prevent open redirect
     if (returnTo) {
       try {
         const returnUrl = new URL(returnTo);
@@ -451,7 +440,6 @@ app.get('/api/auth/discord/callback', async (req, res) => {
   try {
     const fetch = (await import('node-fetch')).default;
     
-    // Exchange code for token
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       body: new URLSearchParams({
@@ -470,7 +458,6 @@ app.get('/api/auth/discord/callback', async (req, res) => {
       return res.status(400).send('Failed to obtain access token from Discord');
     }
 
-    // Fetch user profile
     const userResponse = await fetch('https://discord.com/api/users/@me', {
       headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` }
     });
@@ -490,7 +477,6 @@ app.get('/api/auth/discord/callback', async (req, res) => {
     if (action === 'login') {
       let user = await User.findOne({ 'discord.id': profile.id });
       if (!user) {
-        // Create new user using discord name
         let baseName = profile.username.replace(/\s+/g, '_');
         let finalName = baseName;
         let counter = 1;
@@ -498,7 +484,6 @@ app.get('/api/auth/discord/callback', async (req, res) => {
           finalName = `${baseName}_${counter++}`;
         }
         
-        // Pass a random password since Discord users don't need a local password but the DB requires it
         const dummyPassword = 'discord_oauth_' + Math.random().toString(36).slice(2);
         await db.createUser({
           id: 'user_' + Date.now() + '_' + Math.floor(Math.random()*1000),
@@ -517,16 +502,13 @@ app.get('/api/auth/discord/callback', async (req, res) => {
         { expiresIn: '30d' }
       );
       
-      // Redirect to frontend with token in query params
       const separator = returnTo && returnTo.includes('?') ? '&' : '?';
       return res.redirect(`${returnTo || '/'}${separator}token=${token}`);
       
     } else {
-      // Bind action
       const success = await db.updateUserDiscord(decoded.username, profile);
       
       if (success) {
-        // Redirect back to frontend dynamically based on where they came from
         res.redirect(returnTo || '/');
       } else {
         res.status(404).send('User not found in Earth Online database');
@@ -538,21 +520,25 @@ app.get('/api/auth/discord/callback', async (req, res) => {
   }
 });
 
-// Leaderboard Endpoint
+// Leaderboard Endpoint (整合 Discord 伺服器加成 1.5 倍特權)
 apiRouter.get('/leaderboard', async (req, res) => {
   try {
-    // #5: 加 .sort() 與 .limit(100)，避免全表掃描
     const users = await User.find({}, 'username accumulatedTime accumulatedBonusPoints discord country')
       .sort({ accumulatedTime: -1 })
       .limit(100)
       .lean();
 
-    // 使用 getCachedRole 避免每次打 Discord API
     const leaderboard = await Promise.all(users.map(async u => {
       const idleTimeSeconds = Math.floor((u.accumulatedTime || 0) / 1000);
-      const points = idleTimeSeconds + (u.accumulatedBonusPoints || 0);
+      
+      // 偵測是否為 [@核心能源供應商]
       const discordId = u.discord?.id || '無';
       const realRole = discordId !== '無' ? await getCachedRole(discordId) : '';
+      const isBooster = realRole.includes('核心能源供應商');
+      
+      // 加成供應商享有基礎掛機點數 1.5 倍速狂飆特權
+      const speedMultiplier = isBooster ? 1.5 : 1.0;
+      const points = Math.floor(idleTimeSeconds * speedMultiplier) + (u.accumulatedBonusPoints || 0);
 
       return {
         username: u.username,
@@ -566,7 +552,6 @@ apiRouter.get('/leaderboard', async (req, res) => {
       };
     }));
 
-    // Sort by points descending (後端已排序，前端不須重複)
     leaderboard.sort((a, b) => b.points - a.points);
     res.json(leaderboard);
   } catch (err) {
@@ -595,7 +580,6 @@ app.get('/api/global/stats', async (req, res, next) => {
 
 app.use('/api/:region', apiRouter);
 
-// Frontend is hosted on Cloudflare Pages — redirect non-API requests there
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://earthonline1.pages.dev';
 app.use((req, res, next) => {
   if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/socket.io') && !req.path.startsWith('/downloads')) {
@@ -610,7 +594,6 @@ app.use((err, req, res, next) => {
 });
 
 const server = http.createServer(app);
-
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
@@ -623,12 +606,6 @@ const regionStates = {
   us: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' },
   eu: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' }
 };
-
-
-
-
-
-
 
 regions.forEach(regionName => {
   const nsp = io.of(`/${regionName}`);
@@ -661,18 +638,6 @@ setInterval(() => {
   try {
     const cpus = os.cpus();
     if (cpus && cpus.length > 0) {
-      let user = 0, nice = 0, sys = 0, idle = 0, irq = 0;
-      for (let cpu in cpus) {
-        user += cpus[cpu].times.user;
-        nice += cpus[cpu].times.nice;
-        sys += cpus[cpu].times.sys;
-        irq += cpus[cpu].times.irq;
-        idle += cpus[cpu].times.idle;
-      }
-      const total = user + nice + sys + idle + irq;
-      const active = user + nice + sys + irq;
-      // Calculate cpu usage % based on current snapshot vs 0 (simplification for instantaneous load)
-      // For a better reading, we would compare previous snapshot to current, but os.loadavg is simpler
       const cpuUsage = (os.loadavg()[0] / cpus.length) * 100;
       hardwareStats.cpu = Math.min(100, Math.max(0, cpuUsage));
     }
@@ -685,120 +650,110 @@ regions.forEach(regionName => {
   const nsp = io.of(`/${regionName}`);
   const state = regionStates[regionName];
 
-  // #7: global_stats 廣播頻率降為 5 秒
   setInterval(async () => {
     try {
       const pop = await db.getRegionPopulation(regionName);
       const isBoosted = state.connectedUsers.size >= 5;
-    state.multiplier = isBoosted ? 1.2 : 1.0;
+      state.multiplier = isBoosted ? 1.2 : 1.0;
     
-    if (state.currentGlobalEvent) {
-      if (Date.now() >= state.currentGlobalEvent.endTime) {
-        if (state.currentGlobalEvent.type === 'SOLAR_STORM' && state.connectedUsers.size > 0) {
-          const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
-          await User.updateMany({ username: { $in: usernames } }, { $inc: { accumulatedBonusPoints: 200 } }).catch(console.error);
-        } else if (state.currentGlobalEvent.type === 'SYSTEM_MAINTENANCE' && state.connectedUsers.size > 0) {
-          const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
-          await User.updateMany({ username: { $in: usernames } }, { $inc: { accumulatedBonusPoints: 500 } }).catch(console.error);
-        }
-        nsp.emit('global_event_ended', { type: state.currentGlobalEvent.type });
-        state.currentGlobalEvent = null;
-      } else {
-        switch (state.currentGlobalEvent.type) {
-          case 'QUANTUM_BURST': state.multiplier = 3.0; break;
-          case 'DATA_GOLD_RUSH': state.multiplier = 5.0; break;
-          case 'SYSTEM_MAINTENANCE': state.multiplier = 0.5; break;
-          case 'SATELLITE_ALIGNMENT': state.multiplier = 1.0 + (state.connectedUsers.size * 0.1); break;
+      if (state.currentGlobalEvent) {
+        if (Date.now() >= state.currentGlobalEvent.endTime) {
+          if (state.currentGlobalEvent.type === 'SOLAR_STORM' && state.connectedUsers.size > 0) {
+            const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
+            await User.updateMany({ username: { $in: usernames } }, { $inc: { accumulatedBonusPoints: 200 } }).catch(console.error);
+          } else if (state.currentGlobalEvent.type === 'SYSTEM_MAINTENANCE' && state.connectedUsers.size > 0) {
+            const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
+            await User.updateMany({ username: { $in: usernames } }, { $inc: { accumulatedBonusPoints: 500 } }).catch(console.error);
+          }
+          nsp.emit('global_event_ended', { type: state.currentGlobalEvent.type });
+          state.currentGlobalEvent = null;
+        } else {
+          switch (state.currentGlobalEvent.type) {
+            case 'QUANTUM_BURST': state.multiplier = 3.0; break;
+            case 'DATA_GOLD_RUSH': state.multiplier = 5.0; break;
+            case 'SYSTEM_MAINTENANCE': state.multiplier = 0.5; break;
+            case 'SATELLITE_ALIGNMENT': state.multiplier = 1.0 + (state.connectedUsers.size * 0.1); break;
+          }
         }
       }
-    }
 
-    if (state.connectedUsers.size > 0) {
-      const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
-      // Event multiplier bonus (on top of base)
-      const eventBonus = state.multiplier > 1.0 ? (state.multiplier - 1.0) : 0;
-      
-      const users = await User.find({ username: { $in: usernames } });
-      const updates = [];
-      for (let user of users) {
-        let isDead = false;
-        let decay = 0;
+      if (state.connectedUsers.size > 0) {
+        const usernames = Array.from(state.connectedUsers.values()).map(u => u.username);
+        const eventBonus = state.multiplier > 1.0 ? (state.multiplier - 1.0) : 0;
+        
+        const users = await User.find({ username: { $in: usernames } });
+        const updates = [];
+        for (let user of users) {
+          let isDead = false;
+          let decay = 0;
 
-        // Health decay: ~0.2% per minute total (8+ hours full health)
-        // Tick is every 2s => 30 ticks/min => decay per tick = 0.2/30 ≈ 0.00667
-        if (user.health > 0) {
-          if (user.activeBuffs && user.activeBuffs.get('firewall') > Date.now()) {
-            // Protected by firewall
-          } else {
-            decay = 0.2 / 30;
+          if (user.health > 0) {
+            if (user.activeBuffs && user.activeBuffs.get('firewall') > Date.now()) {
+              // Protected by firewall
+            } else {
+              decay = 0.2 / 30;
+            }
+          }
+          
+          if (user.health <= 0) isDead = true;
+
+          let ptPerTick = 0;
+          let timeEarned = 0;
+
+          if (!isDead) {
+            ptPerTick = (user.health / 100) * 0.1;
+            ptPerTick += eventBonus * 0.05;
+
+            if (user.activeBuffs && user.activeBuffs.get('overclock') > Date.now()) {
+              ptPerTick *= 2;
+            }
+
+            timeEarned = 2000;
+          }
+
+          const incFields = {};
+          if (decay > 0) incFields.health = -decay;
+          if (ptPerTick > 0) incFields.accumulatedBonusPoints = ptPerTick;
+          if (timeEarned > 0) incFields.accumulatedTime = timeEarned;
+
+          if (Object.keys(incFields).length > 0) {
+            updates.push({
+              updateOne: {
+                filter: { username: user.username },
+                update: { $inc: incFields }
+              }
+            });
           }
         }
         
-        if (user.health <= 0) isDead = true;
-
-        let ptPerTick = 0;
-        let timeEarned = 0;
-
-        if (!isDead) {
-          ptPerTick = (user.health / 100) * 0.1;
-
-          // Event multiplier bonus
-          ptPerTick += eventBonus * 0.05;
-
-          // Overclock doubles PT
-          if (user.activeBuffs && user.activeBuffs.get('overclock') > Date.now()) {
-            ptPerTick *= 2;
-          }
-
-          timeEarned = 2000;
-        }
-
-        const incFields = {};
-        if (decay > 0) incFields.health = -decay;
-        if (ptPerTick > 0) incFields.accumulatedBonusPoints = ptPerTick;
-        if (timeEarned > 0) incFields.accumulatedTime = timeEarned;
-
-        if (Object.keys(incFields).length > 0) {
-          updates.push({
-            updateOne: {
-              filter: { username: user.username },
-              update: { $inc: incFields }
-            }
-  });
-
+        if (updates.length > 0) {
+          await User.bulkWrite(updates);
         }
       }
       
-      if (updates.length > 0) {
-        await User.bulkWrite(updates);
-      }
-    }
-    
-    state.activeUsers = state.connectedUsers.size;
-    
-    // calculate compression logic (simplified to string)
-    let comp = '1.000';
-    if (state.activeUsers > 1000000) comp = '0.001';
-    else if (state.activeUsers > 100000) comp = '0.010';
-    else if (state.activeUsers > 10000) comp = '0.100';
-    state.socialCompression = comp;
-    
-    state.globalProduction = await db.getRegionProduction(regionName);
-    
-    // Fetch real hardware metrics (cached from 10s interval)
-    nsp.emit('global_stats', {
-      activeUsers: state.activeUsers,
-      totalPopulation: pop,
-      globalProduction: state.globalProduction,
-      socialCompression: state.socialCompression,
-      multiplier: state.multiplier,
-      systemHardware: {
-        cpu: hardwareStats.cpu,
-        uplink: hardwareStats.uplink,
-        downlink: hardwareStats.downlink,
-        loss: 0
-      }
-    });
+      state.activeUsers = state.connectedUsers.size;
+      
+      let comp = '1.000';
+      if (state.activeUsers > 1000000) comp = '0.001';
+      else if (state.activeUsers > 100000) comp = '0.010';
+      else if (state.activeUsers > 10000) comp = '0.100';
+      state.socialCompression = comp;
+      
+      state.globalProduction = await db.getRegionProduction(regionName);
+      
+      nsp.emit('global_stats', {
+        activeUsers: state.activeUsers,
+        totalPopulation: pop,
+        globalProduction: state.globalProduction,
+        socialCompression: state.socialCompression,
+        multiplier: state.multiplier,
+        systemHardware: {
+          cpu: hardwareStats.cpu,
+          uplink: hardwareStats.uplink,
+          downlink: hardwareStats.downlink,
+          loss: 0
+        }
+      });
     } catch (err) {
       console.error('[SYS] Interval error:', err);
     }
@@ -809,859 +764,633 @@ regions.forEach(regionName => {
     const nspIo = nsp;
     let currentGlobalEvent = state.currentGlobalEvent;
 
-  // Wait for client to authenticate via token
-  // Handle Ping
-  socket.on('ping', () => {
-    socket.emit('pong');
-  });
+    socket.on('ping', () => {
+      socket.emit('pong');
+    });
 
-  socket.on('sync_user', async () => {
-    if (!socket.user) return;
-    const dbUser = await db.findUserByUsername(socket.user.username);
-    if (dbUser) {
-      socket.emit('user_state_update', {
-        health: dbUser.health,
-        pts: dbUser.accumulatedBonusPoints,
-        activeBuffs: dbUser.activeBuffs ? Object.fromEntries(dbUser.activeBuffs) : {},
-        inventory: dbUser.inventory ? Object.fromEntries(dbUser.inventory) : {}
-      });
-    }
-  });
-
-  socket.on('buy_item', async (itemId) => {
-    if (!socket.user) return;
-    try {
-      const shopItems = {
-        'liquid_nitrogen': { cost: 200, effect: 'health', value: 50 },
-        'quantum_cooler': { cost: 500, effect: 'health', value: 100 },
-        'overclock_chip': { cost: 1500, effect: 'buff', type: 'overclock', duration: 3600000 },
-        'firewall': { cost: 1000, effect: 'buff', type: 'firewall', duration: 1800000 },
-        'generator': { cost: 800, effect: 'revive', value: 20 },
-        'neon_strip': { cost: 3000, effect: 'cosmetic' },
-        'flash_drive': { cost: 500, effect: 'random' }
-      };
-      
-      const item = shopItems[itemId];
-      if (!item) {
-        socket.emit('buy_result', { success: false, message: '道具不存在！' });
-        return;
+    socket.on('sync_user', async () => {
+      if (!socket.user) return;
+      const dbUser = await db.findUserByUsername(socket.user.username);
+      if (dbUser) {
+        socket.emit('user_state_update', {
+          health: dbUser.health,
+          pts: dbUser.accumulatedBonusPoints,
+          activeBuffs: dbUser.activeBuffs ? Object.fromEntries(dbUser.activeBuffs) : {},
+          inventory: dbUser.inventory ? Object.fromEntries(dbUser.inventory) : {}
+        });
       }
-      
-      // ── 購買後統一存入背包，不立即套用 ──────────────────────────────
-      // Atomic deduct PT
-      const result = await User.findOneAndUpdate(
-        { username: socket.user.username, accumulatedBonusPoints: { $gte: item.cost } },
-        { $inc: { accumulatedBonusPoints: -item.cost, [`inventory.${itemId}`]: 1 } },
-        { new: true }
-      );
+    });
 
-      if (!result) {
-        socket.emit('buy_result', { success: false, message: 'PT 不足！' });
-        return;
-      }
-
-      socket.emit('buy_result', { success: true, message: `✅ 已購買「${itemId}」並存入背包！` });
-      socket.emit('user_state_update', {
-        pts: result.accumulatedBonusPoints,
-        inventory: result.inventory ? Object.fromEntries(result.inventory) : {}
-      });
-    } catch (err) {
-      console.error(err);
-      socket.emit('buy_result', { success: false, message: '系統錯誤' });
-    }
-  });
-
-  // ── 使用背包道具 ──────────────────────────────────────────────────────────
-  socket.on('use_item', async (itemId) => {
-    if (!socket.user) return;
-    try {
-      const shopItems = {
-        'liquid_nitrogen': { effect: 'health', value: 50 },
-        'quantum_cooler':  { effect: 'health', value: 100 },
-        'overclock_chip':  { effect: 'buff',   type: 'overclock', duration: 3600000 },
-        'firewall':        { effect: 'buff',   type: 'firewall',  duration: 1800000 },
-        'generator':       { effect: 'revive', value: 20 },
-        'neon_strip':      { effect: 'cosmetic' },
-        'flash_drive':     { effect: 'random' }
-      };
-
-      const item = shopItems[itemId];
-      if (!item) { socket.emit('use_item_result', { success: false, message: '道具不存在！' }); return; }
-
-      // 原子扣除背包數量
-      const userBefore = await User.findOneAndUpdate(
-        { username: socket.user.username, [`inventory.${itemId}`]: { $gte: 1 } },
-        { $inc: { [`inventory.${itemId}`]: -1 } },
-        { new: false } // 拿舊值判斷
-      );
-      if (!userBefore) {
-        socket.emit('use_item_result', { success: false, message: '背包中沒有此道具！' });
-        return;
-      }
-
-      // 清除數量歸零的 key
-      const oldCount = userBefore.inventory?.get(itemId) || 0;
-      if (oldCount <= 1) {
-        await User.updateOne({ username: socket.user.username }, { $unset: { [`inventory.${itemId}`]: '' } });
-      }
-
-      // 套用效果
-      let message = '';
-      let extraUpdate = null;
-
-      if (item.effect === 'health') {
-        const dbUser = await User.findOne({ username: socket.user.username });
-        if (dbUser.health <= 0) {
-          // 退回背包
-          await User.updateOne({ username: socket.user.username }, { $inc: { [`inventory.${itemId}`]: 1 } });
-          socket.emit('use_item_result', { success: false, message: '伺服器已死機，無法使用冷卻模組！請先用備用發電機。' });
+    // ── 購買道具（整合 Discord 加成供應商黑市商城終身 8 折特權） ─────────────────
+    socket.on('buy_item', async (itemId) => {
+      if (!socket.user) return;
+      try {
+        const shopItems = {
+          'liquid_nitrogen': { cost: 200, effect: 'health', value: 50 },
+          'quantum_cooler': { cost: 500, effect: 'health', value: 100 },
+          'overclock_chip': { cost: 1500, effect: 'buff', type: 'overclock', duration: 3600000 },
+          'firewall': { cost: 1000, effect: 'buff', type: 'firewall', duration: 1800000 },
+          'generator': { cost: 800, effect: 'revive', value: 20 },
+          'neon_strip': { cost: 3000, effect: 'cosmetic' },
+          'flash_drive': { cost: 500, effect: 'random' }
+        };
+        
+        const item = shopItems[itemId];
+        if (!item) {
+          socket.emit('buy_result', { success: false, message: '道具不存在！' });
           return;
         }
-        const newHealth = Math.min(100, dbUser.health + item.value);
-        extraUpdate = { $set: { health: newHealth } };
-        message = `❤️ 健康度恢復 +${item.value}%（現在 ${Math.floor(newHealth)}%）`;
+        
+        // 檢查是否擁有加成者身分組
+        const userRole = await getCachedRole(socket.user.discordProfile?.id || '');
+        const isBooster = userRole.includes('核心能源供應商');
+        
+        // 加成者終身 8 折
+        const finalCost = isBooster ? Math.floor(item.cost * 0.8) : item.cost;
+        
+        const result = await User.findOneAndUpdate(
+          { username: socket.user.username, accumulatedBonusPoints: { $gte: finalCost } },
+          { $inc: { accumulatedBonusPoints: -finalCost, [`inventory.${itemId}`]: 1 } },
+          { new: true }
+        );
 
-      } else if (item.effect === 'buff') {
-        const expiry = Date.now() + item.duration;
-        extraUpdate = { $set: { [`activeBuffs.${item.type}`]: expiry } };
-        const minLabel = Math.floor(item.duration / 60000);
-        message = item.type === 'overclock'
-          ? `⚡ PT 收益 ×2.0 倍，持續 ${minLabel} 分鐘！`
-          : `🛡️ 防火牆啟動，${minLabel} 分鐘內免疫衰減！`;
-
-      } else if (item.effect === 'revive') {
-        const dbUser = await User.findOne({ username: socket.user.username });
-        if (dbUser.health > 0) {
-          await User.updateOne({ username: socket.user.username }, { $inc: { [`inventory.${itemId}`]: 1 } });
-          socket.emit('use_item_result', { success: false, message: '伺服器仍在運作，不需要發電機！' });
+        if (!result) {
+          socket.emit('buy_result', { success: false, message: 'PT 不足！' });
           return;
         }
-        extraUpdate = { $set: { health: item.value } };
-        message = `🔋 伺服器強制重啟！健康度恢復至 ${item.value}%`;
 
-      } else if (item.effect === 'cosmetic') {
-        message = '🌈 霓虹燈管已安裝，裝飾效果已套用！';
+        socket.emit('buy_result', { success: true, message: `✅ 已購買「${itemId}」並存入背包！${isBooster ? ' (已自動折抵加成商 20% 關稅)' : ''}` });
+        socket.emit('user_state_update', {
+          pts: result.accumulatedBonusPoints,
+          inventory: result.inventory ? Object.fromEntries(result.inventory) : {}
+        });
+      } catch (err) {
+        console.error(err);
+        socket.emit('buy_result', { success: false, message: '系統錯誤' });
+      }
+    });
 
-      } else if (item.effect === 'random') {
-        const rand = Math.random();
-        if (rand < 0.3) {
-          extraUpdate = { $inc: { accumulatedTime: 86400 * 1000 } };
-          message = '🏆 大吉！獲得 1 天生存時間！';
-        } else if (rand < 0.6) {
-          extraUpdate = { $inc: { accumulatedBonusPoints: 2000 } };
-          message = '💰 中吉！獲得 2000 PT！';
-        } else if (rand < 0.9) {
-          extraUpdate = { $inc: { accumulatedBonusPoints: 500 } };
-          message = '🎁 小吉！回本 500 PT！';
-        } else {
-          extraUpdate = { $inc: { health: -50 } };
-          message = '💀 大凶！電腦病毒爆發，健康度 -50%！';
+    socket.on('use_item', async (itemId) => {
+      if (!socket.user) return;
+      try {
+        const shopItems = {
+          'liquid_nitrogen': { effect: 'health', value: 50 },
+          'quantum_cooler':  { effect: 'health', value: 100 },
+          'overclock_chip':  { effect: 'buff',   type: 'overclock', duration: 3600000 },
+          'firewall':        { effect: 'buff',   type: 'firewall',  duration: 1800000 },
+          'generator':       { effect: 'revive', value: 20 },
+          'neon_strip':      { effect: 'cosmetic' },
+          'flash_drive':     { effect: 'random' }
+        };
+
+        const item = shopItems[itemId];
+        if (!item) { socket.emit('use_item_result', { success: false, message: '道具不存在！' }); return; }
+
+        const userBefore = await User.findOneAndUpdate(
+          { username: socket.user.username, [`inventory.${itemId}`]: { $gte: 1 } },
+          { $inc: { [`inventory.${itemId}`]: -1 } },
+          { new: false }
+        );
+        if (!userBefore) {
+          socket.emit('use_item_result', { success: false, message: '背包中沒有此道具！' });
+          return;
         }
-      }
 
-      if (extraUpdate) {
-        await User.updateOne({ username: socket.user.username }, extraUpdate);
-      }
-
-      const finalUser = await User.findOne({ username: socket.user.username });
-      socket.emit('use_item_result', { success: true, message });
-      socket.emit('user_state_update', {
-        health: finalUser.health,
-        pts: finalUser.accumulatedBonusPoints,
-        activeBuffs: finalUser.activeBuffs ? Object.fromEntries(finalUser.activeBuffs) : {},
-        inventory: finalUser.inventory ? Object.fromEntries(finalUser.inventory) : {}
-      });
-    } catch (err) {
-      console.error('[SYS] use_item error:', err);
-      socket.emit('use_item_result', { success: false, message: '系統錯誤，請稍後再試。' });
-    }
-  });
-
-  // Ad revive: restore health after watching an ad
-  socket.on('ad_revive', async () => {
-    if (!socket.user) return;
-    const now = Date.now();
-    const today = new Date().toISOString().substring(0, 10);
-    const adCountKey = `adRevive_${socket.user.username}_${today}`;
-    const count = reviveCounts?.get(adCountKey) || 0;
-    if (count >= 3) {
-      socket.emit('ad_revive_result', { success: false, message: '今日廣告次數已用完（上限 3 次）' });
-      return;
-    }
-    const user = await User.findOne({ username: socket.user.username });
-    if (!user) return;
-    if (user.health > 0) {
-      socket.emit('ad_revive_result', { success: false, message: '伺服器仍在運作，無需復活' });
-      return;
-    }
-    const newHealth = Math.min(100, (user.health || 0) + 50);
-    await User.updateOne({ username: socket.user.username }, { $set: { health: newHealth } });
-    if (!reviveCounts) reviveCounts = new Map();
-    reviveCounts.set(adCountKey, count + 1);
-    socket.emit('ad_revive_result', { success: true, health: newHealth, remaining: 2 - count });
-    socket.emit('user_state_update', { health: newHealth });
-  });
-
-  socket.on('authenticate', async (data) => {
-    try {
-      const decoded = jwt.verify(data.token, JWT_SECRET);
-      
-      let ip = socket.handshake.headers['x-forwarded-for'] || socket.request.connection.remoteAddress;
-      if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
-      let geo = geoip.lookup(ip);
-      
-      // Fallback for local IPs or if geoip fails
-      if (!geo || !geo.ll || geo.ll.length < 2) {
-        if (ip.includes('127.0.0.1') || ip.includes('::1') || ip.startsWith('192.168.') || ip.startsWith('10.')) {
-          geo = { country: 'TW', ll: [23.6978, 120.9605] };
-        } else {
-          geo = { country: geo?.country || 'TW', ll: [0, 0] }; // Force TW as default instead of UNKNOWN for better UI
+        const oldCount = userBefore.inventory?.get(itemId) || 0;
+        if (oldCount <= 1) {
+          await User.updateOne({ username: socket.user.username }, { $unset: { [`inventory.${itemId}`]: '' } });
         }
-      }
-      const dbUser = await db.findUserByUsername(decoded.username);
-      
-      if (geo.country !== 'UNKNOWN') {
-        await User.updateOne({ username: decoded.username }, { $set: { country: geo.country } });
-      }
-      
-      const user = {
-        socketId: socket.id,
-        id: decoded.id,
-        username: decoded.username,
-        role: dbUser?.role || 'user',
-        discordProfile: dbUser?.discord || null,
-        ip: ip,
-        ipObfuscated: obfuscateIp(ip),
-        country: geo.country,
-        lat: geo.ll[0] + (Math.random() - 0.5) * 0.1,
-        lon: geo.ll[1] + (Math.random() - 0.5) * 0.1,
-        accumulatedTime: dbUser?.accumulatedTime || 0,
-        accumulatedBonusPoints: dbUser?.accumulatedBonusPoints || 0,
-        health: dbUser?.health !== undefined ? dbUser.health : 100,
-        inventory: dbUser?.inventory ? Object.fromEntries(dbUser.inventory) : {},
-        activeBuffs: dbUser?.activeBuffs ? Object.fromEntries(dbUser.activeBuffs) : {},
-        createdAt: dbUser?.createdAt || Date.now(),
-        connectedAt: Date.now()
-      };
-      socket.user = user;
 
-      // Anti multi-instance: prevent multiple active sessions per account
-      const existingUser = await User.findOne({ username: decoded.username }, 'activeSession');
-      if (existingUser && existingUser.activeSession && existingUser.activeSession !== socket.id) {
-        const oldSocketId = existingUser.activeSession;
-        const oldSocket = nsp.sockets.get(oldSocketId);
-        if (oldSocket && oldSocket.connected) {
-          oldSocket.emit('auth_error', { message: '您的帳號已在其他裝置登入，此連線已中斷。' });
-          setTimeout(() => { try { oldSocket.disconnect(true); } catch(e) {} }, 500);
-        }
-        connectedUsers.delete(oldSocketId);
-        // Also clear the stale session entry so the db reflects truth
-        await User.updateOne({ username: decoded.username }, { $set: { activeSession: null } });
-      }
+        let message = '';
+        let extraUpdate = null;
 
-      // Clean up any leftover connectedUsers entries for this user
-      for (const [sid, u] of connectedUsers.entries()) {
-        if (u.username === decoded.username && sid !== socket.id) {
-          connectedUsers.delete(sid);
-        }
-      }
-
-      // Persist new session
-      await User.updateOne({ username: decoded.username }, { $set: { activeSession: socket.id } });
-
-      connectedUsers.set(socket.id, user);
-
-      console.log(`[SYS] Node Authenticated: ${user.username} | IP: ${ip} | Region: ${user.country}`);
-
-      const pop = await db.getRegionPopulation(regionName);
-
-      // Disconnect compensation: calculate missed time
-      const lastHeartbeat = heartbeatTimestamps.get(decoded.username);
-      if (lastHeartbeat) {
-        const offlineDuration = Date.now() - lastHeartbeat;
-        if (offlineDuration > 30000 && offlineDuration < 86400000) {
-          const compensatedTime = Math.min(offlineDuration, 4 * 60 * 60 * 1000);
-          await User.updateOne(
-            { username: decoded.username },
-            { $inc: { accumulatedTime: compensatedTime } }
-          );
-          console.log(`[SYS] Disconnect compensation for ${decoded.username}: ${Math.round(compensatedTime/60000)} minutes`);
-        }
-      }
-      heartbeatTimestamps.set(decoded.username, Date.now());
-
-      socket.emit('init_data', {
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-        discordProfile: user.discordProfile,
-        ip: user.ipObfuscated,
-        country: user.country,
-        lat: user.lat,
-        lon: user.lon,
-        accumulatedTime: user.accumulatedTime,
-        accumulatedBonusPoints: user.accumulatedBonusPoints,
-        health: user.health,
-        inventory: user.inventory,
-        activeBuffs: user.activeBuffs,
-        createdAt: user.createdAt,
-        connectedAt: user.connectedAt,
-        activeUsers: connectedUsers.size,
-        totalPopulation: pop,
-        currentGlobalEvent: currentGlobalEvent // Send current event to newly connected users
-      });
-
-      // Sync Discord role to in-app role
-      if (dbUser?.discord?.id) {
-        discordBot.getHighestRole(dbUser.discord.id).then(discordRole => {
-          if (!discordRole) return;
-          if (discordRole.includes('地球管理團隊')) {
-            User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } }).catch(console.error);
-          } else if (user.role === 'admin' && !discordRole.includes('地球管理團隊')) {
-            User.updateOne({ username: decoded.username }, { $set: { role: 'user' } }).catch(console.error);
+        if (item.effect === 'health') {
+          const dbUser = await User.findOne({ username: socket.user.username });
+          if (dbUser.health <= 0) {
+            await User.updateOne({ username: socket.user.username }, { $inc: { [`inventory.${itemId}`]: 1 } });
+            socket.emit('use_item_result', { success: false, message: '伺服器已死機，無法使用冷卻模組！請先用備用發電機。' });
+            return;
           }
-        }).catch(() => {});
+          const newHealth = Math.min(100, dbUser.health + item.value);
+          extraUpdate = { $set: { health: newHealth } };
+          message = `❤️ 健康度恢復 +${item.value}%（現在 ${Math.floor(newHealth)}%）`;
+
+        } else if (item.effect === 'buff') {
+          const expiry = Date.now() + item.duration;
+          extraUpdate = { $set: { [`activeBuffs.${item.type}`]: expiry } };
+          const minLabel = Math.floor(item.duration / 60000);
+          message = item.type === 'overclock'
+            ? `⚡ PT 收益 ×2.0 倍，持續 ${minLabel} 分鐘！`
+            : `🛡️ 防火牆啟動，${minLabel} 分鐘內免疫衰減！`;
+
+        } else if (item.effect === 'revive') {
+          const dbUser = await User.findOne({ username: socket.user.username });
+          if (dbUser.health > 0) {
+            await User.updateOne({ username: socket.user.username }, { $inc: { [`inventory.${itemId}`]: 1 } });
+            socket.emit('use_item_result', { success: false, message: '伺服器仍在運作，不需要發電機！' });
+            return;
+          }
+          extraUpdate = { $set: { health: item.value } };
+          message = `🔋 伺服器強制重啟！健康度恢復至 ${item.value}%`;
+
+        } else if (item.effect === 'cosmetic') {
+          message = '🌈 霓虹燈管已安裝，裝飾效果已套用！';
+
+        } else if (item.effect === 'random') {
+          const rand = Math.random();
+          if (rand < 0.3) {
+            extraUpdate = { $inc: { accumulatedTime: 86400 * 1000 } };
+            message = '🏆 大吉！獲得 1 天生存時間！';
+          } else if (rand < 0.6) {
+            extraUpdate = { $inc: { accumulatedBonusPoints: 2000 } };
+            message = '💰 中吉！獲得 2000 PT！';
+          } else if (rand < 0.9) {
+            extraUpdate = { $inc: { accumulatedBonusPoints: 500 } };
+            message = '🎁 小吉！回本 500 PT！';
+          } else {
+            extraUpdate = { $inc: { health: -50 } };
+            message = '💀 大凶！電腦病毒爆發，健康度 -50%！';
+          }
+        }
+
+        if (extraUpdate) {
+          await User.updateOne({ username: socket.user.username }, extraUpdate);
+        }
+
+        const finalUser = await User.findOne({ username: socket.user.username });
+        socket.emit('use_item_result', { success: true, message });
+        socket.emit('user_state_update', {
+          health: finalUser.health,
+          pts: finalUser.accumulatedBonusPoints,
+          activeBuffs: finalUser.activeBuffs ? Object.fromEntries(finalUser.activeBuffs) : {},
+          inventory: finalUser.inventory ? Object.fromEntries(finalUser.inventory) : {}
+        });
+      } catch (err) {
+        console.error('[SYS] use_item error:', err);
+        socket.emit('use_item_result', { success: false, message: '系統錯誤，請稍後再試。' });
       }
+    });
 
-      if (connectedUsers.size % 10 === 0 && connectedUsers.size > 0) {
-        sendDiscordWebhook(`🌐 **【地理節點高載通報】**\n偵測到大量節點湧入，目前全服掛機人數已達 **${connectedUsers.size}** 人！\n來自 \`${user.country}\` 的節點點亮了板塊。`);
-      }
-
-      // #4: 改用 nspIo.emit，只廣播給當前命名空間（不跨區域洩漏）
-      nspIo.emit('node_connected', {
-        id: user.id,
-        lat: user.lat,
-        lon: user.lon
-      });
-
-      const allNodes = Array.from(connectedUsers.values()).map(u => ({
-        id: u.id,
-        lat: u.lat,
-        lon: u.lon
-      }));
-      socket.emit('all_nodes', allNodes);
-    } catch (err) {
-      console.error('[SYS] Auth error details:', err);
-      if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
-        socket.emit('auth_error', { message: '認證失敗或過期' });
-      } else {
-        socket.emit('terminal_response', '[SYS] 伺服器載入中，請稍後重試。');
-        socket.disconnect(true);
-      }
-    }
-  });
-
-  // Handle World Chat
-  socket.on('send_chat', async (data) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    
-    // Rate limit: 1 message per 2 seconds
-    // #fix: key 改用 username，斷線重連後仍有效且可被清理
-    const lastChat = chatCooldowns.get(user.username);
-    if (lastChat && Date.now() - lastChat < 2000) {
-      return;
-    }
-    chatCooldowns.set(user.username, Date.now());
-    
-    const message = (data.message || '').trim().substring(0, 200);
-    if (!message) return;
-    
-    // Require Discord binding or email verification to chat
-    try {
-      const dbUser = await User.findOne({ username: user.username }, 'discord isEmailVerified role mutedUntil bannedUntil');
-      if (!dbUser) {
-        console.log(`[CHAT] User ${user.username} not found in DB`);
+    socket.on('ad_revive', async () => {
+      if (!socket.user) return;
+      const today = new Date().toISOString().substring(0, 10);
+      const adCountKey = `adRevive_${socket.user.username}_${today}`;
+      const count = reviveCounts?.get(adCountKey) || 0;
+      if (count >= 3) {
+        socket.emit('ad_revive_result', { success: false, message: '今日廣告次數已用完（上限 3 次）' });
         return;
       }
-      
-      console.log(`[CHAT] ${user.username} - discord:${!!dbUser.discord?.id} email:${!!dbUser.isEmailVerified} role:${dbUser.role}`);
-      
-      if (!dbUser.discord?.id && !dbUser.isEmailVerified) {
-        socket.emit('chat_verification_required', { message: '請先綁定 Discord 或驗證電子郵件後才能使用世界聊天。' });
+      const user = await User.findOne({ username: socket.user.username });
+      if (!user) return;
+      if (user.health > 0) {
+        socket.emit('ad_revive_result', { success: false, message: '伺服器仍在運作，無需復活' });
         return;
       }
-      
-      // Check if user is muted or banned
-      const now = Date.now();
-      if (dbUser.mutedUntil && dbUser.mutedUntil > now) {
-        const remaining = Math.ceil((dbUser.mutedUntil - now) / 60000);
-        socket.emit('chat_muted', { message: `您已被禁言，剩餘 ${remaining} 分鐘。` });
-        return;
-      }
-      if (dbUser.bannedUntil && dbUser.bannedUntil > now) {
-        socket.emit('chat_banned', { message: '您已被禁止使用聊天頻道。' });
-        return;
-      }
-      
-      // Content filtering
-      let filteredMessage = message;
-      let hasFilteredContent = false;
-      for (const word of FILTERED_WORDS) {
-        const regex = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        if (regex.test(filteredMessage)) {
-          hasFilteredContent = true;
-          filteredMessage = filteredMessage.replace(regex, '***');
+      const newHealth = Math.min(100, (user.health || 0) + 50);
+      await User.updateOne({ username: socket.user.username }, { $set: { health: newHealth } });
+      if (!reviveCounts) reviveCounts = new Map();
+      reviveCounts.set(adCountKey, count + 1);
+      socket.emit('ad_revive_result', { success: true, health: newHealth, remaining: 2 - count });
+      socket.emit('user_state_update', { health: newHealth });
+    });
+
+    socket.on('authenticate', async (data) => {
+      try {
+        const decoded = jwt.verify(data.token, JWT_SECRET);
+        
+        let ip = socket.handshake.headers['x-forwarded-for'] || socket.request.connection.remoteAddress;
+        if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
+        let geo = geoip.lookup(ip);
+        
+        if (!geo || !geo.ll || geo.ll.length < 2) {
+          if (ip.includes('127.0.0.1') || ip.includes('::1') || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+            geo = { country: 'TW', ll: [23.6978, 120.9605] };
+          } else {
+            geo = { country: geo?.country || 'TW', ll: [0, 0] };
+          }
+        }
+        const dbUser = await db.findUserByUsername(decoded.username);
+        
+        if (geo.country !== 'UNKNOWN') {
+          await User.updateOne({ username: decoded.username }, { $set: { country: geo.country } });
+        }
+        
+        const user = {
+          socketId: socket.id,
+          id: decoded.id,
+          username: decoded.username,
+          role: dbUser?.role || 'user',
+          discordProfile: dbUser?.discord || null,
+          ip: ip,
+          ipObfuscated: obfuscateIp(ip),
+          country: geo.country,
+          lat: geo.ll[0] + (Math.random() - 0.5) * 0.1,
+          lon: geo.ll[1] + (Math.random() - 0.5) * 0.1,
+          accumulatedTime: dbUser?.accumulatedTime || 0,
+          accumulatedBonusPoints: dbUser?.accumulatedBonusPoints || 0,
+          health: dbUser?.health !== undefined ? dbUser.health : 100,
+          inventory: dbUser?.inventory ? Object.fromEntries(dbUser.inventory) : {},
+          activeBuffs: dbUser?.activeBuffs ? Object.fromEntries(dbUser.activeBuffs) : {},
+          createdAt: dbUser?.createdAt || Date.now(),
+          connectedAt: Date.now()
+        };
+        socket.user = user;
+
+        const existingUser = await User.findOne({ username: decoded.username }, 'activeSession');
+        if (existingUser && existingUser.activeSession && existingUser.activeSession !== socket.id) {
+          const oldSocketId = existingUser.activeSession;
+          const oldSocket = nsp.sockets.get(oldSocketId);
+          if (oldSocket && oldSocket.connected) {
+            oldSocket.emit('auth_error', { message: '您的帳號已在其他裝置登入，此連線已中斷。' });
+            setTimeout(() => { try { oldSocket.disconnect(true); } catch(e) {} }, 500);
+          }
+          connectedUsers.delete(oldSocketId);
+          await User.updateOne({ username: decoded.username }, { $set: { activeSession: null } });
+        }
+
+        for (const [sid, u] of connectedUsers.entries()) {
+          if (u.username === decoded.username && sid !== socket.id) {
+            connectedUsers.delete(sid);
+          }
+        }
+
+        await User.updateOne({ username: decoded.username }, { $set: { activeSession: socket.id } });
+        connectedUsers.set(socket.id, user);
+
+        console.log(`[SYS] Node Authenticated: ${user.username} | IP: ${ip} | Region: ${user.country}`);
+
+        const pop = await db.getRegionPopulation(regionName);
+
+        const lastHeartbeat = heartbeatTimestamps.get(decoded.username);
+        if (lastHeartbeat) {
+          const offlineDuration = Date.now() - lastHeartbeat;
+          if (offlineDuration > 30000 && offlineDuration < 86400000) {
+            const compensatedTime = Math.min(offlineDuration, 4 * 60 * 60 * 1000);
+            await User.updateOne(
+              { username: decoded.username },
+              { $inc: { accumulatedTime: compensatedTime } }
+            );
+            console.log(`[SYS] Disconnect compensation for ${decoded.username}: ${Math.round(compensatedTime/60000)} minutes`);
+          }
+        }
+        heartbeatTimestamps.set(decoded.username, Date.now());
+
+        socket.emit('init_data', {
+          userId: user.id,
+          username: user.username,
+          role: user.role,
+          discordProfile: user.discordProfile,
+          ip: user.ipObfuscated,
+          country: user.country,
+          lat: user.lat,
+          lon: user.lon,
+          accumulatedTime: user.accumulatedTime,
+          accumulatedBonusPoints: user.accumulatedBonusPoints,
+          health: user.health,
+          inventory: user.inventory,
+          activeBuffs: user.activeBuffs,
+          createdAt: user.createdAt,
+          connectedAt: user.connectedAt,
+          activeUsers: connectedUsers.size,
+          totalPopulation: pop,
+          currentGlobalEvent: currentGlobalEvent
+        });
+
+        if (dbUser?.discord?.id) {
+          discordBot.getHighestRole(dbUser.discord.id).then(discordRole => {
+            if (!discordRole) return;
+            if (discordRole.includes('地球管理團隊')) {
+              User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } }).catch(console.error);
+            } else if (user.role === 'admin' && !discordRole.includes('地球管理團隊')) {
+              User.updateOne({ username: decoded.username }, { $set: { role: 'user' } }).catch(console.error);
+            }
+          }).catch(() => {});
+        }
+
+        if (connectedUsers.size % 10 === 0 && connectedUsers.size > 0) {
+          sendDiscordWebhook(`🌐 **【地理節點高載通報】**\n偵測到大量節點湧入，目前全服掛機人數已達 **${connectedUsers.size}** 人！\n來自 \`${user.country}\` 的節點點亮了板塊。`);
+        }
+
+        nspIo.emit('node_connected', { id: user.id, lat: user.lat, lon: user.lon });
+
+        const allNodes = Array.from(connectedUsers.values()).map(u => ({ id: u.id, lat: u.lat, lon: u.lon }));
+        socket.emit('all_nodes', allNodes);
+      } catch (err) {
+        console.error('[SYS] Auth error details:', err);
+        if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+          socket.emit('auth_error', { message: '認證失敗或過期' });
+        } else {
+          socket.emit('terminal_response', '[SYS] 伺服器載入中，請稍後重試。');
+          socket.disconnect(true);
         }
       }
+    });
+
+    // Handle World Chat
+    socket.on('send_chat', async (data) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
       
-      const isAdmin = dbUser.role === 'admin' || dbUser.role === 'moderator';
-      nspIo.emit('chat_message', { username: user.username, message: filteredMessage, isAdmin, filtered: hasFilteredContent });
-      console.log(`[CHAT] ${user.username}: ${hasFilteredContent ? '(filtered) ' : ''}${filteredMessage}`);
+      const lastChat = chatCooldowns.get(user.username);
+      if (lastChat && Date.now() - lastChat < 2000) return;
+      chatCooldowns.set(user.username, Date.now());
       
-      // Sync to Discord
-      discordBot.sendChatMessageToDiscord(user.username, filteredMessage);
-    } catch (err) {
-      console.error('[CHAT] Verification check error:', err);
-      return;
-    }
-  });
-
-  // Moderation: Delete message (moderator+ only)
-  socket.on('mod_delete_message', async (data) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username }, 'role');
-      if (!dbUser || dbUser.role === 'user') return;
-      nspIo.emit('chat_message_deleted', { messageId: data.messageId, targetUsername: data.targetUsername, modUsername: user.username });
-      console.log(`[MOD] ${user.username} deleted a message`);
-    } catch (err) {
-      console.error('[MOD] delete_message error:', err);
-    }
-  });
-
-  // Moderation: Mute user (moderator+ only)
-  socket.on('mod_mute_user', async (data) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username }, 'role');
-      if (!dbUser || dbUser.role === 'user') return;
-      const duration = Math.min(data.duration || 60, 1440);
-      const targetUser = await User.findOneAndUpdate(
-        { username: data.targetUsername },
-        { $set: { mutedUntil: Date.now() + duration * 60000 } },
-        { new: true }
-      );
-      if (!targetUser) {
-        socket.emit('terminal_response', `[MOD] 找不到使用者 ${data.targetUsername}`);
-        return;
-      }
-      nspIo.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員禁言 ${duration} 分鐘` });
-      for (const [sid, u] of connectedUsers.entries()) {
-        if (u.username === data.targetUsername) {
-          nspIo.to(sid).emit('chat_muted', { message: `您已被管理員禁言 ${duration} 分鐘。` });
-          break;
-        }
-      }
-    } catch (err) {
-      console.error('[MOD] mute_user error:', err);
-    }
-  });
-
-  // Moderation: Unmute user (moderator+ only)
-  socket.on('mod_unmute_user', async (data) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username }, 'role');
-      if (!dbUser || dbUser.role === 'user') return;
-      await User.updateOne({ username: data.targetUsername }, { $set: { mutedUntil: null } });
-      nspIo.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員解除禁言` });
-    } catch (err) {
-      console.error('[MOD] unmute_user error:', err);
-    }
-  });
-
-  // Moderation: Ban user (moderator+ only)
-  socket.on('mod_ban_user', async (data) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username }, 'role');
-      if (!dbUser || dbUser.role === 'user') return;
-      const duration = Math.min(data.duration || 1440, 43200);
-      const targetUser = await User.findOneAndUpdate(
-        { username: data.targetUsername },
-        { $set: { bannedUntil: Date.now() + duration * 60000 } },
-        { new: true }
-      );
-      if (!targetUser) {
-        socket.emit('terminal_response', `[MOD] 找不到使用者 ${data.targetUsername}`);
-        return;
-      }
-      nspIo.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員封鎖 ${duration} 分鐘` });
-      for (const [sid, u] of connectedUsers.entries()) {
-        if (u.username === data.targetUsername) {
-          nspIo.to(sid).emit('chat_banned', { message: `您已被管理員封鎖 ${duration} 分鐘。` });
-          break;
-        }
-      }
-    } catch (err) {
-      console.error('[MOD] ban_user error:', err);
-    }
-  });
-
-  // Moderation: Unban user (moderator+ only)
-  socket.on('mod_unban_user', async (data) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username }, 'role');
-      if (!dbUser || dbUser.role === 'user') return;
-      await User.updateOne({ username: data.targetUsername }, { $set: { bannedUntil: null } });
-      nspIo.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員解除封鎖` });
-    } catch (err) {
-      console.error('[MOD] unban_user error:', err);
-    }
-  });
-
-  // Moderation: Add points to user (moderator+ only)
-  socket.on('mod_add_pts', async (data) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username }, 'role');
-      if (!dbUser || dbUser.role === 'user') return;
-      const amount = Math.min(Math.abs(parseInt(data.amount) || 0), 100000);
-      if (amount <= 0) {
-        socket.emit('terminal_response', `[MOD] 請輸入有效的點數數量（1 ~ 100000）`);
-        return;
-      }
-      const target = await User.findOneAndUpdate(
-        { username: data.targetUsername },
-        { $inc: { accumulatedBonusPoints: amount } },
-        { new: true }
-      );
-      if (!target) {
-        socket.emit('terminal_response', `[MOD] 找不到使用者 ${data.targetUsername}`);
-        return;
-      }
-      nspIo.emit('chat_system_message', { message: `[系統] 管理員給予 ${data.targetUsername} ${amount} PT` });
-      for (const [sid, u] of connectedUsers.entries()) {
-        if (u.username === data.targetUsername) {
-          nspIo.to(sid).emit('user_state_update', { pts: target.accumulatedBonusPoints });
-          break;
-        }
-      }
-    } catch (err) {
-      console.error('[MOD] add_pts error:', err);
-    }
-  });
-
-  // Get online users list
-  socket.on('get_online_users', () => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    const users = [];
-    for (const [sid, u] of connectedUsers.entries()) {
-      if (u.username) users.push(u.username);
-    }
-    socket.emit('online_users', [...new Set(users)]);
-  });
-
-  // ── 管理員：取得全部玩家名單 ────────────────────────────────────────────
-  socket.on('get_all_players', async () => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username }, 'role');
-      if (!dbUser || dbUser.role === 'user') return;
-      const allUsers = await User.find({}, {
-        username: 1, role: 1, country: 1,
-        accumulatedTime: 1, accumulatedBonusPoints: 1,
-        mutedUntil: 1, bannedUntil: 1,
-        createdAt: 1
-      }).sort({ createdAt: -1 }).limit(500).lean();
-
-      const onlineSet = new Set();
-      for (const u of connectedUsers.values()) onlineSet.add(u.username);
-
-      const now = Date.now();
-      const playerList = allUsers.map(u => ({
-        username: u.username,
-        role: u.role || 'user',
-        country: u.country || 'UNKNOWN',
-        accumulatedTime: Math.floor((u.accumulatedTime || 0) / 1000),
-        pts: Math.floor((u.accumulatedTime || 0) / 1000) + (u.accumulatedBonusPoints || 0),
-        online: onlineSet.has(u.username),
-        isMuted: u.mutedUntil && u.mutedUntil > now,
-        isBanned: u.bannedUntil && u.bannedUntil > now,
-        createdAt: u.createdAt
-      }));
-
-      socket.emit('all_players_list', playerList);
-    } catch (err) {
-      console.error('[MOD] get_all_players error:', err);
-    }
-  });
-
-  // Friend System Handlers
-  const isUserOnline = (username) => {
-    for (const [id, user] of connectedUsers.entries()) {
-      if (user.username === username) return true;
-    }
-    return false;
-  };
-
-  socket.on('get_social_data', async () => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username });
-      if (!dbUser) return;
+      const message = (data.message || '').trim().substring(0, 200);
+      if (!message) return;
       
-      // #6: 加 .limit(50) 避免全表掃描
-      const allUsersCursor = await User.find({}, { username: 1, country: 1 }).limit(50).lean();
-      
-      const allPlayers = allUsersCursor.map(u => ({
-        username: u.username,
-        country: u.country,
-        online: isUserOnline(u.username)
-      }));
-
-      const friendsData = (dbUser.friends || []).map(f => ({
-        username: f,
-        online: isUserOnline(f)
-      }));
-
-      socket.emit('social_data', {
-        allPlayers,
-        friends: friendsData,
-        friendRequests: dbUser.friendRequests || []
-      });
-    } catch (err) {
-      console.error('[SYS] get_social_data error:', err);
-    }
-  });
-
-  socket.on('send_friend_request', async ({ targetUsername }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user || !targetUsername || typeof targetUsername !== 'string' || user.username === targetUsername) return;
-    
-    try {
-      const dbTarget = await User.findOne({ username: targetUsername });
-      if (!dbTarget) return;
-
-      if ((dbTarget.friends || []).includes(user.username)) return;
-      if ((dbTarget.friendRequests || []).includes(user.username)) return;
-
-      await User.updateOne({ username: targetUsername }, { $push: { friendRequests: user.username } });
-      
-      // Notify target if online
-      for (const [sid, u] of connectedUsers.entries()) {
-        if (u.username === targetUsername) {
-          nspIo.to(sid).emit('friend_request_received', { from: user.username });
-          break;
+      try {
+        const dbUser = await User.findOne({ username: user.username }, 'discord isEmailVerified role mutedUntil bannedUntil');
+        if (!dbUser) return;
+        
+        if (!dbUser.discord?.id && !dbUser.isEmailVerified) {
+          socket.emit('chat_verification_required', { message: '請先綁定 Discord 或驗證電子郵件後才能使用世界聊天。' });
+          return;
         }
-      }
-    } catch (err) {
-      console.error('[SYS] send_friend_request error:', err);
-    }
-  });
-
-  socket.on('accept_friend_request', async ({ targetUsername }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username });
-      if (!dbUser || !(dbUser.friendRequests || []).includes(targetUsername)) return;
-
-      await User.updateOne(
-        { username: user.username },
-        { 
-          $pull: { friendRequests: targetUsername },
-          $addToSet: { friends: targetUsername }
+        
+        const now = Date.now();
+        if (dbUser.mutedUntil && dbUser.mutedUntil > now) {
+          const remaining = Math.ceil((dbUser.mutedUntil - now) / 60000);
+          socket.emit('chat_muted', { message: `您已被禁言，剩餘 ${remaining} 分鐘。` });
+          return;
         }
-      );
-
-      await User.updateOne(
-        { username: targetUsername },
-        { $addToSet: { friends: user.username } }
-      );
-      
-      // Update clients
-      socket.emit('social_data_updated');
-      for (const [sid, u] of connectedUsers.entries()) {
-        if (u.username === targetUsername) {
-          nspIo.to(sid).emit('social_data_updated');
-          break;
+        if (dbUser.bannedUntil && dbUser.bannedUntil > now) {
+          socket.emit('chat_banned', { message: '您已被禁止使用聊天頻道。' });
+          return;
         }
-      }
-    } catch (err) {
-      console.error('[SYS] accept_friend_request error:', err);
-    }
-  });
-
-  socket.on('reject_friend_request', async ({ targetUsername }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      await User.updateOne(
-        { username: user.username },
-        { $pull: { friendRequests: targetUsername } }
-      );
-      socket.emit('social_data_updated');
-    } catch (err) {
-      console.error('[SYS] reject_friend_request error:', err);
-    }
-  });
-
-  socket.on('remove_friend', async ({ targetUsername }) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      await User.updateOne(
-        { username: user.username },
-        { $pull: { friends: targetUsername } }
-      );
-      await User.updateOne(
-        { username: targetUsername },
-        { $pull: { friends: user.username } }
-      );
-      socket.emit('social_data_updated');
-      for (const [sid, u] of connectedUsers.entries()) {
-        if (u.username === targetUsername) {
-          nspIo.to(sid).emit('social_data_updated');
-          break;
+        
+        let filteredMessage = message;
+        let hasFilteredContent = false;
+        for (const word of FILTERED_WORDS) {
+          const regex = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+          if (regex.test(filteredMessage)) {
+            hasFilteredContent = true;
+            filteredMessage = filteredMessage.replace(regex, '***');
+          }
         }
+        
+        const isAdmin = dbUser.role === 'admin' || dbUser.role === 'moderator';
+        nspIo.emit('chat_message', { username: user.username, message: filteredMessage, isAdmin, filtered: hasFilteredContent });
+        
+        discordBot.sendChatMessageToDiscord(user.username, filteredMessage);
+      } catch (err) {
+        console.error('[CHAT] Verification check error:', err);
       }
-    } catch (err) {
-      console.error('[SYS] remove_friend error:', err);
-    }
-  });
+    });
 
+    // Moderation Handlers
+    socket.on('mod_delete_message', async (data) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        const dbUser = await User.findOne({ username: user.username }, 'role');
+        if (!dbUser || dbUser.role === 'user') return;
+        nspIo.emit('chat_message_deleted', { messageId: data.messageId, targetUsername: data.targetUsername, modUsername: user.username });
+      } catch (err) { console.error(err); }
+    });
 
-  // Handle Terminal Commands
-  socket.on('terminal_command', async (data) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user || !data || typeof data.command !== 'string') return;
-    
-    const rawCmd = data.command.trim();
-    const cmdUpper = rawCmd.toUpperCase().replace(/^\//, '');
-    
-    if (cmdUpper.startsWith('BROADCAST ')) {
-      const message = rawCmd.substring(10).trim();
-      if (!message) {
-        return socket.emit('terminal_response', `[ERROR] BROADCAST REQUIRES A MESSAGE.`);
-      }
-      
-      const BROADCAST_COST = 3600;
+    socket.on('mod_mute_user', async (data) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        const dbUser = await User.findOne({ username: user.username }, 'role');
+        if (!dbUser || dbUser.role === 'user') return;
+        const duration = Math.min(data.duration || 60, 1440);
+        await User.findOneAndUpdate({ username: data.targetUsername }, { $set: { mutedUntil: Date.now() + duration * 60000 } });
+        nspIo.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員禁言 ${duration} 分鐘` });
+      } catch (err) { console.error(err); }
+    });
+
+    socket.on('mod_unmute_user', async (data) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        const dbUser = await User.findOne({ username: user.username }, 'role');
+        if (!dbUser || dbUser.role === 'user') return;
+        await User.updateOne({ username: data.targetUsername }, { $set: { mutedUntil: null } });
+        nspIo.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員解除禁言` });
+      } catch (err) { console.error(err); }
+    });
+
+    socket.on('mod_ban_user', async (data) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        const dbUser = await User.findOne({ username: user.username }, 'role');
+        if (!dbUser || dbUser.role === 'user') return;
+        const duration = Math.min(data.duration || 1440, 43200);
+        await User.findOneAndUpdate({ username: data.targetUsername }, { $set: { bannedUntil: Date.now() + duration * 60000 } });
+        nspIo.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員封鎖 ${duration} 分鐘` });
+      } catch (err) { console.error(err); }
+    });
+
+    socket.on('mod_unban_user', async (data) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        const dbUser = await User.findOne({ username: user.username }, 'role');
+        if (!dbUser || dbUser.role === 'user') return;
+        await User.updateOne({ username: data.targetUsername }, { $set: { bannedUntil: null } });
+        nspIo.emit('chat_system_message', { message: `[系統] 使用者 ${data.targetUsername} 已被管理員解除封鎖` });
+      } catch (err) { console.error(err); }
+    });
+
+    socket.on('mod_add_pts', async (data) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        const dbUser = await User.findOne({ username: user.username }, 'role');
+        if (!dbUser || dbUser.role === 'user') return;
+        const amount = Math.min(Math.abs(parseInt(data.amount) || 0), 100000);
+        const target = await User.findOneAndUpdate({ username: data.targetUsername }, { $inc: { accumulatedBonusPoints: amount } }, { new: true });
+        if (target) {
+          nspIo.emit('chat_system_message', { message: `[系統] 管理員給予 ${data.targetUsername} ${amount} PT` });
+        }
+      } catch (err) { console.error(err); }
+    });
+
+    socket.on('get_online_users', () => {
+      const users = [];
+      for (const [sid, u] of connectedUsers.entries()) { if (u.username) users.push(u.username); }
+      socket.emit('online_users', [...new Set(users)]);
+    });
+
+    socket.on('get_all_players', async () => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        const dbUser = await User.findOne({ username: user.username }, 'role');
+        if (!dbUser || dbUser.role === 'user') return;
+        const allUsers = await User.find({}, { username: 1, role: 1, country: 1, accumulatedTime: 1, accumulatedBonusPoints: 1, mutedUntil: 1, bannedUntil: 1, createdAt: 1 }).sort({ createdAt: -1 }).limit(500).lean();
+        const onlineSet = new Set();
+        for (const u of connectedUsers.values()) onlineSet.add(u.username);
+        const now = Date.now();
+        const playerList = allUsers.map(u => ({
+          username: u.username,
+          role: u.role || 'user',
+          country: u.country || 'UNKNOWN',
+          accumulatedTime: Math.floor((u.accumulatedTime || 0) / 1000),
+          pts: Math.floor((u.accumulatedTime || 0) / 1000) + (u.accumulatedBonusPoints || 0),
+          online: onlineSet.has(u.username),
+          isMuted: u.mutedUntil && u.mutedUntil > now,
+          isBanned: u.bannedUntil && u.bannedUntil > now,
+          createdAt: u.createdAt
+        }));
+        socket.emit('all_players_list', playerList);
+      } catch (err) { console.error(err); }
+    });
+
+    // Friend System
+    socket.on('get_social_data', async () => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
       try {
         const dbUser = await User.findOne({ username: user.username });
         if (!dbUser) return;
-        
-        if ((dbUser.accumulatedBonusPoints || 0) < BROADCAST_COST) {
-          return socket.emit('terminal_response', `[ERROR] INSUFFICIENT BONUS POINTS. BROADCAST REQUIRES ${BROADCAST_COST} PT (CURRENT: ${dbUser.accumulatedBonusPoints || 0} PT).`);
-        }
-        
-        await User.updateOne({ username: user.username }, { $inc: { accumulatedBonusPoints: -BROADCAST_COST } });
-        user.accumulatedBonusPoints = (user.accumulatedBonusPoints || 0) - BROADCAST_COST;
-        
-        nspIo.emit('global_broadcast', { username: user.username, message: message });
-        socket.emit('terminal_response', `[SUCCESS] BROADCAST TRANSMITTED GLOBALLY. -${BROADCAST_COST} PT.`);
-        
-        // Log to terminal console
-        console.log(`[SYS] Global Broadcast by ${user.username}: ${message}`);
-        
-        // Optionally send to discord if webhook is configured
-        if (typeof sendDiscordWebhook === 'function') {
-          sendDiscordWebhook(`📢 **全域廣播**\n**${user.username}**：${message}`);
-        }
-      } catch (err) {
-        console.error('[SYS] Broadcast Error:', err);
-        socket.emit('terminal_response', `[ERROR] SYSTEM FAILURE DURING BROADCAST.`);
-      }
-      return;
-    }
+        const allUsersCursor = await User.find({}, { username: 1, country: 1 }).limit(50).lean();
+        const allPlayers = allUsersCursor.map(u => ({ username: u.username, country: u.country, online: isUserOnline(u.username) }));
+        const friendsData = (dbUser.friends || []).map(f => ({ username: f, online: isUserOnline(f) }));
+        socket.emit('social_data', { allPlayers, friends: friendsData, friendRequests: dbUser.friendRequests || [] });
+      } catch (err) { console.error(err); }
+    });
 
-    if (cmdUpper === 'REPORT') {
+    socket.on('send_friend_request', async ({ targetUsername }) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user || !targetUsername || user.username === targetUsername) return;
       try {
-        const allUsers = await User.find({});
-        let realCount = 0;
-        let botCount = 0;
-        let botNames = [];
-        let onlineReal = 0;
-        let onlineBot = 0;
+        const dbTarget = await User.findOne({ username: targetUsername });
+        if (!dbTarget) return;
+        if ((dbTarget.friends || []).includes(user.username)) return;
+        if ((dbTarget.friendRequests || []).includes(user.username)) return;
+        await User.updateOne({ username: targetUsername }, { $push: { friendRequests: user.username } });
+        for (const [sid, u] of connectedUsers.entries()) {
+          if (u.username === targetUsername) { nspIo.to(sid).emit('friend_request_received', { from: user.username }); break; }
+        }
+      } catch (err) { console.error(err); }
+    });
 
-        for (const u of allUsers) {
-          const isBot = !u.discord?.id && (u.accumulatedTime === 0 || /^[a-zA-Z0-9]{8,35}$/.test(u.username));
-          if (isBot) {
-            botCount++;
-            botNames.push(u.username);
-          } else {
-            realCount++;
+    socket.on('accept_friend_request', async ({ targetUsername }) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        const dbUser = await User.findOne({ username: user.username });
+        if (!dbUser || !(dbUser.friendRequests || []).includes(targetUsername)) return;
+        await User.updateOne({ username: user.username }, { $pull: { friendRequests: targetUsername }, $addToSet: { friends: targetUsername } });
+        await User.updateOne({ username: targetUsername }, { $addToSet: { friends: user.username } });
+        socket.emit('social_data_updated');
+        for (const [sid, u] of connectedUsers.entries()) { if (u.username === targetUsername) { nspIo.to(sid).emit('social_data_updated'); break; } }
+      } catch (err) { console.error(err); }
+    });
+
+    socket.on('reject_friend_request', async ({ targetUsername }) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        await User.updateOne({ username: user.username }, { $pull: { friendRequests: targetUsername } });
+        socket.emit('social_data_updated');
+      } catch (err) { console.error(err); }
+    });
+
+    socket.on('remove_friend', async ({ targetUsername }) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user) return;
+      try {
+        await User.updateOne({ username: user.username }, { $pull: { friends: targetUsername } });
+        await User.updateOne({ username: targetUsername }, { $pull: { friends: user.username } });
+        socket.emit('social_data_updated');
+        for (const [sid, u] of connectedUsers.entries()) { if (u.username === targetUsername) { nspIo.to(sid).emit('social_data_updated'); break; } }
+      } catch (err) { console.error(err); }
+    });
+
+    // Handle Terminal Commands
+    socket.on('terminal_command', async (data) => {
+      const user = connectedUsers.get(socket.id);
+      if (!user || !data || typeof data.command !== 'string') return;
+      
+      const rawCmd = data.command.trim();
+      const cmdUpper = rawCmd.toUpperCase().replace(/^\//, '');
+      
+      if (cmdUpper.startsWith('BROADCAST ')) {
+        const message = rawCmd.substring(10).trim();
+        if (!message) return socket.emit('terminal_response', `[ERROR] BROADCAST REQUIRES A MESSAGE.`);
+        
+        const BROADCAST_COST = 3600;
+        try {
+          const dbUser = await User.findOne({ username: user.username });
+          if (!dbUser) return;
+          
+          if ((dbUser.accumulatedBonusPoints || 0) < BROADCAST_COST) {
+            return socket.emit('terminal_response', `[ERROR] INSUFFICIENT BONUS POINTS.`);
           }
-        }
-        
-        for (const [sid, cu] of connectedUsers.entries()) {
-          const isBot = !cu.discord?.id && (cu.accumulatedTime === 0 || /^[a-zA-Z0-9]{8,35}$/.test(cu.username));
-          if (isBot) onlineBot++; else onlineReal++;
-        }
-
-        socket.emit('terminal_response', `[REPORT] Total Population: ${allUsers.length}\n[REPORT] Real Players: ${realCount} | Suspected Bots: ${botCount}\n[REPORT] Online Now: ${connectedUsers.size} (Real: ${onlineReal}, Bots: ${onlineBot})\n[REPORT] Sample Bot Names: ${botNames.slice(0, 5).join(', ')}`);
-      } catch (err) {
-        socket.emit('terminal_response', `[ERROR] REPORT FAILED.`);
-      }
-    } else if (cmdUpper === 'SCAN_BOTS') {
-      try {
-        const bots = await User.find({ 'discord.id': { $exists: false }, username: { $regex: /^[a-zA-Z0-9]{8,35}$/ } }).limit(50);
-        if (bots.length === 0) {
-          socket.emit('terminal_response', `[SYS] NO SUSPICIOUS BOTS FOUND.`);
-        } else {
-          const names = bots.map(b => b.username).join(', ');
-          socket.emit('terminal_response', `[SYS] FOUND ${bots.length} SUSPECTS (Showing up to 50): ${names}\nTYPE /NUKE_BOTS TO DELETE THEM.`);
-        }
-      } catch (err) {
-        socket.emit('terminal_response', `[ERROR] SCAN FAILED.`);
-      }
-    } else if (cmdUpper === 'NUKE_BOTS') {
-      // Admin check
-      if (user.username !== '大拇哥科技' && user.username !== 'admin') {
-        socket.emit('terminal_response', '[ERROR] 權限不足：僅管理員可執行此指令。');
+          
+          await User.updateOne({ username: user.username }, { $inc: { accumulatedBonusPoints: -BROADCAST_COST } });
+          nspIo.emit('global_broadcast', { username: user.username, message: message });
+          socket.emit('terminal_response', `[SUCCESS] BROADCAST TRANSMITTED GLOBALLY.`);
+          sendDiscordWebhook(`📢 **全域廣播**\n**${user.username}**：${message}`);
+        } catch (err) { console.error(err); }
         return;
       }
-      try {
-        // Delete all users that look like bots
-        const result = await User.deleteMany({ 
-          'discord.id': { $exists: false }, 
-          $or: [
-            { username: { $regex: /^[a-zA-Z0-9]{8,35}$/ } },
-            { accumulatedTime: 0 }
-          ]
-        });
-        socket.emit('terminal_response', `[SYS] NUKED ${result.deletedCount} SUSPICIOUS BOT ACCOUNTS.`);
-        nspIo.emit('social_data_updated'); // refresh UI for everyone
-      } catch (err) {
-        socket.emit('terminal_response', `[ERROR] NUKE FAILED.`);
-      }
-    } else {
-      socket.emit('terminal_response', `[ERROR] UNKNOWN OR INVALID COMMAND: ${data.command}`);
-    }
-  });
 
-  // Handle Disconnect
-  socket.on('disconnect', async () => {
-    const disconnectedUser = connectedUsers.get(socket.id);
-    if (disconnectedUser) {
-      if (currentGlobalEvent && currentGlobalEvent.type === 'SOLAR_STORM') {
-        // Penalty for disconnecting during solar storm
-        await User.updateOne({ username: disconnectedUser.username }, { $inc: { accumulatedBonusPoints: -100 } }).catch(console.error);
-        console.log(`[SYS] Penalty applied to ${disconnectedUser.username} for Solar Storm disconnect`);
+      if (cmdUpper === 'REPORT') {
+        try {
+          const allUsers = await User.find({});
+          let realCount = 0, botCount = 0, onlineReal = 0, onlineBot = 0;
+          for (const u of allUsers) {
+            if (!u.discord?.id && (u.accumulatedTime === 0 || /^[a-zA-Z0-9]{8,35}$/.test(u.username))) botCount++; else realCount++;
+          }
+          for (const [sid, cu] of connectedUsers.entries()) {
+            if (!cu.discord?.id && (cu.accumulatedTime === 0 || /^[a-zA-Z0-9]{8,35}$/.test(cu.username))) onlineBot++; else onlineReal++;
+          }
+          socket.emit('terminal_response', `[REPORT] Population: ${allUsers.length}\n[REPORT] Online: ${connectedUsers.size} (Real: ${onlineReal}, Bots: ${onlineBot})`);
+        } catch (err) { socket.emit('terminal_response', `[ERROR] REPORT FAILED.`); }
+      } else if (cmdUpper === 'SCAN_BOTS') {
+        try {
+          const bots = await User.find({ 'discord.id': { $exists: false }, username: { $regex: /^[a-zA-Z0-9]{8,35}$/ } }).limit(50);
+          if (bots.length === 0) socket.emit('terminal_response', `[SYS] NO SUSPICIOUS BOTS FOUND.`);
+          else socket.emit('terminal_response', `[SYS] FOUND ${bots.length} SUSPECTS. TYPE /NUKE_BOTS TO DELETE.`);
+        } catch (err) { socket.emit('terminal_response', `[ERROR] SCAN FAILED.`); }
+      } else if (cmdUpper === 'NUKE_BOTS') {
+        if (user.username !== '大拇哥科技' && user.username !== 'admin') {
+          return socket.emit('terminal_response', '[ERROR] 權限不足。');
+        }
+        try {
+          const result = await User.deleteMany({ 'discord.id': { $exists: false }, $or: [{ username: { $regex: /^[a-zA-Z0-9]{8,35}$/ } }, { accumulatedTime: 0 }] });
+          socket.emit('terminal_response', `[SYS] NUKED ${result.deletedCount} BOT ACCOUNTS.`);
+          nspIo.emit('social_data_updated');
+        } catch (err) { socket.emit('terminal_response', `[ERROR] NUKE FAILED.`); }
+      } else {
+        socket.emit('terminal_response', `[ERROR] UNKNOWN COMMAND.`);
       }
-      connectedUsers.delete(socket.id);
-      heartbeatTimestamps.delete(disconnectedUser.username);
-      chatCooldowns.delete(disconnectedUser.username); // 主動清理 chatCooldowns
-      console.log(`[SYS] Node Disconnected: ${socket.id}`);
-      // #4: 改用 nspIo.emit，只廣播給當前命名空間
-      nspIo.emit('node_disconnected', { id: disconnectedUser.id || socket.id });
-    }
+    });
+
+    // ── 處理中斷連線（整合 Discord 供應商特權：太陽風暴天災免疫防護） ──────────────────
+    socket.on('disconnect', async () => {
+      const disconnectedUser = connectedUsers.get(socket.id);
+      if (disconnectedUser) {
+        if (state.currentGlobalEvent && state.currentGlobalEvent.type === 'SOLAR_STORM') {
+          
+          // 讀取該島民是否具備 [核心能源供應商] 特權稱號
+          const realRole = disconnectedUser.discordProfile?.id ? await getCachedRole(disconnectedUser.discordProfile.id) : '';
+          
+          if (!realRole.includes('核心能源供應商')) {
+            // 普通島民：扣除 100 PT
+            await User.updateOne({ username: disconnectedUser.username }, { $inc: { accumulatedBonusPoints: -100 } }).catch(console.error);
+            console.log(`[SYS] Penalty -100 PT applied to non-booster: ${disconnectedUser.username}`);
+          } else {
+            // 能源供應商：防火牆豁免，不扣分
+            console.log(`[SYS] Booster ${disconnectedUser.username} bypassed Solar Storm disconnect penalty successfully.`);
+          }
+        }
+        connectedUsers.delete(socket.id);
+        heartbeatTimestamps.delete(disconnectedUser.username);
+        chatCooldowns.delete(disconnectedUser.username);
+        console.log(`[SYS] Node Disconnected: ${socket.id}`);
+        nspIo.emit('node_disconnected', { id: disconnectedUser.id || socket.id });
+      }
+    });
   });
-});
 });
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`[SYS] Earth Online Backend Core initialized on port ${PORT}`);
+  console.log(`[SYS] Earth Online Backend Core v2.0.0 successfully operating on port ${PORT}`);
 });
