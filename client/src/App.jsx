@@ -943,11 +943,13 @@ function Dashboard({ token, onLogout, region }) {
       setMyRole(data.role || 'user');
       addLog(`身分確認：節點 [${data.username}] 成功接入全球網路`);
       
-      if (data.discordProfile) {
+      if (data.discordProfile && data.discordProfile.id) {
         setBoundDiscord({
           username: data.discordProfile.username,
           avatar: data.discordProfile.avatar
         });
+      } else {
+        setBoundDiscord(null);
       }
       if (data.currentGlobalEvent) {
         setCurrentEvent(data.currentGlobalEvent);
