@@ -21,6 +21,42 @@ const FILTERED_WORDS = ['fuck', 'shit', 'asshole', 'bitch', 'damn', 'cao', '幹'
 // Chat rate limiting
 const chatCooldowns = new Map();
 
+// Discord role cache: discordId -> { role, ts }
+const roleCache = new Map();
+const ROLE_CACHE_TTL = 60 * 1000; // 1 minute
+
+async function getCachedRole(discordId) {
+  const cached = roleCache.get(discordId);
+  if (cached && Date.now() - cached.ts < ROLE_CACHE_TTL) return cached.role;
+  const role = await discordBot.getHighestRole(discordId);
+  roleCache.set(discordId, { role: role || '', ts: Date.now() });
+  return role || '';
+}
+
+// Cleanup stale Map entries every 10 minutes
+setInterval(() => {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const todayStr = new Date().toISOString().substring(0, 10);
+
+  for (const [key, ts] of heartbeatTimestamps.entries()) {
+    if (typeof ts === 'number' && ts < cutoff) heartbeatTimestamps.delete(key);
+  }
+  for (const [key] of reviveCounts.entries()) {
+    // key format: adRevive_username_YYYY-MM-DD
+    const dateStr = key.split('_').pop();
+    if (dateStr && dateStr < todayStr) reviveCounts.delete(key);
+  }
+  // chatCooldowns are keyed by username; remove entries older than 10s
+  const chatCutoff = Date.now() - 10000;
+  for (const [key, ts] of chatCooldowns.entries()) {
+    if (ts < chatCutoff) chatCooldowns.delete(key);
+  }
+  // role cache cleanup
+  for (const [id, val] of roleCache.entries()) {
+    if (Date.now() - val.ts > ROLE_CACHE_TTL * 10) roleCache.delete(id);
+  }
+}, 10 * 60 * 1000);
+
 // Run offline time migration once on startup
 db.migrateOfflineTime().catch(err => console.error('[SYS] Migration failed:', err));
 
@@ -505,12 +541,18 @@ app.get('/api/auth/discord/callback', async (req, res) => {
 // Leaderboard Endpoint
 apiRouter.get('/leaderboard', async (req, res) => {
   try {
-    const users = await User.find({}, 'username accumulatedTime accumulatedBonusPoints discord country').lean();
-    let leaderboard = await Promise.all(users.map(async u => {
+    // #5: 加 .sort() 與 .limit(100)，避免全表掃描
+    const users = await User.find({}, 'username accumulatedTime accumulatedBonusPoints discord country')
+      .sort({ accumulatedTime: -1 })
+      .limit(100)
+      .lean();
+
+    // 使用 getCachedRole 避免每次打 Discord API
+    const leaderboard = await Promise.all(users.map(async u => {
       const idleTimeSeconds = Math.floor((u.accumulatedTime || 0) / 1000);
       const points = idleTimeSeconds + (u.accumulatedBonusPoints || 0);
       const discordId = u.discord?.id || '無';
-      const realRole = discordId !== '無' ? await discordBot.getHighestRole(discordId) : '';
+      const realRole = discordId !== '無' ? await getCachedRole(discordId) : '';
 
       return {
         username: u.username,
@@ -523,9 +565,8 @@ apiRouter.get('/leaderboard', async (req, res) => {
         role: realRole || ''
       };
     }));
-    // Fake roles removed
 
-    // Sort by points descending
+    // Sort by points descending (後端已排序，前端不須重複)
     leaderboard.sort((a, b) => b.points - a.points);
     res.json(leaderboard);
   } catch (err) {
@@ -644,6 +685,7 @@ regions.forEach(regionName => {
   const nsp = io.of(`/${regionName}`);
   const state = regionStates[regionName];
 
+  // #7: global_stats 廣播頻率降為 5 秒
   setInterval(async () => {
     try {
       const pop = await db.getRegionPopulation(regionName);
@@ -760,7 +802,7 @@ regions.forEach(regionName => {
     } catch (err) {
       console.error('[SYS] Interval error:', err);
     }
-  }, 2000);
+  }, 5000);
 
   nsp.on('connection', (socket) => {
     const connectedUsers = state.connectedUsers;
@@ -1026,7 +1068,8 @@ regions.forEach(regionName => {
         sendDiscordWebhook(`🌐 **【地理節點高載通報】**\n偵測到大量節點湧入，目前全服掛機人數已達 **${connectedUsers.size}** 人！\n來自 \`${user.country}\` 的節點點亮了板塊。`);
       }
 
-      io.emit('node_connected', {
+      // #4: 改用 nspIo.emit，只廣播給當前命名空間（不跨區域洩漏）
+      nspIo.emit('node_connected', {
         id: user.id,
         lat: user.lat,
         lon: user.lon
@@ -1055,11 +1098,12 @@ regions.forEach(regionName => {
     if (!user) return;
     
     // Rate limit: 1 message per 2 seconds
-    const lastChat = chatCooldowns.get(socket.id);
+    // #fix: key 改用 username，斷線重連後仍有效且可被清理
+    const lastChat = chatCooldowns.get(user.username);
     if (lastChat && Date.now() - lastChat < 2000) {
       return;
     }
-    chatCooldowns.set(socket.id, Date.now());
+    chatCooldowns.set(user.username, Date.now());
     
     const message = (data.message || '').trim().substring(0, 200);
     if (!message) return;
@@ -1214,50 +1258,6 @@ regions.forEach(regionName => {
     }
   });
 
-  // Moderation: Add points to user (moderator+ only)
-  socket.on('mod_add_pts', async (data) => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    try {
-      const dbUser = await User.findOne({ username: user.username }, 'role');
-      if (!dbUser || dbUser.role === 'user') return;
-      const amount = Math.min(Math.abs(parseInt(data.amount) || 0), 100000);
-      if (amount <= 0) {
-        socket.emit('terminal_response', `[MOD] 請輸入有效的點數數量（1 ~ 100000）`);
-        return;
-      }
-      const target = await User.findOneAndUpdate(
-        { username: data.targetUsername },
-        { $inc: { accumulatedBonusPoints: amount } },
-        { new: true }
-      );
-      if (!target) {
-        socket.emit('terminal_response', `[MOD] 找不到使用者 ${data.targetUsername}`);
-        return;
-      }
-      nspIo.emit('chat_system_message', { message: `[系統] 管理員給予 ${data.targetUsername} ${amount} PT` });
-      for (const [sid, u] of connectedUsers.entries()) {
-        if (u.username === data.targetUsername) {
-          nspIo.to(sid).emit('user_state_update', { pts: target.accumulatedBonusPoints });
-          break;
-        }
-      }
-    } catch (err) {
-      console.error('[MOD] add_pts error:', err);
-    }
-  });
-
-  // Get online users list
-  socket.on('get_online_users', () => {
-    const user = connectedUsers.get(socket.id);
-    if (!user) return;
-    const users = [];
-    for (const [sid, u] of connectedUsers.entries()) {
-      if (u.username) users.push(u.username);
-    }
-    socket.emit('online_users', [...new Set(users)]);
-  });
-
   // Friend System Handlers
   const isUserOnline = (username) => {
     for (const [id, user] of connectedUsers.entries()) {
@@ -1273,7 +1273,8 @@ regions.forEach(regionName => {
       const dbUser = await User.findOne({ username: user.username });
       if (!dbUser) return;
       
-      const allUsersCursor = await User.find({}, { username: 1, country: 1 }).lean();
+      // #6: 加 .limit(50) 避免全表掃描
+      const allUsersCursor = await User.find({}, { username: 1, country: 1 }).limit(50).lean();
       
       const allPlayers = allUsersCursor.map(u => ({
         username: u.username,
@@ -1512,8 +1513,10 @@ regions.forEach(regionName => {
       }
       connectedUsers.delete(socket.id);
       heartbeatTimestamps.delete(disconnectedUser.username);
+      chatCooldowns.delete(disconnectedUser.username); // 主動清理 chatCooldowns
       console.log(`[SYS] Node Disconnected: ${socket.id}`);
-      io.emit('node_disconnected', { id: socket.id });
+      // #4: 改用 nspIo.emit，只廣播給當前命名空間
+      nspIo.emit('node_disconnected', { id: disconnectedUser.id || socket.id });
     }
   });
 });
