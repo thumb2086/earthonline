@@ -68,10 +68,14 @@ function LoginGateway({ onLogin }) {
     } catch(e) {}
   };
 
-  // Check for discord token in URL
+  // Check for discord token in URL (query or hash fragment)
   useEffect(() => {
+    let token = null;
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    token = params.get('token');
+    if (!token && window.location.hash.startsWith('#token=')) {
+      token = window.location.hash.replace('#token=', '').split('&')[0];
+    }
     if (token) {
       window.history.replaceState({}, document.title, window.location.pathname);
       onLogin(token, 'Discord User', region); 
