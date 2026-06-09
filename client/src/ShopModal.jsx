@@ -7,7 +7,7 @@ const SHOP_ITEMS = [
     name: '液態氮冷卻瓶',
     cost: 200,
     type: 'health',
-    emoji: '🧊',
+    icon: 'liquid_nitrogen.png',
     tagLabel: 'HEALTH',
     shortDesc: '瞬間恢復伺服器健康度',
     effects: [
@@ -22,7 +22,7 @@ const SHOP_ITEMS = [
     name: '量子散熱塔',
     cost: 500,
     type: 'health',
-    emoji: '🌡️',
+    icon: 'quantum_cooler.png',
     tagLabel: 'HEALTH',
     shortDesc: '滿血回復，伺服器滿載救星',
     effects: [
@@ -37,7 +37,7 @@ const SHOP_ITEMS = [
     name: '實驗性超頻晶片',
     cost: 1500,
     type: 'buff',
-    emoji: '⚡',
+    icon: 'overclock_chip.png',
     tagLabel: 'BUFF',
     shortDesc: '1 小時 PT 收益翻倍',
     effects: [
@@ -52,7 +52,7 @@ const SHOP_ITEMS = [
     name: '實體防火牆模組',
     cost: 1000,
     type: 'buff',
-    emoji: '🛡️',
+    icon: 'firewall.png',
     tagLabel: 'BUFF',
     shortDesc: '30 分鐘免疫健康度衰減',
     effects: [
@@ -67,7 +67,7 @@ const SHOP_ITEMS = [
     name: '備用柴油發電機',
     cost: 800,
     type: 'revive',
-    emoji: '🔋',
+    icon: 'generator.png',
     tagLabel: 'REVIVE',
     shortDesc: '死機後強制復活，恢復 20% 血量',
     effects: [
@@ -82,7 +82,7 @@ const SHOP_ITEMS = [
     name: 'RGB 霓虹燈管',
     cost: 3000,
     type: 'cosmetic',
-    emoji: '🌈',
+    icon: 'neon_strip.png',
     tagLabel: 'COSMETIC',
     shortDesc: '解鎖賽博龐克背景燈光效果',
     effects: [
@@ -97,7 +97,7 @@ const SHOP_ITEMS = [
     name: '神祕的隨身碟',
     cost: 500,
     type: 'random',
-    emoji: '🎲',
+    icon: 'flash_drive.png',
     tagLabel: 'RANDOM',
     shortDesc: '抽獎盲盒，驚喜與風險並存',
     effects: [
@@ -183,9 +183,14 @@ export default function ShopModal({ onClose, pts, onBuy, onAdRevive, adReviveRem
                   }}
                   onClick={() => setSelected(isSelected ? null : item.id)}
                 >
-                  {/* Emoji + type badge */}
+                  {/* Icon image + type badge */}
                   <div style={css.cardTop}>
-                    <span style={css.emoji}>{item.emoji}</span>
+                    <img
+                      src={`/assets/items/${item.icon}`}
+                      alt={item.name}
+                      style={css.itemImg(tc)}
+                      onError={e => { e.target.style.opacity = '0.3'; }}
+                    />
                     <span style={{ ...css.typeBadge, color: tc.color, border: `1px solid ${tc.border}`, background: tc.bg }}>
                       {item.tagLabel}
                     </span>
@@ -225,7 +230,12 @@ export default function ShopModal({ onClose, pts, onBuy, onAdRevive, adReviveRem
             return (
               <div style={{ ...css.detail, borderColor: tc.border, background: `linear-gradient(135deg, ${tc.bg}, rgba(10,14,23,0.9))` }}>
                 <div style={css.detailHeader}>
-                  <span style={{ fontSize: '2rem' }}>{selectedItem.emoji}</span>
+                  <img
+                    src={`/assets/items/${selectedItem.icon}`}
+                    alt={selectedItem.name}
+                    style={css.detailImg(tc)}
+                    onError={e => { e.target.style.opacity = '0.3'; }}
+                  />
                   <div>
                     <div style={css.detailName}>{selectedItem.name}</div>
                     <span style={{ ...css.typeBadge, color: tc.color, border: `1px solid ${tc.border}`, background: tc.bg }}>
@@ -385,7 +395,29 @@ const css = {
     userSelect: 'none',
   },
   cardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  emoji: { fontSize: '1.6rem', lineHeight: 1 },
+  itemImg: (tc) => ({
+    width: 40, height: 40,
+    objectFit: 'contain',
+    imageRendering: 'pixelated',
+    background: '#050a12',
+    border: `1px solid ${tc.border}`,
+    padding: '4px',
+    boxSizing: 'border-box',
+    borderRadius: '6px',
+    flexShrink: 0,
+  }),
+  detailImg: (tc) => ({
+    width: 56, height: 56,
+    objectFit: 'contain',
+    imageRendering: 'pixelated',
+    background: '#050a12',
+    border: `1px solid ${tc.border}`,
+    padding: '6px',
+    boxSizing: 'border-box',
+    borderRadius: '10px',
+    flexShrink: 0,
+    boxShadow: `0 0 12px ${tc.border}`,
+  }),
   typeBadge: {
     fontSize: '0.6rem', letterSpacing: '1px', fontWeight: '700',
     padding: '2px 7px', borderRadius: '4px',
