@@ -543,6 +543,7 @@ function Dashboard({ token, onLogout, region }) {
   const [showAdRevive, setShowAdRevive] = useState(false);
   const [adCountdown, setAdCountdown] = useState(0);
   const [adReviveRemaining, setAdReviveRemaining] = useState(3);
+  const [currentAd, setCurrentAd] = useState('');
   const [globalStats, setGlobalStats] = useState({ activeUsers: 0, totalPopulation: 0, globalProduction: 0, socialCompression: '1.000' });
   const [hubStats, setHubStats] = useState(null);
 
@@ -1139,6 +1140,8 @@ function Dashboard({ token, onLogout, region }) {
 
   const handleStartAdRevive = () => {
     if (!socket || adReviveRemaining <= 0) return;
+    const ads = ['/ads/zixi_casino.png', '/ads/zixi_app.png'];
+    setCurrentAd(ads[Math.floor(Math.random() * ads.length)]);
     setAdCountdown(15);
     const timer = setInterval(() => {
       setAdCountdown(prev => {
@@ -1763,9 +1766,12 @@ function Dashboard({ token, onLogout, region }) {
           }}>
             {adCountdown > 0 ? (
               <>
-                <div style={{fontSize: '3rem', marginBottom: '20px'}}>📺</div>
-                <div style={{color: 'var(--text-color)', fontSize: '1.1rem', marginBottom: '10px'}}>正在播放廣告...</div>
+                <div style={{marginBottom: '15px', borderRadius: '8px', overflow: 'hidden', maxHeight: '250px'}}>
+                  <img src={currentAd} alt="ad" style={{width: '100%', height: 'auto', display: 'block', borderRadius: '8px'}} />
+                </div>
+                <div style={{color: 'var(--text-color)', fontSize: '1.1rem', marginBottom: '10px'}}>觀看廣告中...</div>
                 <div style={{color: 'var(--accent-color)', fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '15px'}}>{adCountdown}s</div>
+                <div style={{color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: '10px'}}>贊助商：子熙生態系</div>
                 <div style={{width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden'}}>
                   <div style={{width: `${((15 - adCountdown) / 15) * 100}%`, height: '100%', background: 'var(--accent-color)', transition: 'width 1s linear'}} />
                 </div>
