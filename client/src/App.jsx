@@ -1495,40 +1495,7 @@ function Dashboard({ token, onLogout, region }) {
             <div ref={logRef} className="bottom-log-console" style={{display: 'flex', flexDirection: 'column'}}>
               <div className="log-header" style={{display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-color)', cursor: 'move'}}>
               <Activity size={16} /> 世界頻道 / 系統日誌 (World Chat)
-              {(myRole === 'admin' || myRole === 'moderator') && (
-                <button onClick={() => setShowAdminPanel(!showAdminPanel)} style={{marginLeft: 'auto', background: showAdminPanel ? 'var(--danger-color)' : 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem'}}>
-                  {showAdminPanel ? '關閉管理' : '⚙ 管理'}
-                </button>
-              )}
             </div>
-            {showAdminPanel && (
-              <div style={{padding: '8px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,0,0,0.05)'}}>
-                <span style={{color: 'var(--danger-color)', fontSize: '0.8rem', fontWeight: 'bold'}}>管理員功能</span>
-                <input type="text" value={adminTarget} onChange={e => setAdminTarget(e.target.value)} placeholder="目標使用者名稱" style={{flex: 1, minWidth: '120px', background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '0.8rem'}} />
-                <select id="muteDuration" defaultValue="5" style={{background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '4px', borderRadius: '4px', fontSize: '0.8rem'}}>
-                  <option value="1">1 分鐘</option>
-                  <option value="5">5 分鐘</option>
-                  <option value="10">10 分鐘</option>
-                  <option value="30">30 分鐘</option>
-                  <option value="60">1 小時</option>
-                  <option value="360">6 小時</option>
-                  <option value="1440">24 小時</option>
-                </select>
-                <button onClick={handleAdminMute} style={{background: 'var(--danger-color)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>禁言</button>
-                <button onClick={handleAdminUnmute} style={{background: 'var(--success-color)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>解禁</button>
-                <button onClick={handleAdminDelete} style={{background: 'var(--warning-color)', border: 'none', color: '#000', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>刪除訊息</button>
-                <select id="banDuration" defaultValue="1440" style={{background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '4px', borderRadius: '4px', fontSize: '0.8rem'}}>
-                  <option value="60">1 小時</option>
-                  <option value="360">6 小時</option>
-                  <option value="1440">24 小時</option>
-                  <option value="4320">3 天</option>
-                  <option value="10080">7 天</option>
-                  <option value="43200">30 天</option>
-                </select>
-                <button onClick={handleAdminBan} style={{background: '#000', border: '1px solid var(--danger-color)', color: 'var(--danger-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>封鎖</button>
-                <button onClick={handleAdminUnban} style={{background: 'var(--success-color)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem'}}>解封</button>
-              </div>
-            )}
             <div className="log-content" style={{flex: 1, overflowY: 'auto'}}>
               {logs.map((log, i) => {
                 let logColor = 'inherit';
@@ -1739,10 +1706,9 @@ function Dashboard({ token, onLogout, region }) {
       {showAccountInfo && <AccountInfoModal token={token} apiUrl={API_URL} onClose={() => setShowAccountInfo(false)} onLogout={onLogout} />}
 
       {/* Admin Panel Modal */}
-      {showAdminPanel && (
-        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)'}} onClick={() => setShowAdminPanel(false)}>
-          <Draggable handle=".admin-header">
-            <div onClick={e => e.stopPropagation()} style={{width: '450px', maxWidth: '90vw', background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', overflow: 'hidden'}}>
+      <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', visibility: showAdminPanel ? 'visible' : 'hidden'}} onClick={() => setShowAdminPanel(false)}>
+        <Draggable nodeRef={adminModalRef} handle=".admin-header">
+          <div ref={adminModalRef} onClick={e => e.stopPropagation()} style={{width: '450px', maxWidth: '90vw', background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', overflow: 'hidden'}}>
             <div className="admin-header" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-light)', borderBottom: '1px solid var(--border-color)', cursor: 'move'}}>
               <span style={{color: 'var(--danger-color)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px'}}><Shield size={18} /> 管理員功能 (Admin Panel)</span>
               <button onClick={() => setShowAdminPanel(false)} style={{background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px', fontSize: '1.2rem'}}><X size={18} /></button>
@@ -1793,7 +1759,6 @@ function Dashboard({ token, onLogout, region }) {
           </div>
         </Draggable>
       </div>
-      )}
 
       {/* Ad Revive Modal */}
       {showAdRevive && (
