@@ -1387,7 +1387,9 @@ regions.forEach(regionName => {
         pts: Math.floor((u.accumulatedTime || 0) / 1000) + (u.accumulatedBonusPoints || 0),
         online: onlineSet.has(u.username),
         isMuted: u.mutedUntil && u.mutedUntil > now,
+        mutedUntil: u.mutedUntil || null,
         isBanned: u.bannedUntil && u.bannedUntil > now,
+        bannedUntil: u.bannedUntil || null,
         createdAt: u.createdAt
       }));
 

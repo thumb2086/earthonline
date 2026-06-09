@@ -1136,6 +1136,7 @@ function Dashboard({ token, onLogout, region }) {
     const duration = parseInt(document.getElementById('muteDuration')?.value || '5', 10);
     socket.emit('mod_mute_user', { targetUsername: adminTarget.trim(), duration });
     addLog(`[MOD] 發出禁言指令：${adminTarget.trim()} ${duration} 分鐘`);
+    socket.emit('get_all_players');
     setAdminTarget('');
   };
 
@@ -1143,6 +1144,7 @@ function Dashboard({ token, onLogout, region }) {
     if (!socket || !adminTarget.trim()) return;
     socket.emit('mod_unmute_user', { targetUsername: adminTarget.trim() });
     addLog(`[MOD] 發出解禁指令：${adminTarget.trim()}`);
+    socket.emit('get_all_players');
     setAdminTarget('');
   };
 
@@ -1158,6 +1160,7 @@ function Dashboard({ token, onLogout, region }) {
     const duration = parseInt(document.getElementById('banDuration')?.value || '1440', 10);
     socket.emit('mod_ban_user', { targetUsername: adminTarget.trim(), duration });
     addLog(`[MOD] 發出封鎖指令：${adminTarget.trim()} ${duration} 分鐘`);
+    socket.emit('get_all_players');
     setAdminTarget('');
   };
 
@@ -1165,6 +1168,7 @@ function Dashboard({ token, onLogout, region }) {
     if (!socket || !adminTarget.trim()) return;
     socket.emit('mod_unban_user', { targetUsername: adminTarget.trim() });
     addLog(`[MOD] 發出解除封鎖指令：${adminTarget.trim()}`);
+    socket.emit('get_all_players');
     setAdminTarget('');
   };
 
@@ -1174,6 +1178,7 @@ function Dashboard({ token, onLogout, region }) {
     if (!socket || !adminTarget.trim() || adminPtsAmount <= 0) return;
     socket.emit('mod_add_pts', { targetUsername: adminTarget.trim(), amount: adminPtsAmount });
     addLog(`[MOD] 給予 ${adminTarget.trim()} ${adminPtsAmount} PT`);
+    socket.emit('get_all_players');
     setAdminTarget('');
     setAdminPtsAmount(0);
   };
@@ -1896,8 +1901,8 @@ function Dashboard({ token, onLogout, region }) {
                             {selected?.country} ·
                             {selected?.online ? <span style={{ color: '#22c55e' }}> 在線</span> : ' 離線'} ·
                             {' '}{(selected?.pts || 0).toLocaleString()} PT
-                            {selected?.isMuted && <span style={{ color: '#fbbf24', marginLeft: '8px' }}>⚠ 禁言中</span>}
-                            {selected?.isBanned && <span style={{ color: '#ef4444', marginLeft: '8px' }}>🚫 封鎖中</span>}
+                            {selected?.isMuted && <span style={{ color: '#fbbf24', marginLeft: '8px' }}>⚠ 禁言中{selected?.mutedUntil ? ` (${Math.ceil((selected.mutedUntil - Date.now()) / 60000)}分)` : ''}</span>}
+                            {selected?.isBanned && <span style={{ color: '#ef4444', marginLeft: '8px' }}>🚫 封鎖中{selected?.bannedUntil ? ` (${Math.ceil((selected.bannedUntil - Date.now()) / 60000)}分)` : ''}</span>}
                           </div>
                         </div>
                         <button onClick={() => setAdminTarget('')} style={{
