@@ -1,21 +1,14 @@
-/* ============================================
-   Pixel Art / Relaxing Cartoon Data Center
-   Theme-Aware Version
-   ============================================ */
-
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+/* Modern Data Center Visualizer CSS */
 
 .dc-modern-container {
   width: 100%;
   height: 100%;
   position: relative;
   overflow: hidden;
-  background: var(--bg-color);
+  background-color: var(--bg-color);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.3s ease;
 }
 
 .dc-bg-grid {
@@ -24,38 +17,9 @@
   background-image: 
     linear-gradient(var(--border-color) 1px, transparent 1px),
     linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-size: 50px 50px;
   pointer-events: none;
-  opacity: 0.15;
-  image-rendering: pixelated;
-}
-
-/* Floating pixel decorations */
-.dc-bg-grid::before {
-  content: '';
-  position: absolute;
-  width: 4px; height: 4px;
-  background: var(--accent-color);
-  border-radius: 0;
-  top: 15%; left: 20%;
-  box-shadow: 
-    80px 40px 0 var(--accent-color),
-    200px 80px 0 var(--warning-color),
-    320px 30px 0 var(--accent-color),
-    450px 120px 0 var(--info-color),
-    580px 50px 0 var(--accent-color),
-    700px 150px 0 var(--warning-color),
-    120px 200px 0 var(--accent-color),
-    350px 250px 0 var(--info-color),
-    600px 200px 0 var(--accent-color),
-    80px 350px 0 var(--warning-color);
-  animation: twinkle 3s ease-in-out infinite alternate;
-}
-
-@keyframes twinkle {
-  0% { opacity: 0.2; }
-  50% { opacity: 0.6; }
-  100% { opacity: 0.3; }
+  opacity: 0.3;
 }
 
 .dc-layout {
@@ -70,149 +34,89 @@
   z-index: 10;
 }
 
-/* ============================================
-   Status Card - Pixel Art Style (Theme Aware)
-   ============================================ */
 .dc-status-card {
   width: 400px;
-  background: var(--surface-color);
-  border: 3px solid var(--border-color);
-  border-radius: 0;
-  padding: 24px;
-  box-shadow: 
-    6px 6px 0 rgba(0, 0, 0, 0.3),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.03);
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 30px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  image-rendering: pixelated;
-  position: relative;
-  transition: all 0.3s ease;
-}
-
-.dc-status-card::before {
-  content: '';
-  position: absolute;
-  top: 4px; left: 4px; right: 4px; bottom: 4px;
-  border: 1px dashed var(--accent-color);
-  opacity: 0.15;
-  pointer-events: none;
+  gap: 25px;
 }
 
 .dc-card-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .dc-card-header h2 {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--accent-color);
-  font-weight: normal;
-  font-family: 'Press Start 2P', cursive;
-  letter-spacing: 1px;
-  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
-}
-
-.dc-card-header svg {
-  color: var(--accent-color);
-  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.3));
+  font-size: 1.15rem;
+  color: var(--text-color);
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .dc-level-badge {
   display: flex;
   align-items: center;
-  gap: 16px;
-  background: var(--bg-light);
-  border: 2px solid var(--border-color);
-  border-radius: 0;
-  padding: 16px;
-  position: relative;
-}
-
-.dc-level-badge::after {
-  content: '';
-  position: absolute;
-  top: 3px; right: 3px;
-  width: 0; height: 0;
-  border-left: 10px solid transparent;
-  border-top: 10px solid var(--text-dim);
-  opacity: 0.3;
+  gap: 20px;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 20px;
 }
 
 .level-number {
-  font-size: 1.2rem;
-  font-weight: normal;
-  color: var(--accent-color);
-  font-family: 'Press Start 2P', cursive;
-  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
-  background: var(--bg-color);
-  padding: 8px 12px;
-  border: 2px solid var(--accent-color);
-  white-space: nowrap;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  font-family: monospace;
 }
 
 .level-info h3 {
   margin: 0 0 4px 0;
-  font-size: 0.65rem;
+  font-size: 1.05rem;
   color: var(--text-color);
-  font-family: 'Press Start 2P', cursive;
-  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
 }
 
 .level-info p {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--text-dim);
-  font-family: 'VT323', monospace;
-  letter-spacing: 0.5px;
 }
 
 .dc-metrics {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: var(--bg-light);
-  border: 2px solid var(--border-color);
-  border-radius: 0;
-  padding: 14px;
+  gap: 12px;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 20px;
 }
 
 .metric-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border-left: 3px solid var(--accent-color);
-  transition: all 0.2s ease;
-}
-
-.metric-row:hover {
-  background: rgba(255, 255, 255, 0.05);
+  gap: 12px;
 }
 
 .metric-row span {
   flex-grow: 1;
   color: var(--text-dim);
-  font-size: 0.75rem;
-  font-family: 'VT323', monospace;
-  letter-spacing: 0.5px;
-}
-
-.metric-row svg {
-  color: var(--accent-color);
-  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.3));
+  font-size: 0.9rem;
 }
 
 .data-value {
-  color: var(--accent-color) !important;
-  font-size: 0.85rem;
-  font-family: 'Press Start 2P', cursive;
-  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+  color: var(--text-color) !important;
+  font-size: 1rem;
+  font-family: monospace;
 }
 
 .dc-progress-section {
@@ -226,47 +130,28 @@
   display: flex;
   justify-content: space-between;
   color: var(--text-dim);
-  font-size: 0.6rem;
-  font-family: 'Press Start 2P', cursive;
+  font-size: 0.85rem;
 }
 
 .progress-track {
   width: 100%;
-  height: 14px;
+  height: 6px;
   background: var(--bg-color);
-  border: 2px solid var(--border-color);
-  border-radius: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
   overflow: hidden;
-  position: relative;
 }
 
 .progress-fill {
   height: 100%;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--accent-color) 0px,
-    var(--accent-color) 8px,
-    var(--accent-hover) 8px,
-    var(--accent-hover) 16px
-  );
-  image-rendering: pixelated;
-  position: relative;
-  transition: width 0.3s ease;
-}
-
-.progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%, rgba(0,0,0,0.15) 100%);
+  background-color: var(--accent-color);
 }
 
 .progress-hint {
-  margin: 4px 0 0 0;
-  font-size: 0.7rem;
+  margin: 5px 0 0 0;
+  font-size: 0.75rem;
   color: var(--text-dim);
   text-align: center;
-  font-family: 'VT323', monospace;
 }
 
 .dc-social-section {
@@ -275,7 +160,6 @@
   align-items: center;
   margin-top: 15px;
   padding-top: 15px;
-  border-top: 2px solid var(--border-color);
 }
 
 .social-btn {
@@ -283,21 +167,19 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: var(--bg-light);
-  border: 2px solid var(--border-color);
-  border-radius: 0;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   color: var(--text-dim);
   text-decoration: none;
   font-size: 0.85rem;
   transition: all 0.2s;
-  font-family: 'VT323', monospace;
 }
 
 .social-btn:hover {
-  background: var(--surface-color);
-  color: var(--accent-color);
+  background-color: var(--surface-color);
+  color: var(--text-color);
   border-color: var(--accent-color);
-  box-shadow: 0 0 8px var(--accent-color);
 }
 
 .social-icons {
@@ -309,15 +191,11 @@
   padding: 8px;
 }
 
-/* ============================================
-   Visual Area - Pixel Art Server Farm
-   ============================================ */
 .dc-visual-area {
   flex-grow: 1;
   width: 100%;
   height: 100%;
   min-height: 500px;
-  position: relative;
 }
 
 .data-flow-grid {
@@ -331,17 +209,14 @@
 .svg-equipment {
   width: 300px;
   height: 300px;
-  image-rendering: pixelated;
 }
 
 .svg-equipment-wide {
   width: 100%;
   max-width: 600px;
   height: auto;
-  image-rendering: pixelated;
 }
 
-/* Pixel Art Animations */
 .type-anim-1 { animation: typeLine 2s infinite steps(20, end); }
 .type-anim-2 { animation: typeLine 2.5s infinite steps(30, end); animation-delay: 0.5s; }
 .type-anim-3 { animation: typeLine 1.5s infinite steps(15, end); animation-delay: 1s; }
@@ -352,80 +227,14 @@
   100% { opacity: 0; }
 }
 
-.led-blink-fast { animation: blinkLed 0.3s infinite steps(2, end); }
-.led-blink-slow { animation: blinkLed 1s infinite steps(2, end); }
+.led-blink-fast { animation: blinkLed 0.3s infinite alternate; }
+.led-blink-slow { animation: blinkLed 1s infinite alternate; }
 
 @keyframes blinkLed {
-  0% { opacity: 0.2; }
+  0% { opacity: 0.1; }
   100% { opacity: 1; }
 }
 
-/* ============================================
-   Pixel Moon Animation
-   ============================================ */
-.dc-pixel-moon {
-  position: absolute;
-  top: 8%;
-  right: 15%;
-  width: 48px;
-  height: 48px;
-  background: var(--accent-color);
-  border-radius: 0;
-  image-rendering: pixelated;
-  animation: floatMoon 6s ease-in-out infinite;
-}
-
-@keyframes floatMoon {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-10px) rotate(3deg); }
-}
-
-/* Badge Sticker */
-.dc-badge-sticker {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: var(--surface-color);
-  padding: 12px 18px;
-  border-radius: 0;
-  border: 2px solid var(--border-color);
-  color: var(--text-color);
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 10;
-  backdrop-filter: blur(4px);
-  user-select: none;
-  cursor: move;
-  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
-  font-family: 'VT323', monospace;
-  image-rendering: pixelated;
-  transition: all 0.3s ease;
-}
-
-.dc-badge-title {
-  font-weight: 600;
-  font-family: 'Press Start 2P', cursive;
-  font-size: 0.65rem;
-  color: var(--accent-color);
-}
-
-.dc-badge-racks {
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  margin-left: 6px;
-  border-left: 2px solid var(--border-color);
-  padding-left: 12px;
-}
-
-.dc-badge-racks strong {
-  color: var(--accent-color);
-}
-
-/* ============================================
-   Responsive - Mobile
-   ============================================ */
 @media (max-width: 1024px) {
   .dc-layout {
     flex-direction: column-reverse;

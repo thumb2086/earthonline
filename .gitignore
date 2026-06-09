@@ -11,6 +11,3 @@ crash.log
 .dev.vars*
 !.dev.vars.example
 !.env.example
-
-# AI agent instructions (local only, not tracked)
-AGENTS.md

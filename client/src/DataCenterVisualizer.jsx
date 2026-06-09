@@ -1,12 +1,10 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Draggable from 'react-draggable';
 import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Users, MapPin } from 'lucide-react';
-import { useTheme } from './ThemeContext';
 import './datacenter.css';
 
 export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage, region, onOpenSocial }) {
-  const { themeData } = useTheme();
-  
+  // Region mappings
   const regionConfig = {
     asia: { name: 'Taiwan', flag: '🇹🇼' },
     us: { name: 'United States', flag: '🇺🇸' },
@@ -14,6 +12,7 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
   };
   const currentRegion = regionConfig[region] || { name: 'Unknown Node', flag: '🌍' };
 
+  // Level Calculation
   const level = useMemo(() => {
     const hours = lifespan / 3600;
     const pt = bonusPoints || 0;
@@ -49,13 +48,17 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
     if (level === 2) return Math.min(100, Math.max((hours/24)*100, (pt/2000)*100));
     if (level === 3) return Math.min(100, Math.max((hours/168)*100, (pt/10000)*100));
     if (level === 4) return Math.min(100, Math.max((hours/720)*100, (pt/50000)*100));
-    return (hours % 10) * 10;
+    return (hours % 10) * 10; // 10 hours per rack progress loop
   }, [level, lifespan, bonusPoints]);
 
+  // Using the real cpuUsage passed from props
+
+  // Infinite Canvas Dragging Logic
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+  // Refs for react-draggable
   const cardRef = useRef(null);
   const badgeRef = useRef(null);
 
@@ -73,10 +76,12 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
     setIsDragging(false);
   };
 
+  // Dynamic Racks Generation
   const rackCount = useMemo(() => {
-    if (level < 3) return 0;
+    if (level < 3) return 0; // Laptop or Tower
     const hours = lifespan / 3600;
     const pt = bonusPoints || 0;
+    // 1 rack per 10 hours or 500 PT
     return Math.max(1, Math.floor(hours / 10) + Math.floor(pt / 500));
   }, [level, lifespan, bonusPoints]);
 
@@ -84,16 +89,13 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
     <div className="dc-modern-container">
       <div className="dc-bg-grid"></div>
       
-      {/* Pixel Art Decorative Elements */}
-      <PixelDecorations level={level} accentColor={themeData.accent} />
-      
       <div className="dc-layout">
         
         {/* Left Side: Solid Status Panel */}
         <Draggable nodeRef={cardRef} handle=".drag-handle">
           <div ref={cardRef} className="dc-status-card" style={{ position: 'absolute', top: '40px', left: '40px', zIndex: 100 }}>
             <div className="dc-card-header drag-handle" style={{ cursor: 'move' }}>
-              <PixelServerIcon accentColor={themeData.accent} />
+              <Server size={18} color="#3b82f6" />
               <h2>我的雲端伺服器</h2>
             </div>
           
@@ -107,27 +109,27 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
 
           <div className="dc-metrics">
             <div className="metric-row">
-              <Clock size={16} />
+              <Clock size={16} color="#64748b" />
               <span>總生存時間</span>
               <strong className="data-value">{formatTime(lifespan || 0)}</strong>
             </div>
             <div className="metric-row">
-              <ShieldCheck size={16} />
+              <ShieldCheck size={16} color="#64748b" />
               <span>PT 信用積分</span>
               <strong className="data-value">{Number(bonusPoints || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} PT</strong>
             </div>
             <div className="metric-row">
-              <Cpu size={16} />
+              <Cpu size={16} color="#64748b" />
               <span>伺服器負載</span>
               <strong className="data-value">{(cpuUsage || 0).toFixed(1)}%</strong>
             </div>
             <div className="metric-row">
-              <Network size={16} />
+              <Network size={16} color="#64748b" />
               <span>全球在線節點</span>
               <strong className="data-value">{onlineCount || 0}</strong>
             </div>
             <div className="metric-row">
-              <Activity size={16} />
+              <Activity size={16} color="#64748b" />
               <span>連線延遲 (Ping)</span>
               <strong className="data-value">{ping || 0} ms</strong>
             </div>
@@ -144,6 +146,7 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
             <p className="progress-hint">累積生存時間或積分以解鎖擴建</p>
           </div>
 
+          {/* Social Links & Github Badge */}
           <div className="dc-social-section" style={{ display: 'flex', gap: '25px', justifyContent: 'flex-start', alignItems: 'center', marginTop: '20px', padding: '0' }}>
             <a href="https://github.com/huchialun9-ctrl/earthonline.git" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex', alignItems: 'center', color: 'var(--text-color)', textDecoration: 'none', gap: '8px' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.1) rotate(-2deg)'} onMouseOut={e => e.currentTarget.style.transform='scale(1) rotate(0)'}>
               <GithubIcon size={28} />
@@ -152,25 +155,26 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
             <a href="https://www.threads.com/@earthonline6?xmt=AQG048ez1j6AMkcDGAG_U01pj1JoVoCFFMvWnZ5MZGYhgfk" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex', alignItems: 'center', color: 'var(--text-color)', textDecoration: 'none' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.1) rotate(2deg)'} onMouseOut={e => e.currentTarget.style.transform='scale(1) rotate(0)'}>
               <ThreadsIcon size={28} />
             </a>
-            <button onClick={onOpenSocial} title="社群討論" style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', padding: '0', fontWeight: 'bold', marginLeft: '10px' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='var(--accent-color)'; e.currentTarget.style.textShadow='0 0 8px var(--accent-color)'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='var(--text-dim)'; e.currentTarget.style.textShadow='none'; }}>
+            <button onClick={onOpenSocial} title="社群討論" style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', padding: '0', fontWeight: 'bold', marginLeft: '10px' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='var(--text-color)'; e.currentTarget.style.textShadow='0 0 8px rgba(59, 130, 246, 0.8)'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='var(--text-dim)'; e.currentTarget.style.textShadow='none'; }}>
               <Users size={22} /> <span>討論區</span>
             </button>
           </div>
 
-          <div className="dc-contribution-wall" style={{ marginTop: '10px', paddingTop: '15px', borderTop: '2px solid var(--border-color)' }}>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'VT323', monospace" }}>
+          {/* GitHub Contribution Wall */}
+          <div className="dc-contribution-wall" style={{ marginTop: '10px', paddingTop: '15px', borderTop: '1px solid #2d313b' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <GithubIcon size={14} /> <span>開發者貢獻紀錄</span>
             </div>
             <img 
               src="https://ghchart.rshah.org/3b82f6/huchialun9-ctrl" 
               alt="huchialun9-ctrl's Github Chart" 
-              style={{ width: '100%', opacity: 0.8, filter: 'hue-rotate(180deg) brightness(0.8) contrast(1.2)', imageRendering: 'pixelated' }} 
+              style={{ width: '100%', opacity: 0.8, filter: 'hue-rotate(180deg) brightness(0.8) contrast(1.2)' }} 
             />
           </div>
         </div>
         </Draggable>
 
-        {/* Right Side: Visual Area */}
+        {/* Right Side: Visual Area (Infinite Canvas) */}
         <div 
           className="dc-visual-area infinite-canvas" 
           onMouseDown={handleMouseDown}
@@ -181,21 +185,17 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
         >
           {/* Server Location Badge Sticker */}
           <Draggable nodeRef={badgeRef}>
-            <div ref={badgeRef} className="dc-badge-sticker">
-              <PixelMapIcon />
-              <strong className="dc-badge-title">
-                Node: {currentRegion.name} {currentRegion.flag}
-              </strong>
-              <span className="dc-badge-racks">
-                Racks: <strong>{level < 3 ? 1 : rackCount}</strong>
-              </span>
+            <div ref={badgeRef} style={{ position: 'absolute', top: '20px', right: '20px', background: 'var(--panel-bg)', padding: '10px 18px', borderRadius: '12px', border: '1px solid var(--border-color)', color: 'var(--text-color)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 10, backdropFilter: 'blur(4px)', userSelect: 'none', cursor: 'move', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+              <MapPin size={18} color="#ef4444" />
+              <strong style={{ fontWeight: '600' }}>Node: {currentRegion.name} {currentRegion.flag}</strong>
+              <span style={{ color: 'var(--text-dim)', fontSize: '0.85rem', marginLeft: '6px', borderLeft: '1px solid var(--border-color)', paddingLeft: '12px' }}>Racks: <strong style={{ color: 'var(--text-color)' }}>{level < 3 ? 1 : rackCount}</strong></span>
             </div>
           </Draggable>
 
           <div className="canvas-content" style={{ transform: `translate(${offset.x}px, ${offset.y}px)`, transition: isDragging ? 'none' : 'transform 0.1s ease-out', position: 'absolute', top: '50%', left: '50%', width: 0, height: 0 }}>
-            {level === 1 && <div style={{ position: 'absolute', transform: 'translate(-100px, -100px)' }}><PixelLaptopSvg accentColor={themeData.accent} /></div>}
-            {level === 2 && <div style={{ position: 'absolute', transform: 'translate(-100px, -100px)' }}><PixelTowerSvg accentColor={themeData.accent} /></div>}
-            {level >= 3 && <InfiniteServerFarm rackCount={rackCount} progress={progressToNext} accentColor={themeData.accent} />}
+            {level === 1 && <div style={{ position: 'absolute', transform: 'translate(-100px, -100px)' }}><LaptopSvg /></div>}
+            {level === 2 && <div style={{ position: 'absolute', transform: 'translate(-100px, -100px)' }}><TowerSvg /></div>}
+            {level >= 3 && <InfiniteServerFarm rackCount={rackCount} progress={progressToNext} />}
           </div>
         </div>
 
@@ -204,90 +204,9 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
   );
 }
 
-/* ============================================
-   Pixel Art Decorative Components
-   ============================================ */
-function PixelDecorations({ level, accentColor }) {
-  return (
-    <>
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        pointerEvents: 'none', overflow: 'hidden', zIndex: 1
-      }}>
-        {/* Pixel Moon */}
-        <div className="dc-pixel-moon" style={{
-          boxShadow: `0 0 30px ${accentColor}40, inset -8px -8px 0 ${accentColor}80`
-        }}>
-          <div style={{
-            position: 'absolute', top: '8px', right: '8px',
-            width: '16px', height: '16px',
-            background: `${accentColor}90`,
-            borderRadius: 0
-          }}/>
-        </div>
-        
-        {/* Pixel Clouds */}
-        <PixelCloud x="10%" y="20%" delay={0} />
-        <PixelCloud x="70%" y="60%" delay={2} />
-        <PixelCloud x="40%" y="80%" delay={4} />
-      </div>
-      
-      <style>{`
-        @keyframes floatPixelCloud {
-          0% { transform: translateX(-120px); }
-          100% { transform: translateX(calc(100vw + 120px)); }
-        }
-      `}</style>
-    </>
-  );
-}
-
-function PixelCloud({ x, y, delay }) {
-  return (
-    <div style={{
-      position: 'absolute', left: x, top: y,
-      width: '64px', height: '24px',
-      background: 'var(--accent-color)',
-      borderRadius: 0,
-      imageRendering: 'pixelated',
-      opacity: 0.12,
-      boxShadow: '16px -8px 0 var(--accent-color), 32px 0 0 var(--accent-color), 48px -4px 0 var(--accent-color)',
-      animation: `floatPixelCloud ${20 + delay * 3}s linear infinite`,
-      animationDelay: `${delay}s`
-    }}/>
-  );
-}
-
-function PixelServerIcon({ accentColor }) {
-  return (
-    <svg width="24" height="24" viewBox="0 0 16 16" style={{ imageRendering: 'pixelated' }}>
-      <rect x="2" y="1" width="12" height="4" fill="var(--accent-color)"/>
-      <rect x="2" y="6" width="12" height="4" fill="var(--accent-color)"/>
-      <rect x="2" y="11" width="12" height="4" fill="var(--accent-color)"/>
-      <rect x="4" y="2" width="2" height="2" fill="var(--success-color)"/>
-      <rect x="4" y="7" width="2" height="2" fill="var(--warning-color)"/>
-      <rect x="4" y="12" width="2" height="2" fill="var(--success-color)"/>
-      <rect x="8" y="2" width="4" height="2" fill="var(--bg-color)"/>
-      <rect x="8" y="7" width="4" height="2" fill="var(--bg-color)"/>
-      <rect x="8" y="12" width="4" height="2" fill="var(--bg-color)"/>
-    </svg>
-  );
-}
-
-function PixelMapIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 16 16" style={{ imageRendering: 'pixelated' }}>
-      <path d="M8 1 L14 4 L14 12 L8 15 L2 12 L2 4 Z" fill="var(--danger-color)"/>
-      <circle cx="8" cy="7" r="2" fill="var(--text-color)"/>
-      <rect x="7" y="9" width="2" height="4" fill="var(--text-color)"/>
-    </svg>
-  );
-}
-
-/* ============================================
-   Pixel Art Server SVGs
-   ============================================ */
-function InfiniteServerFarm({ rackCount, progress, accentColor }) {
+function InfiniteServerFarm({ rackCount, progress }) {
+  // Generate racks in a grid.
+  // We place racks in rows, each row has up to 10 racks.
   const COLUMNS = 10;
   const RACK_WIDTH_OFFSET = 60;
   const RACK_HEIGHT_OFFSET = 180;
@@ -297,17 +216,20 @@ function InfiniteServerFarm({ rackCount, progress, accentColor }) {
       {Array.from({ length: rackCount }).map((_, idx) => {
         const row = Math.floor(idx / COLUMNS);
         const col = idx % COLUMNS;
+        // Center the grid by calculating total width/height
         const totalCols = Math.min(rackCount, COLUMNS);
         const totalRows = Math.ceil(rackCount / COLUMNS);
         const xPos = (col - totalCols / 2) * RACK_WIDTH_OFFSET + 30;
         const yPos = (row - totalRows / 2) * RACK_HEIGHT_OFFSET + 90;
         
+        // For the very last rack, we show the progressive blades based on progress.
+        // For all preceding racks, they are fully active (100% progress).
         const isLastRack = idx === rackCount - 1;
         const currentProgress = isLastRack ? progress : 100;
 
         return (
           <div key={idx} style={{ position: 'absolute', transform: `translate(${xPos}px, ${yPos}px)` }}>
-            <PixelSingleRackSvg progress={currentProgress} />
+            <SingleRackSvg progress={currentProgress} />
           </div>
         );
       })}
@@ -315,12 +237,12 @@ function InfiniteServerFarm({ rackCount, progress, accentColor }) {
   );
 }
 
-function PixelSingleRackSvg({ progress }) {
+function SingleRackSvg({ progress }) {
   const activeBladesCount = Math.max(1, Math.floor((progress / 100) * 12));
   return (
-    <svg viewBox="0 0 45 160" width="45" height="160" style={{ imageRendering: 'pixelated' }}>
+    <svg viewBox="0 0 45 160" width="45" height="160">
       {/* Outer Rack */}
-      <rect x="0" y="0" width="45" height="160" fill="var(--bg-color)" stroke="var(--border-color)" strokeWidth="2"/>
+      <rect x="0" y="0" width="45" height="160" rx="1" fill="#111" stroke="#333" strokeWidth="2" />
       {/* Server Blades */}
       {Array.from({ length: 12 }).map((_, bIdx) => {
         const globalBladeIndex = 11 - bIdx;
@@ -328,13 +250,13 @@ function PixelSingleRackSvg({ progress }) {
 
         return (
           <g key={bIdx} transform={`translate(4, ${10 + bIdx * 12})`}>
-            <rect x="0" y="0" width="37" height="9" fill={isActive ? "var(--surface-color)" : "var(--bg-light)"} stroke={isActive ? "var(--border-color)" : "var(--bg-color)"} strokeWidth="1"/>
-            <rect x="2" y="2" width="12" height="5" fill="var(--bg-color)"/>
+            <rect x="0" y="0" width="37" height="9" fill={isActive ? "#1a1a1a" : "#0d0d0d"} stroke={isActive ? "#262626" : "#111"} strokeWidth="1" />
+            <rect x="2" y="2" width="12" height="5" fill="#050505" />
             {isActive && (
               <>
-                <rect x="22" y="3" width="3" height="3" fill="var(--success-color)" className={`led-blink-${bIdx%3 === 0 ? 'fast' : 'slow'}`}/>
-                <rect x="27" y="3" width="3" height="3" fill="var(--info-color)" className={`led-blink-${bIdx%2 === 0 ? 'fast' : 'slow'}`}/>
-                <rect x="32" y="3" width="3" height="3" fill="var(--warning-color)" className={`led-blink-${bIdx%4 === 0 ? 'fast' : 'slow'}`}/>
+                <circle cx="22" cy="4.5" r="1.5" fill="#34c759" className={`led-blink-${bIdx%3 === 0 ? 'fast' : 'slow'}`} />
+                <circle cx="27" cy="4.5" r="1.5" fill="#007aff" className={`led-blink-${bIdx%2 === 0 ? 'fast' : 'slow'}`} />
+                <circle cx="32" cy="4.5" r="1.5" fill="#ffcc00" className={`led-blink-${bIdx%4 === 0 ? 'fast' : 'slow'}`} />
               </>
             )}
           </g>
@@ -344,44 +266,37 @@ function PixelSingleRackSvg({ progress }) {
   );
 }
 
-function PixelLaptopSvg({ accentColor }) {
+// Solid & Realistic SVGs
+
+function LaptopSvg() {
   return (
-    <svg viewBox="0 0 200 200" width="200" height="200" style={{ imageRendering: 'pixelated' }}>
-      {/* Laptop body */}
-      <rect x="40" y="55" width="120" height="70" fill="var(--surface-color)" stroke="var(--border-color)" strokeWidth="3"/>
-      <rect x="45" y="60" width="110" height="60" fill="var(--bg-color)"/>
-      {/* Screen content */}
-      <rect x="55" y="70" width="40" height="3" fill="var(--accent-color)" className="type-anim-1"/>
-      <rect x="55" y="80" width="60" height="3" fill="var(--info-color)" className="type-anim-2"/>
-      <rect x="55" y="90" width="30" height="3" fill="var(--warning-color)" className="type-anim-3"/>
-      {/* Keyboard */}
-      <path d="M 30 130 L 170 130 L 180 145 L 20 145 Z" fill="var(--border-color)" stroke="var(--text-dim)" strokeWidth="1"/>
-      {/* LED */}
-      <rect x="95" y="135" width="10" height="3" fill="var(--success-color)" className="led-blink-slow"/>
+    <svg viewBox="0 0 200 200" width="200" height="200" className="svg-equipment">
+      <rect x="40" y="55" width="120" height="70" rx="4" fill="#292929" stroke="#4a4a4a" strokeWidth="2" />
+      <rect x="45" y="60" width="110" height="60" rx="2" fill="#141414" />
+      <path d="M 30 130 L 170 130 L 180 145 L 20 145 Z" fill="#3b3b3b" stroke="#4a4a4a" strokeWidth="1" />
+      {/* Code scroll */}
+      <rect x="55" y="70" width="40" height="2" fill="#d1d5db" className="type-anim-1" />
+      <rect x="55" y="80" width="60" height="2" fill="#d1d5db" className="type-anim-2" />
+      <rect x="55" y="90" width="30" height="2" fill="#d1d5db" className="type-anim-3" />
     </svg>
   );
 }
 
-function PixelTowerSvg({ accentColor }) {
+function TowerSvg() {
   return (
-    <svg viewBox="0 0 200 200" width="200" height="200" style={{ imageRendering: 'pixelated' }}>
-      {/* Tower body */}
-      <rect x="65" y="30" width="70" height="140" fill="var(--surface-color)" stroke="var(--border-color)" strokeWidth="3"/>
-      {/* Drive bays */}
-      <rect x="75" y="45" width="50" height="15" fill="var(--bg-light)"/>
-      <rect x="75" y="65" width="50" height="15" fill="var(--bg-light)"/>
-      {/* Fan */}
-      <circle cx="100" cy="120" r="20" fill="var(--bg-color)" stroke="var(--border-color)" strokeWidth="2"/>
-      <circle cx="100" cy="120" r="12" fill="var(--surface-color)" stroke="var(--border-color)" strokeWidth="1"/>
-      {/* LEDs */}
-      <rect x="82" y="155" width="5" height="5" fill="var(--success-color)" className="led-blink-fast"/>
-      <rect x="92" y="155" width="5" height="5" fill="var(--info-color)" className="led-blink-slow"/>
-      <rect x="110" y="155" width="8" height="5" fill="var(--danger-color)"/>
+    <svg viewBox="0 0 200 200" width="200" height="200" className="svg-equipment">
+      <rect x="65" y="30" width="70" height="140" rx="2" fill="#1c1c1e" stroke="#3a3a3c" strokeWidth="3" />
+      <rect x="75" y="45" width="50" height="15" fill="#2c2c2e" />
+      <rect x="75" y="65" width="50" height="15" fill="#2c2c2e" />
+      <circle cx="100" cy="120" r="20" fill="#000" stroke="#3a3a3c" strokeWidth="2" />
+      <circle cx="85" cy="155" r="3" fill="#34c759" className="led-blink-fast" />
+      <circle cx="95" cy="155" r="3" fill="#007aff" className="led-blink-slow" />
+      <rect x="110" y="153" width="10" height="4" fill="#ff3b30" />
     </svg>
   );
 }
 
-/* Social Icons SVGs */
+// Social Icons SVGs
 function GithubIcon({ size = 16 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
