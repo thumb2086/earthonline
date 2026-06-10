@@ -39,11 +39,11 @@ const SHOP_ITEMS = [
     id: 'firewall',
     name: '防火牆', cost: 600, type: 'buff',
     icon: 'firewall.png', tagLabel: 'BUFF',
-    shortDesc: '45 分鐘免疫衰減 + 太陽風暴 + 禁言',
+    shortDesc: '45 分鐘免疫衰減 + 太陽風暴',
     effects: [
       { icon: '🛡️', text: '45 分鐘內健康度不再自然衰減' },
       { icon: '🌪️', text: '太陽風暴期間斷線不扣 PT' },
-      { icon: '🔇', text: '期間聊天免疫禁言' },
+      { icon: '🔇', text: '管理員不能對你禁言' },
     ],
     tip: '全方位防護，太陽風暴期間必備。',
   },

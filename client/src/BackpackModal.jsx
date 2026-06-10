@@ -39,15 +39,17 @@ const ITEM_INFO = {
     ],
   },
   firewall: {
-    name: '實體防火牆模組',
+    name: '防火牆',
     icon: 'firewall.png',
     tagLabel: 'BUFF',
     color: '#a855f7',
     bg: 'rgba(168,85,247,0.10)',
     border: 'rgba(168,85,247,0.30)',
-    shortDesc: '30 分鐘免疫健康度衰減',
+    shortDesc: '45 分鐘全方位防護',
     effects: [
-      { text: '30 分鐘內健康度不再自然衰減' },
+      { text: '45 分鐘內健康度不再自然衰減' },
+      { text: '太陽風暴斷線不扣 PT' },
+      { text: '管理員不能對你禁言' },
     ],
   },
   generator: {
