@@ -217,24 +217,6 @@
   height: auto;
 }
 
-.type-anim-1 { animation: typeLine 2s infinite steps(20, end); }
-.type-anim-2 { animation: typeLine 2.5s infinite steps(30, end); animation-delay: 0.5s; }
-.type-anim-3 { animation: typeLine 1.5s infinite steps(15, end); animation-delay: 1s; }
-
-@keyframes typeLine {
-  0% { width: 0; opacity: 1; }
-  80% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-.led-blink-fast { animation: blinkLed 0.3s infinite alternate; }
-.led-blink-slow { animation: blinkLed 1s infinite alternate; }
-
-@keyframes blinkLed {
-  0% { opacity: 0.1; }
-  100% { opacity: 1; }
-}
-
 @media (max-width: 1024px) {
   .dc-layout {
     flex-direction: column-reverse;
@@ -246,4 +228,141 @@
     width: 100%;
     max-width: 450px;
   }
+}
+
+/* Earth Globe Styles */
+.earth-globe-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 50%, #0d1b2a, #050810);
+  cursor: grab;
+  user-select: none;
+}
+
+.earth-globe-wrapper:active {
+  cursor: grabbing;
+}
+
+.earth-globe-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.globe-top-left {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.globe-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 14px;
+  backdrop-filter: blur(4px);
+}
+
+.globe-stat-label {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+.globe-stat-value {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #00ffaa;
+  font-family: monospace;
+}
+
+.globe-event-badge {
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: #ffd700;
+  font-family: monospace;
+  animation: globeEventPulse 2s ease-in-out infinite;
+}
+
+@keyframes globeEventPulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(255, 215, 0, 0.1); }
+  50% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.3); }
+}
+
+.globe-bottom-right {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.globe-nasa-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: monospace;
+  backdrop-filter: blur(4px);
+}
+
+.globe-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px 14px;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.globe-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: monospace;
+}
+
+.globe-legend-item.active {
+  color: #fff;
+}
+
+.globe-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.globe-count {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
 }

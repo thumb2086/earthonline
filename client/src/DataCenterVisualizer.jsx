@@ -1,18 +1,12 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import Draggable from 'react-draggable';
-import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Users, MapPin } from 'lucide-react';
+import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Users } from 'lucide-react';
+import EarthGlobe from './EarthGlobe';
 import './datacenter.css';
 
-export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage, region, onOpenSocial }) {
-  // Region mappings
-  const regionConfig = {
-    asia: { name: 'Taiwan', flag: '🇹🇼' },
-    us: { name: 'United States', flag: '🇺🇸' },
-    eu: { name: 'Europe', flag: '🇪🇺' }
-  };
-  const currentRegion = regionConfig[region] || { name: 'Unknown Node', flag: '🌍' };
+export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage, region, onOpenSocial, playerCounts, activeEvent, multiplier }) {
+  const cardRef = useRef(null);
 
-  // Level Calculation
   const level = useMemo(() => {
     const hours = lifespan / 3600;
     const pt = bonusPoints || 0;
@@ -48,41 +42,7 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
     if (level === 2) return Math.min(100, Math.max((hours/24)*100, (pt/2000)*100));
     if (level === 3) return Math.min(100, Math.max((hours/168)*100, (pt/10000)*100));
     if (level === 4) return Math.min(100, Math.max((hours/720)*100, (pt/50000)*100));
-    return (hours % 10) * 10; // 10 hours per rack progress loop
-  }, [level, lifespan, bonusPoints]);
-
-  // Using the real cpuUsage passed from props
-
-  // Infinite Canvas Dragging Logic
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
-  // Refs for react-draggable
-  const cardRef = useRef(null);
-  const badgeRef = useRef(null);
-
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
-    setOffset({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-  };
-
-  const handleMouseUpOrLeave = () => {
-    setIsDragging(false);
-  };
-
-  // Dynamic Racks Generation
-  const rackCount = useMemo(() => {
-    if (level < 3) return 0; // Laptop or Tower
-    const hours = lifespan / 3600;
-    const pt = bonusPoints || 0;
-    // 1 rack per 10 hours or 500 PT
-    return Math.max(1, Math.floor(hours / 10) + Math.floor(pt / 500));
+    return (hours % 10) * 10;
   }, [level, lifespan, bonusPoints]);
 
   return (
@@ -174,125 +134,19 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
         </div>
         </Draggable>
 
-        {/* Right Side: Visual Area (Infinite Canvas) */}
-        <div 
-          className="dc-visual-area infinite-canvas" 
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUpOrLeave}
-          onMouseLeave={handleMouseUpOrLeave}
-          style={{ cursor: isDragging ? 'grabbing' : 'grab', overflow: 'hidden', position: 'relative' }}
-        >
-          {/* Server Location Badge Sticker */}
-          <Draggable nodeRef={badgeRef}>
-            <div ref={badgeRef} style={{ position: 'absolute', top: '20px', right: '20px', background: 'var(--panel-bg)', padding: '10px 18px', borderRadius: '12px', border: '1px solid var(--border-color)', color: 'var(--text-color)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 10, backdropFilter: 'blur(4px)', userSelect: 'none', cursor: 'move', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-              <MapPin size={18} color="#ef4444" />
-              <strong style={{ fontWeight: '600' }}>Node: {currentRegion.name} {currentRegion.flag}</strong>
-              <span style={{ color: 'var(--text-dim)', fontSize: '0.85rem', marginLeft: '6px', borderLeft: '1px solid var(--border-color)', paddingLeft: '12px' }}>Racks: <strong style={{ color: 'var(--text-color)' }}>{level < 3 ? 1 : rackCount}</strong></span>
-            </div>
-          </Draggable>
-
-          <div className="canvas-content" style={{ transform: `translate(${offset.x}px, ${offset.y}px)`, transition: isDragging ? 'none' : 'transform 0.1s ease-out', position: 'absolute', top: '50%', left: '50%', width: 0, height: 0 }}>
-            {level === 1 && <div style={{ position: 'absolute', transform: 'translate(-100px, -100px)' }}><LaptopSvg /></div>}
-            {level === 2 && <div style={{ position: 'absolute', transform: 'translate(-100px, -100px)' }}><TowerSvg /></div>}
-            {level >= 3 && <InfiniteServerFarm rackCount={rackCount} progress={progressToNext} />}
-          </div>
+        {/* Right Side: NASA Earth Globe */}
+        <div className="dc-visual-area">
+          <EarthGlobe
+            onlineCount={onlineCount}
+            region={region}
+            playerCounts={playerCounts}
+            activeEvent={activeEvent}
+            multiplier={multiplier}
+          />
         </div>
 
       </div>
     </div>
-  );
-}
-
-function InfiniteServerFarm({ rackCount, progress }) {
-  // Generate racks in a grid.
-  // We place racks in rows, each row has up to 10 racks.
-  const COLUMNS = 10;
-  const RACK_WIDTH_OFFSET = 60;
-  const RACK_HEIGHT_OFFSET = 180;
-  
-  return (
-    <>
-      {Array.from({ length: rackCount }).map((_, idx) => {
-        const row = Math.floor(idx / COLUMNS);
-        const col = idx % COLUMNS;
-        // Center the grid by calculating total width/height
-        const totalCols = Math.min(rackCount, COLUMNS);
-        const totalRows = Math.ceil(rackCount / COLUMNS);
-        const xPos = (col - totalCols / 2) * RACK_WIDTH_OFFSET + 30;
-        const yPos = (row - totalRows / 2) * RACK_HEIGHT_OFFSET + 90;
-        
-        // For the very last rack, we show the progressive blades based on progress.
-        // For all preceding racks, they are fully active (100% progress).
-        const isLastRack = idx === rackCount - 1;
-        const currentProgress = isLastRack ? progress : 100;
-
-        return (
-          <div key={idx} style={{ position: 'absolute', transform: `translate(${xPos}px, ${yPos}px)` }}>
-            <SingleRackSvg progress={currentProgress} />
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-function SingleRackSvg({ progress }) {
-  const activeBladesCount = Math.max(1, Math.floor((progress / 100) * 12));
-  return (
-    <svg viewBox="0 0 45 160" width="45" height="160">
-      {/* Outer Rack */}
-      <rect x="0" y="0" width="45" height="160" rx="1" fill="#111" stroke="#333" strokeWidth="2" />
-      {/* Server Blades */}
-      {Array.from({ length: 12 }).map((_, bIdx) => {
-        const globalBladeIndex = 11 - bIdx;
-        const isActive = globalBladeIndex < activeBladesCount;
-
-        return (
-          <g key={bIdx} transform={`translate(4, ${10 + bIdx * 12})`}>
-            <rect x="0" y="0" width="37" height="9" fill={isActive ? "#1a1a1a" : "#0d0d0d"} stroke={isActive ? "#262626" : "#111"} strokeWidth="1" />
-            <rect x="2" y="2" width="12" height="5" fill="#050505" />
-            {isActive && (
-              <>
-                <circle cx="22" cy="4.5" r="1.5" fill="#34c759" className={`led-blink-${bIdx%3 === 0 ? 'fast' : 'slow'}`} />
-                <circle cx="27" cy="4.5" r="1.5" fill="#007aff" className={`led-blink-${bIdx%2 === 0 ? 'fast' : 'slow'}`} />
-                <circle cx="32" cy="4.5" r="1.5" fill="#ffcc00" className={`led-blink-${bIdx%4 === 0 ? 'fast' : 'slow'}`} />
-              </>
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-// Solid & Realistic SVGs
-
-function LaptopSvg() {
-  return (
-    <svg viewBox="0 0 200 200" width="200" height="200" className="svg-equipment">
-      <rect x="40" y="55" width="120" height="70" rx="4" fill="#292929" stroke="#4a4a4a" strokeWidth="2" />
-      <rect x="45" y="60" width="110" height="60" rx="2" fill="#141414" />
-      <path d="M 30 130 L 170 130 L 180 145 L 20 145 Z" fill="#3b3b3b" stroke="#4a4a4a" strokeWidth="1" />
-      {/* Code scroll */}
-      <rect x="55" y="70" width="40" height="2" fill="#d1d5db" className="type-anim-1" />
-      <rect x="55" y="80" width="60" height="2" fill="#d1d5db" className="type-anim-2" />
-      <rect x="55" y="90" width="30" height="2" fill="#d1d5db" className="type-anim-3" />
-    </svg>
-  );
-}
-
-function TowerSvg() {
-  return (
-    <svg viewBox="0 0 200 200" width="200" height="200" className="svg-equipment">
-      <rect x="65" y="30" width="70" height="140" rx="2" fill="#1c1c1e" stroke="#3a3a3c" strokeWidth="3" />
-      <rect x="75" y="45" width="50" height="15" fill="#2c2c2e" />
-      <rect x="75" y="65" width="50" height="15" fill="#2c2c2e" />
-      <circle cx="100" cy="120" r="20" fill="#000" stroke="#3a3a3c" strokeWidth="2" />
-      <circle cx="85" cy="155" r="3" fill="#34c759" className="led-blink-fast" />
-      <circle cx="95" cy="155" r="3" fill="#007aff" className="led-blink-slow" />
-      <rect x="110" y="153" width="10" height="4" fill="#ff3b30" />
-    </svg>
   );
 }
 
