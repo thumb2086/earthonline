@@ -683,9 +683,15 @@ app.get('/api/global/stats', async (req, res, next) => {
 
 app.use('/api/:region', apiRouter);
 
-// Only redirect non-API GET requests in production (skip for local dev)
-const IS_DEV = process.env.NODE_ENV === 'development' || process.env.BACKEND_URL?.includes('localhost');
-if (!IS_DEV) {
+// Serve client build if available, otherwise redirect to frontend URL
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+if (require('fs').existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/socket.io') || req.path.startsWith('/downloads')) return next();
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+} else if (process.env.NODE_ENV !== 'development' && !process.env.BACKEND_URL?.includes('localhost')) {
   app.use((req, res, next) => {
     if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/socket.io') && !req.path.startsWith('/downloads')) {
       return res.redirect(301, FRONTEND_URL);
