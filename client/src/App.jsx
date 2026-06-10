@@ -6,6 +6,7 @@ import Draggable from 'react-draggable';
 import DataCenterVisualizer from './DataCenterVisualizer';
 import ShopModal from './ShopModal';
 import BackpackModal from './BackpackModal';
+import LeaderboardModal from './components/Modals/LeaderboardModal';
 import useTimer from './hooks/useTimer';
 import useSocket from './hooks/useSocket';
 import useGameState from './hooks/useGameState';
@@ -1591,108 +1592,10 @@ function Dashboard({ token, onLogout, region }) {
         </main>
       </div>
 
-      {/* Leaderboard Modal */}
-      {showLeaderboard && (
-        <div className="modal-overlay" onClick={() => setShowLeaderboard(false)} style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
-        }}>
-          <div className="modal-content" style={{
-            maxWidth: '900px', width: '90%', maxHeight: '85vh', overflowY: 'auto',
-            background: 'var(--surface-color)', borderRadius: '12px', padding: '30px',
-            border: '1px solid var(--border-color)', boxShadow: '0 0 40px rgba(0,255,204,0.1)'
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '25px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px', flexWrap: 'wrap', gap: '15px'}}>
-              <h2 style={{margin: 0, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem'}}>
-                <Globe2 size={28} className="icon-spin" /> 全球節點排行榜 (GLOBAL LEADERBOARD)
-              </h2>
-              <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-                <button className="terminal-btn" style={{
-                  padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
-                  width: 'auto', // Override .terminal-btn width: 100%
-                  background: sortMode === 'points' ? 'var(--accent-color)' : 'transparent', 
-                  color: sortMode === 'points' ? '#ffffff' : 'var(--text-secondary)',
-                  border: sortMode === 'points' ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
-                  fontWeight: sortMode === 'points' ? 'bold' : 'normal',
-                  boxShadow: 'none', borderRadius: '4px'
-                }} onClick={() => setSortMode('points')}>
-                  <Star size={16} /> 依點數排行
-                </button>
-                <button className="terminal-btn" style={{
-                  padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
-                  width: 'auto',
-                  background: sortMode === 'time' ? 'var(--accent-color)' : 'transparent', 
-                  color: sortMode === 'time' ? '#ffffff' : 'var(--text-secondary)',
-                  border: sortMode === 'time' ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
-                  fontWeight: sortMode === 'time' ? 'bold' : 'normal',
-                  boxShadow: 'none', borderRadius: '4px'
-                }} onClick={() => setSortMode('time')}>
-                  <Clock size={16} /> 依時間排行
-                </button>
-                <button className="terminal-btn" style={{
-                  padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
-                  width: 'auto',
-                  background: 'transparent', color: 'var(--text-secondary)', 
-                  border: '1px solid var(--border-color)', marginLeft: '10px',
-                  boxShadow: 'none', borderRadius: '4px'
-                }} onClick={() => setShowLeaderboard(false)}>
-                  <X size={16} /> 關閉
-                </button>
-              </div>
-            </div>
-            
-            <table style={{width: '100%', fontSize: '0.9rem', color: 'var(--text-secondary)', borderCollapse: 'collapse', textAlign: 'left'}}>
-              <thead>
-                <tr style={{borderBottom: '1px solid rgba(255,255,255,0.2)'}}>
-                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>排名</th>
-                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>頭像</th>
-                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>使用者 ID</th>
-                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>國家/地區</th>
-                  <th style={{padding: '12px 8px', color: sortMode === 'time' ? '#00ffcc' : 'var(--text-primary)'}}>累積在線時間 {sortMode === 'time' && '▼'}</th>
-                  <th style={{padding: '12px 8px', color: sortMode === 'points' ? 'var(--accent-color)' : 'var(--text-primary)'}}>累積點數 {sortMode === 'points' && '▼'}</th>
-                  <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>目前 Discord 實際身分組</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.length === 0 && (
-                  <tr>
-                    <td colSpan="7" style={{padding: '20px', textAlign: 'center'}}>載入中或尚無資料...</td>
-                  </tr>
-                )}
-                {[...leaderboard].sort((a, b) => sortMode === 'points' ? b.points - a.points : b.idleTime - a.idleTime).map((user, idx) => (
-                  <tr key={user.username} style={{
-                    borderBottom: '1px solid rgba(255,255,255,0.05)', 
-                    color: idx === 0 ? 'var(--accent-color)' : 'inherit',
-                    backgroundColor: idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'
-                  }}>
-                    <td style={{padding: '12px 8px', fontWeight: idx === 0 ? 'bold' : 'normal'}}>#{idx + 1}</td>
-                    <td style={{padding: '12px 8px'}}>
-                      {user.avatar ? <img src={user.avatar} alt="avatar" style={{width: '32px', height: '32px', borderRadius: '50%', border: idx === 0 ? '2px solid var(--accent-color)' : 'none'}} /> : '無'}
-                    </td>
-                    <td style={{padding: '12px 8px', fontWeight: 'bold', color: 'var(--text-main)'}}>{user.discordName !== '未綁定' ? user.discordName : user.username}</td>
-                    <td style={{padding: '12px 8px'}}><div style={{display: 'flex', alignItems: 'center', gap: '5px'}}><MapPin size={16} /> {user.country || 'UNKNOWN'} 伺服器</div></td>
-                    <td style={{padding: '12px 8px'}}>{formatTime(user.idleTime)}</td>
-                    <td style={{padding: '12px 8px', fontFamily: 'monospace', fontSize: '1.1rem'}}>{Number(user.points).toFixed(1)}</td>
-                    <td style={{
-                      padding: '12px 8px', 
-                      fontWeight: 'bold',
-                      color: (user.role || '').includes('無業遊民') ? '#F1C40F' :
-       (user.role || '').includes('財務自由') ? '#2ECC71' :
-       (user.role || '').includes('月光族') ? '#E67E22' :
- 'var(--text-secondary)'
-                    }}>
-                      {user.role || '平民'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+            {/* Leaderboard Modal */}
+      <LeaderboardModal show={showLeaderboard} onClose={()=>setShowLeaderboard(false)} leaderboard={leaderboard} sortMode={sortMode} setSortMode={setSortMode} formatTime={formatTime} />
 
-      {showDiscordModal && (
+{showDiscordModal && (
         <div className="modal-overlay">
           <div className="modal-content" style={{maxWidth: '500px'}}>
             <h3 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--info-color)'}}>
