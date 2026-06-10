@@ -20,6 +20,11 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const os = require('os');
 
+const { FILTERED_WORDS, SHOP_ITEMS, ITEM_NAMES, COUNTRY_REGION, REGIONS } = require('./config/constants');
+const { JWT_SECRET, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, BACKEND_URL, DISCORD_REDIRECT_URI, DISCORD_WEBHOOK_URL, FRONTEND_URL } = require('./config/env');
+const { startCleanupInterval } = require('./jobs/cleanup');
+const { runStartupMigrations } = require('./jobs/migration');
+
 const REINCARNATE_COUNTRIES = [
   { code: 'US', name: '美國', lat: 39.8, lon: -98.6, spread: 15 },
   { code: 'TW', name: '台灣', lat: 23.7, lon: 121.0, spread: 1.5 },
@@ -77,9 +82,6 @@ function randomReincarnation() {
   };
 }
 
-// Filtered words for chat moderation
-const FILTERED_WORDS = ['fuck', 'shit', 'asshole', 'bitch', 'damn', 'cao', '幹', '靠北', '操你媽', 'fucking', 'stupid', 'idiot', 'nigger', 'bastard', 'piss off', 'suck my', 'motherfucker'];
-
 // Chat rate limiting
 const chatCooldowns = new Map();
 
@@ -95,32 +97,8 @@ async function getCachedRole(discordId) {
   return role || '';
 }
 
-// Cleanup stale Map entries every 10 minutes
-setInterval(() => {
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  const todayStr = new Date().toISOString().substring(0, 10);
-
-  for (const [key, ts] of heartbeatTimestamps.entries()) {
-    if (typeof ts === 'number' && ts < cutoff) heartbeatTimestamps.delete(key);
-  }
-  for (const [key] of reviveCounts.entries()) {
-    // key format: adRevive_username_YYYY-MM-DD
-    const dateStr = key.split('_').pop();
-    if (dateStr && dateStr < todayStr) reviveCounts.delete(key);
-  }
-  // chatCooldowns are keyed by username; remove entries older than 10s
-  const chatCutoff = Date.now() - 10000;
-  for (const [key, ts] of chatCooldowns.entries()) {
-    if (ts < chatCutoff) chatCooldowns.delete(key);
-  }
-  // role cache cleanup
-  for (const [id, val] of roleCache.entries()) {
-    if (Date.now() - val.ts > ROLE_CACHE_TTL * 10) roleCache.delete(id);
-  }
-}, 10 * 60 * 1000);
-
 // Run offline time migration once on startup
-db.migrateOfflineTime().catch(err => console.error('[SYS] Migration failed:', err));
+runStartupMigrations();
 
 const app = express();
 const apiRouter = express.Router({ mergeParams: true });
@@ -162,19 +140,7 @@ process.on('unhandledRejection', (reason) => {
 const heartbeatTimestamps = new Map();
 let reviveCounts = new Map();
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) { console.error('[SYS] FATAL: JWT_SECRET environment variable is required'); process.exit(1); }
-// Validate critical env vars at startup
-['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'MONGODB_URI'].forEach(key => {
-  if (!process.env[key]) console.warn(`[SYS] WARNING: ${key} environment variable is not set`);
-});
-const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
-const BACKEND_URL = process.env.BACKEND_URL || 'https://earthonline.onrender.com';
-const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || 'http://localhost:3001/api/auth/discord/callback';
-
-// Discord Webhook configuration
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || null;
+startCleanupInterval(heartbeatTimestamps, reviveCounts, chatCooldowns, roleCache);
 
 async function sendDiscordWebhook(message) {
   if (!DISCORD_WEBHOOK_URL) return;
@@ -432,7 +398,7 @@ apiRouter.post('/auth/send-verification', sendVerificationLimiter, async (req, r
     user.isEmailVerified = false;
     await user.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://earthonline1.pages.dev';
+    const frontendUrl = FRONTEND_URL;
     const verifyLink = `${frontendUrl}?verifyToken=${verificationToken}`;
 
     const transporter = nodemailer.createTransport({
@@ -715,7 +681,6 @@ app.get('/api/global/stats', async (req, res, next) => {
 app.use('/api/:region', apiRouter);
 
 // Frontend is hosted on Cloudflare Pages — redirect non-API requests there
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://earthonline1.pages.dev';
 app.use((req, res, next) => {
   if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/socket.io') && !req.path.startsWith('/downloads')) {
     return res.redirect(301, FRONTEND_URL);
@@ -737,7 +702,7 @@ const io = new Server(server, {
 
 discordBot.setIoInstance(io);
 
-const regions = ['asia', 'us', 'eu'];
+const regions = REGIONS;
 const regionStates = {
   asia: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' },
   us: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' },
@@ -971,17 +936,7 @@ regions.forEach(regionName => {
   socket.on('buy_item', async (itemId) => {
     if (!socket.user) return;
     try {
-      const shopItems = {
-        'liquid_nitrogen': { cost: 200, effect: 'buff', type: 'cooling', duration: 1800000 },
-        'quantum_cooler': { cost: 500, effect: 'health', value: 100 },
-        'overclock_chip': { cost: 1500, effect: 'buff', type: 'overclock', duration: 3600000 },
-        'firewall': { cost: 1000, effect: 'buff', type: 'firewall', duration: 1800000 },
-        'generator': { cost: 800, effect: 'revive', value: 20 },
-        'neon_strip': { cost: 3000, effect: 'cosmetic' },
-        'flash_drive': { cost: 500, effect: 'random' }
-      };
-      
-      const item = shopItems[itemId];
+      const item = SHOP_ITEMS[itemId];
       if (!item) {
         socket.emit('buy_result', { success: false, message: '道具不存在！' });
         return;
@@ -1000,8 +955,7 @@ regions.forEach(regionName => {
         return;
       }
 
-      const itemNames = { liquid_nitrogen: '液態氮冷卻瓶', quantum_cooler: '量子散熱塔', overclock_chip: '超頻晶片', firewall: '防火牆', generator: '備用發電機', neon_strip: '霓虹燈管', flash_drive: '隨身碟' };
-      socket.emit('buy_result', { success: true, message: `✅ 已購買「${itemNames[itemId] || itemId}」並存入背包！` });
+      socket.emit('buy_result', { success: true, message: `✅ 已購買「${ITEM_NAMES[itemId] || itemId}」並存入背包！` });
       socket.emit('user_state_update', {
         pts: result.accumulatedBonusPoints,
         inventory: result.inventory ? Object.fromEntries(result.inventory) : {}
@@ -1019,17 +973,7 @@ regions.forEach(regionName => {
   socket.on('use_item', async (itemId) => {
     if (!socket.user) return;
     try {
-      const shopItems = {
-        'liquid_nitrogen': { effect: 'buff', type: 'cooling', duration: 1800000 },
-        'quantum_cooler':  { effect: 'health', value: 100 },
-        'overclock_chip':  { effect: 'buff',   type: 'overclock', duration: 3600000 },
-        'firewall':        { effect: 'buff',   type: 'firewall',  duration: 1800000 },
-        'generator':       { effect: 'revive', value: 20 },
-        'neon_strip':      { effect: 'cosmetic' },
-        'flash_drive':     { effect: 'random' }
-      };
-
-      const item = shopItems[itemId];
+      const item = SHOP_ITEMS[itemId];
       if (!item) { socket.emit('use_item_result', { success: false, message: '道具不存在！' }); return; }
 
       // 原子扣除背包數量
@@ -1307,7 +1251,7 @@ regions.forEach(regionName => {
       }
 
       // #4: 改用 nspIo.emit，只廣播給當前命名空間（不跨區域洩漏）
-      const countryRegion = { TW: 'asia', CN: 'asia', JP: 'asia', KR: 'asia', HK: 'asia', SG: 'asia', IN: 'asia', MY: 'asia', TH: 'asia', VN: 'asia', PH: 'asia', ID: 'asia', US: 'us', CA: 'us', MX: 'us', GB: 'eu', DE: 'eu', FR: 'eu', IT: 'eu', ES: 'eu', NL: 'eu', SE: 'eu', NO: 'eu', DK: 'eu', FI: 'eu', PL: 'eu', PT: 'eu', BE: 'eu', AT: 'eu', CH: 'eu', IE: 'eu', CZ: 'eu', TR: 'eu', IL: 'eu', AE: 'asia', SA: 'asia', EG: 'eu', NG: 'eu', KE: 'eu', ZA: 'eu', AU: 'other', BR: 'other', RU: 'other', AR: 'other', CL: 'other', NZ: 'other' };
+      const countryRegion = COUNTRY_REGION;
       const calcNodeLevel = (accTime, accPts) => {
         const hours = (accTime || 0) / 3600000;
         const pt = accPts || 0;
