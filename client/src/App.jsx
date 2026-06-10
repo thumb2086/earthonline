@@ -1084,7 +1084,12 @@ function Dashboard({ token, onLogout, region }) {
     if (!socket) return;
     const onPause = () => { lifespanPausedRef.current = true; };
     const onResume = () => { lifespanPausedRef.current = false; };
-    const onForceSync = () => { setLifespanTick(t => t + 1); if (socket) socket.emit('sync_user'); };
+    const onForceSync = () => {
+      setLifespanTick(t => t + 1);
+      sessionStartRef.current = Date.now();
+      setSessionTime(0);
+      if (socket) socket.emit('sync_user');
+    };
     socket.on('tick_paused', onPause);
     socket.on('tick_resumed', onResume);
     socket.on('force_sync', onForceSync);
