@@ -1076,21 +1076,32 @@ function Dashboard({ token, onLogout, region }) {
     };
   }, [token, onLogout]);
 
-  // Lifespan display: runs once myNode is available, interval never re-created
-  const lifespanMetaRef = useRef({ started: false, base: 0, startAt: 0 });
+  // Lifespan display: pauseable, resettable via socket events
+  const [lifespanTick, setLifespanTick] = useState(0);
+  const lifespanPausedRef = useRef(false);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onPause = () => { lifespanPausedRef.current = true; };
+    const onResume = () => { lifespanPausedRef.current = false; };
+    const onForceSync = () => { setLifespanTick(t => t + 1); if (socket) socket.emit('sync_user'); };
+    socket.on('tick_paused', onPause);
+    socket.on('tick_resumed', onResume);
+    socket.on('force_sync', onForceSync);
+    return () => { socket.off('tick_paused', onPause); socket.off('tick_resumed', onResume); socket.off('force_sync', onForceSync); };
+  }, [socket]);
 
   useEffect(() => {
     if (!myNode || myNode.accumulatedTime === undefined) return;
-    if (lifespanMetaRef.current.started) return;
     const base = Math.floor((myNode.accumulatedTime || 0) / 1000);
     const startAt = Date.now();
-    lifespanMetaRef.current = { started: true, base, startAt };
     setLifespan(base);
     const id = setInterval(() => {
+      if (lifespanPausedRef.current) return;
       setLifespan(base + Math.floor((Date.now() - startAt) / 1000));
     }, 1000);
     return () => clearInterval(id);
-  }, [myNode?.accumulatedTime === undefined ? undefined : 'ready']);
+  }, [myNode, lifespanTick]);
 
   // Session timer — counts from the moment user connects
   useEffect(() => {

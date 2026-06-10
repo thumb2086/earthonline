@@ -98,15 +98,18 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers) {
         const r1 = await User.updateMany({}, { $set: { accumulatedTime: 0, accumulatedBonusPoints: 0, health: 100 } });
         const r2 = await User.updateMany({}, { $unset: { inventory: '', activeBuffs: '', cosmetics: '' } });
         socket.emit('terminal_response', `[SYS] 已重置 ${count} 位玩家（time/PT/血量歸零，背包/buff 清除）`);
+        nspIo.emit('force_sync');
         nspIo.emit('social_data_updated');
       } catch (err) { socket.emit('terminal_response', `[ERROR] 重置失敗: ${err.message}`); }
     } else if (cmdUpper === 'PAUSE_TICK') {
       if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
       setPaused(true);
+      nspIo.emit('tick_paused');
       socket.emit('terminal_response', `[SYS] 伺服器 tick 已暫停`);
     } else if (cmdUpper === 'RESUME_TICK') {
       if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
       setPaused(false);
+      nspIo.emit('tick_resumed');
       socket.emit('terminal_response', `[SYS] 伺服器 tick 已恢復`);
     } else {
       socket.emit('terminal_response', `[ERROR] UNKNOWN OR INVALID COMMAND: ${data.command}`);
