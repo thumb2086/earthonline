@@ -149,6 +149,23 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json({ error: err.message || 'Internal Server Error' });
 });
 
+// Crash logging
+const crashLogPath = path.join(__dirname, 'crash.log');
+async function writeCrashLog(type, err) {
+  try {
+    const timestamp = new Date().toISOString();
+    const stack = err?.stack || err?.message || String(err);
+    await fs.promises.appendFile(crashLogPath, `[${timestamp}] [${type}] ${stack}\n`);
+  } catch (e) { console.error('[SYS] Failed to write crash log:', e); }
+}
+process.on('uncaughtException', (err) => { writeCrashLog('UNCAUGHT_EXCEPTION', err); console.error('[SYS] Uncaught Exception:', err); process.exit(1); });
+process.on('unhandledRejection', (reason) => { writeCrashLog('UNHANDLED_REJECTION', reason); console.error('[SYS] Unhandled Rejection:', reason); });
+
+// Runtime state
+const heartbeatTimestamps = new Map();
+let reviveCounts = new Map();
+startCleanupInterval(heartbeatTimestamps, reviveCounts, chatCooldowns, roleCache);
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
