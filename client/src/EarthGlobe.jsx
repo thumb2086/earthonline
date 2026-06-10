@@ -525,8 +525,8 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', activeEve
       flatOffsetRef.current.x -= dx / ((scale - TRANSITION_SCALE) * 0.5 + 1);
       flatOffsetRef.current.y -= dy / ((scale - TRANSITION_SCALE) * 0.5 + 1);
     } else {
-      rotationRef.current.y += dx * 0.005;
-      rotationRef.current.x += dy * 0.005;
+      rotationRef.current.y -= dx * 0.005;
+      rotationRef.current.x -= dy * 0.005;
     }
     mouseRef.current.x = e.clientX;
     mouseRef.current.y = e.clientY;
