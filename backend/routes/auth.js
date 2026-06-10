@@ -3,7 +3,6 @@ const router = express.Router({ mergeParams: true });
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const rateLimit = require('express-rate-limit');
 const geoip = require('geoip-lite');
 const db = require('../db');
@@ -144,8 +143,18 @@ router.post('/auth/send-verification', sendVerificationLimiter, async (req, res)
     user.isEmailVerified = false;
     await user.save();
     const verifyLink = `${FRONTEND_URL}?verifyToken=${verificationToken}`;
-    const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
-    await transporter.sendMail({ from: `"Earth Online" <${process.env.EMAIL_USER}>`, to: email, subject: 'Verify your Earth Online account', html: `<div style="font-family: sans-serif; padding: 20px; text-align: center;"><h2>Earth Online Verification</h2><p>Click the button below to verify your email address.</p><a href="${verifyLink}" style="display: inline-block; padding: 10px 20px; background: #00ffaa; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold;">Verify Email</a><p style="margin-top: 20px; font-size: 12px; color: #888;">Or copy this link: ${verifyLink}</p></div>` });
+    const EMAIL_API = process.env.EMAIL_API_URL || 'https://earthonline.qzz.io/email/send';
+    const fetch = (await import('node-fetch')).default;
+    const emailRes = await fetch(EMAIL_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: email,
+        subject: 'Verify your Earth Online account',
+        html: `<div style="font-family: sans-serif; padding: 20px; text-align: center;"><h2>Earth Online Verification</h2><p>Click the button below to verify your email address.</p><a href="${verifyLink}" style="display: inline-block; padding: 10px 20px; background: #00ffaa; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold;">Verify Email</a><p style="margin-top: 20px; font-size: 12px; color: #888;">Or copy this link: ${verifyLink}</p></div>`
+      })
+    });
+    if (!emailRes.ok) throw new Error('Email API returned ' + emailRes.status);
     res.json({ success: true, message: 'Verification email sent' });
   } catch (err) { console.error(err); res.status(401).json({ error: 'Invalid token or server error' }); }
 });
