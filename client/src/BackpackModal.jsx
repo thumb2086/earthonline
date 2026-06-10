@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const ITEM_INFO = {
   liquid_nitrogen: {
@@ -101,6 +101,14 @@ export default function BackpackModal({ onClose, inventory, socket, addLog }) {
         .map(([id, count]) => ({ id, count, info: ITEM_INFO[id] }))
         .filter(item => item.info)
     : [];
+
+  // Reset "使用中…" state when server responds
+  useEffect(() => {
+    if (!socket) return;
+    const onResult = () => setUsingId(null);
+    socket.on('use_item_result', onResult);
+    return () => socket.off('use_item_result', onResult);
+  }, [socket]);
 
   const handleUse = (itemId) => {
     if (usingId || !socket?.connected) return;

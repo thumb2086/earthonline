@@ -609,6 +609,7 @@ function Dashboard({ token, onLogout, region }) {
   const [discordId, setDiscordId] = useState('');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [toast, setToast] = useState(null); // { message, type } for non-blocking notifications
   const { theme, setTheme, themeData: currentThemeData, themes } = useTheme();
   
   const pingStartRef = useRef(0);
@@ -973,6 +974,8 @@ function Dashboard({ token, onLogout, region }) {
     s.on('buy_result', (data) => {
       if (data.success) {
         addLog(`[SYSTEM] ${data.message}`);
+        setToast({ message: data.message, type: 'success' });
+        setTimeout(() => setToast(null), 2500);
       } else {
         addLog(`[SYSTEM] ⚠️ ${data.message}`);
       }
@@ -981,6 +984,8 @@ function Dashboard({ token, onLogout, region }) {
     s.on('use_item_result', (data) => {
       if (data.success) {
         addLog(`[SYSTEM] ${data.message}`);
+        setToast({ message: data.message, type: 'success' });
+        setTimeout(() => setToast(null), 2500);
       } else {
         addLog(`[SYSTEM] ⚠️ ${data.message}`);
       }
@@ -1526,6 +1531,9 @@ function Dashboard({ token, onLogout, region }) {
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
               <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>倍率</div>
               <div style={{fontSize: '1.3rem', fontWeight: 'bold', color: globalStats.multiplier > 1.0 ? 'var(--accent-color)' : 'var(--text-main)'}}>{globalStats.multiplier?.toFixed(1) || '1.0'}x</div>
+              {myNode?.activeBuffs?.overclock > Date.now() && (
+                <div style={{fontSize: '0.65rem', color: '#a855f7', marginTop: '2px'}}>⚡超頻 ×2.0</div>
+              )}
             </div>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
               <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>生命</div>
@@ -2642,6 +2650,23 @@ function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket, myN
         </div>
       </div>
       
+      {/* Toast Notification */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 99999, padding: '10px 24px', borderRadius: '8px',
+          background: toast.type === 'success' ? 'rgba(0,255,170,0.15)' : 'rgba(255,65,100,0.15)',
+          border: `1px solid ${toast.type === 'success' ? 'rgba(0,255,170,0.4)' : 'rgba(255,65,100,0.4)'}`,
+          color: toast.type === 'success' ? '#00ffaa' : '#ff416c',
+          fontWeight: 'bold', fontSize: '0.9rem',
+          backdropFilter: 'blur(8px)',
+          animation: 'fadeInUp 0.2s ease',
+          pointerEvents: 'none', whiteSpace: 'nowrap',
+        }}>
+          {toast.type === 'success' ? '✅ ' : '⚠️ '}{toast.message}
+        </div>
+      )}
+
       {/* Footer / Open Source Badge */}
       <div style={{ position: 'fixed', bottom: '15px', left: '0', width: '100%', textAlign: 'center', pointerEvents: 'none', zIndex: 9999 }}>
         <a href="https://github.com/huchialun9-ctrl/earthonline" target="_blank" rel="noreferrer" style={{ pointerEvents: 'auto', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--panel-bg)', padding: '6px 14px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-dim)', fontSize: '0.8rem', backdropFilter: 'blur(4px)', border: '1px solid var(--border-color)', transition: 'all 0.2s' }} onMouseEnter={e => {e.currentTarget.style.background='var(--bg-light)'; e.currentTarget.style.color='var(--text-color)'}} onMouseLeave={e => {e.currentTarget.style.background='var(--panel-bg)'; e.currentTarget.style.color='var(--text-dim)'}}>
