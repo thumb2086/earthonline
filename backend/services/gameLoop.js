@@ -1,7 +1,7 @@
 const User = require('../models/User');
 
 const HEALTH_DECAY_PER_TICK = 0.2 / 30;
-const TIME_EARNED_PER_TICK = 5000;
+const TIME_EARNED_PER_TICK = 2000;
 const BASE_PT_MULTIPLIER = 0.1;
 
 async function processTick(state, connectedUsers) {
