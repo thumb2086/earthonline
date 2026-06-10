@@ -684,7 +684,7 @@ app.get('/api/global/stats', async (req, res, next) => {
 app.use('/api/:region', apiRouter);
 
 // Only redirect non-API GET requests in production (skip for local dev)
-const IS_DEV = process.env.NODE_ENV === 'development' || process.env.FRONTEND_URL?.includes('localhost');
+const IS_DEV = process.env.NODE_ENV === 'development' || process.env.BACKEND_URL?.includes('localhost');
 if (!IS_DEV) {
   app.use((req, res, next) => {
     if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/socket.io') && !req.path.startsWith('/downloads')) {
