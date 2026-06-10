@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from 'react';
-import { io } from 'socket.io-client';
 import { Globe2, Activity, User, Link as LinkIcon, ShieldCheck, Shield, Info, Database, X, Star, Clock, Volume2, VolumeX, Coffee, Users, ChevronDown, Zap, Tornado, Coins, Satellite, Settings, AlertTriangle, CheckCircle, MapPin, Monitor, ShoppingCart, Palette } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
 import { useTheme } from './ThemeContext';
@@ -8,6 +7,7 @@ import DataCenterVisualizer from './DataCenterVisualizer';
 import ShopModal from './ShopModal';
 import BackpackModal from './BackpackModal';
 import useTimer from './hooks/useTimer';
+import useSocket from './hooks/useSocket';
 import './index.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
@@ -550,7 +550,8 @@ function Dashboard({ token, onLogout, region }) {
   const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
   const API_URL = `${BASE_URL}/api/${region}`;
   const SOCKET_URL = BASE_URL;
-  const [socket, setSocket] = useState(null);
+  const { socket, isConnected, ping } = useSocket(SOCKET_URL, region, token, onLogout);
+
   const [nodes, setNodes] = useState([]);
   const [myNode, setMyNode] = useState(null);
   const [myRole, setMyRole] = useState('user');
@@ -559,26 +560,13 @@ function Dashboard({ token, onLogout, region }) {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [allPlayersList, setAllPlayersList] = useState([]);
   const [playerSearch, setPlayerSearch] = useState('');
-  const [adminPlayerFilter, setAdminPlayerFilter] = useState('all'); // 'all' | 'online' | 'muted' | 'banned'
+  const [adminPlayerFilter, setAdminPlayerFilter] = useState('all');
   const [showAdRevive, setShowAdRevive] = useState(false);
   const [adCountdown, setAdCountdown] = useState(0);
   const [adReviveRemaining, setAdReviveRemaining] = useState(3);
   const [currentAd, setCurrentAd] = useState('');
   const [adPlaying, setAdPlaying] = useState(false);
   const [adSlogan, setAdSlogan] = useState('');
-  const AD_SLOGANS = [
-    { title: '子熙生態・無限可能', lines: ['玩遊戲・賺代幣・擁抱區塊鏈', 'Play. Earn. Own.'] },
-    { title: '12 款經典博弈遊戲', lines: ['硬幣翻轉・輪盤・21點・賽馬・骰寶', '老虎機・賓果・爆擊 Crash・德州撲克'] },
-    { title: '雙代幣經濟', lines: ['子熙幣 (ZXC) — 遊戲流通代幣', '佑戩幣 (YJC) — 稀缺保值（1 YJC = 1 億 ZXC）'] },
-    { title: '你的裝置・就是你的冷錢包', lines: ['Device-Linker App 私鑰存於本地', 'PIN 碼簽署・安全又方便'] },
-    { title: '10 大寶箱系統', lines: ['從普通到超越・保證掉落機制', '你敢挑戰超越寶箱嗎？'] },
-    { title: '完整虛擬經濟', lines: ['股票市場・期貨交易・銀行・公司經營', '當舖・玩家交易市場・貸款系統'] },
-    { title: '最強鏈上賭場・盡在子熙', lines: ['https://zixi-casino.vercel.app', '可驗證公平・鏈上結算・雙語界面'] },
-  ];
-  const AD_LINKS = {
-    '/ads/zixi_casino.png': 'https://zixi-casino.vercel.app/landing',
-    '/ads/zixi_app.png': 'https://zixi-casino.vercel.app/landing',
-  };
   const [globalStats, setGlobalStats] = useState({ activeUsers: 0, totalPopulation: 0, globalProduction: 0, socialCompression: '1.000' });
 
   // 管理員面板開啟時自動載入全部玩家名單
@@ -594,8 +582,6 @@ function Dashboard({ token, onLogout, region }) {
     { text: '[SYS] 地球在線連線建立中...', time: new Date().toISOString().substring(11, 19) },
     { text: '[SYS] 進入全球節點網路...', time: new Date().toISOString().substring(11, 19) }
   ]);
-  const [ping, setPing] = useState(0);
-  const [isConnected, setIsConnected] = useState(false);
   const [showDiscordModal, setShowDiscordModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [showManualBind, setShowManualBind] = useState(false);
@@ -826,16 +812,12 @@ function Dashboard({ token, onLogout, region }) {
     });
   };
 
+  // Register socket event listeners (connection + auth handled by useSocket)
   useEffect(() => {
-    const s = io(`${SOCKET_URL}/${region}`);
-    setSocket(s);
+    if (!socket) return;
+    const s = socket;
 
-    s.on('connect', () => {
-      s.emit('authenticate', { token });
-      addLog('驗證金鑰已發送，等待授權...');
-      setIsConnected(true);
-    });
-
+    addLog('驗證金鑰已發送，等待授權...');
     s.on('auth_error', (data) => {
       const msg = data?.message || '授權已過期，請重新登入';
       addLog(`[SYSTEM] ${msg}`);
@@ -1053,26 +1035,15 @@ function Dashboard({ token, onLogout, region }) {
         pingStartRef.current = Date.now();
         s.emit('ping');
       }
-    }, 2000);
-    
-    const syncInterval = setInterval(() => {
-      if (s.connected) {
-        s.emit('sync_user');
-      }
     }, 10000);
 
-    setSocket(s);
-
     return () => {
-      clearInterval(pingInterval);
       clearInterval(syncInterval);
-      // #11: 組件卸載時清理廣告計時器
       if (adTimerRef.current) clearInterval(adTimerRef.current);
       if (adSloganTimerRef.current) clearInterval(adSloganTimerRef.current);
       s.removeAllListeners();
-      s.disconnect();
     };
-  }, [token, onLogout]);
+  }, [socket]);
 
   // Format time HH:MM:SS
   const formatTime = (seconds) => {
