@@ -78,17 +78,12 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers) {
       } catch (err) { socket.emit('terminal_response', `[ERROR] NUKE FAILED.`); }
     } else if (cmdUpper.startsWith('SET_TIME ')) {
       if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
-      const parts = rawCmd.substring(9).trim().split(' ');
-      const targetUser = parts[0], timeSec = parseInt(parts[1]);
-      if (!targetUser || isNaN(timeSec)) { socket.emit('terminal_response', '[ERROR] 用法: SET_TIME <username> <seconds>'); return; }
-      await User.updateOne({ username: targetUser }, { $set: { accumulatedTime: timeSec * 1000 } });
-      socket.emit('terminal_response', `[SYS] 已將 ${targetUser} 的 accumulatedTime 設為 ${timeSec} 秒`);
-    } else if (cmdUpper.startsWith('ROLLBACK ')) {
-      if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
-      const sec = parseInt(rawCmd.substring(9).trim());
-      if (isNaN(sec) || sec < 0) { socket.emit('terminal_response', '[ERROR] 用法: ROLLBACK <秒數>'); return; }
-      const result = await User.updateMany({}, { $inc: { accumulatedTime: -sec * 1000 } });
-      socket.emit('terminal_response', `[SYS] 已從 ${result.modifiedCount} 位玩家扣除 ${sec} 秒`);
+      const parts = rawCmd.substring(9).trim().split(/ +/);
+      const targetUser = parts[0], timeSec = parseFloat(parts[1]);
+      if (!targetUser || isNaN(timeSec)) { socket.emit('terminal_response', '[ERROR] 用法: SET_TIME <username> <秒數>'); return; }
+      const r = await User.updateOne({ username: targetUser }, { $set: { accumulatedTime: Math.round(timeSec * 1000) } });
+      if (r.modifiedCount === 0) { socket.emit('terminal_response', '[ERROR] 找不到使用者 ' + targetUser); return; }
+      socket.emit('terminal_response', '[SYS] 已將 ' + targetUser + ' 的 accumulatedTime 設為 ' + timeSec + ' 秒');
     } else if (cmdUpper.startsWith('SCALE_TIME ')) {
       if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
       const ratio = parseFloat(rawCmd.substring(11).trim());
