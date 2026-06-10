@@ -177,31 +177,32 @@ function LoginGateway({ onLogin }) {
     <div className="login-gateway">
       <div className={`login-bg ${isDaytime ? 'bg-day' : 'bg-night'}`}>
         <div className="login-bg-deco">
+          <div className="pixel-grid"></div>
           {isDaytime ? (
             <>
-              <div className="bg-sun"></div>
-              <div className="bg-clouds">
-                <div className="bcloud bcloud-1"></div>
-                <div className="bcloud bcloud-2"></div>
-                <div className="bcloud bcloud-3"></div>
+              <div className="pixel-sun"></div>
+              <div className="pixel-clouds">
+                <div className="pixel-cloud pixel-cloud-1"></div>
+                <div className="pixel-cloud pixel-cloud-2"></div>
+                <div className="pixel-cloud pixel-cloud-3"></div>
               </div>
-              <div className="bg-grass"></div>
+              <div className="pixel-mountains"></div>
+              <div className="pixel-grass"></div>
             </>
           ) : (
             <>
-              <div className="bg-moon"></div>
-              <div className="bg-stars">
-                {Array.from({ length: 30 }, (_, i) => (
-                  <div key={i} className="bstar" style={{
+              <div className="pixel-moon"></div>
+              <div className="pixel-stars">
+                {Array.from({ length: 40 }, (_, i) => (
+                  <div key={i} className="pixel-star" style={{
                     left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 40}%`,
+                    top: `${Math.random() * 45}%`,
                     animationDelay: `${Math.random() * 3}s`,
-                    width: `${1 + Math.random() * 3}px`,
-                    height: `${1 + Math.random() * 3}px`,
                   }} />
                 ))}
               </div>
-              <div className="bg-ground"></div>
+              <div className="pixel-mountains-night"></div>
+              <div className="pixel-ground"></div>
             </>
           )}
         </div>
