@@ -137,9 +137,12 @@ async function sendDiscordWebhook(message) {
 const app = express();
 const apiRouter = express.Router({ mergeParams: true });
 app.use('/api/:region', apiRouter);
+
+// Health check for Render
+app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() }));
 app.use('/api/:region', authRoutes);
 app.use('/api/:region', leaderboardRoutes);
-app.use('/api/:region', globalRoutes);
+app.use('/api', globalRoutes);
 app.use((err, req, res, next) => {
   console.error('[SYS] Express Error:', err);
   const statusCode = err.statusCode || err.status || 500;
