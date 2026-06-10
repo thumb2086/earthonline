@@ -11,8 +11,10 @@ import Console from './components/Dashboard/Console';
 import { GameProvider } from './context/GameContext';
 import './index.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
+const VITE_API = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
+const BASE_URL = VITE_API;
+const API_URL = VITE_API;
+const SOCKET_URL = VITE_API;
 
 
 function LoginGateway({ onLogin }) {
