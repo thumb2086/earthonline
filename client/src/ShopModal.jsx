@@ -98,15 +98,14 @@ const SHOP_ITEMS = [
     cost: 500,
     type: 'random',
     icon: 'flash_drive.png',
-    tagLabel: 'RANDOM',
-    shortDesc: '抽獎盲盒，驚喜與風險並存',
+    tagLabel: 'LOCKED',
+    shortDesc: '⚠️ 過於 OP，暫時封鎖',
+    locked: true,
     effects: [
-      { icon: '🏆', text: '30% 機率：獲得 1 天（86400 秒）生存時間' },
-      { icon: '💰', text: '30% 機率：獲得 2000 PT' },
-      { icon: '🎁', text: '30% 機率：獲得 500 PT（小回本）' },
-      { icon: '💀', text: '10% 機率：電腦病毒！健康度 -50%（大凶）' },
+      { icon: '🔒', text: '此道具因平衡問題暫時下架' },
+      { icon: '⏳', text: '持有者仍可從背包使用' },
     ],
-    tip: '手氣好的節點可以一夜暴富，手氣差的... 祝您好運。',
+    tip: '此道具過於 OP，管理員已暫時封鎖。已持有的節點仍可使用。',
   },
 ];
 
@@ -173,13 +172,14 @@ export default function ShopModal({ onClose, pts, onBuy, onAdRevive, adReviveRem
                   style={{
                     ...css.card,
                     background: isSelected ? tc.bg : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isSelected ? tc.border : 'rgba(255,255,255,0.08)'}`,
+                    border: `1px solid ${item.locked ? 'rgba(255,65,100,0.3)' : (isSelected ? tc.border : 'rgba(255,255,255,0.08)')}`,
                     boxShadow: isSelected ? tc.glow : 'none',
-                    opacity: canAfford ? 1 : 0.5,
+                    opacity: item.locked ? 0.6 : (canAfford ? 1 : 0.5),
                     animation: isFlash ? 'shop-flash 0.6s ease' : 'none',
                     cursor: 'pointer',
                     transform: isSelected ? 'translateY(-2px)' : 'none',
                     transition: 'all 0.2s ease',
+                    position: 'relative',
                   }}
                   onClick={() => setSelected(isSelected ? null : item.id)}
                 >
@@ -207,15 +207,15 @@ export default function ShopModal({ onClose, pts, onBuy, onAdRevive, adReviveRem
                     <button
                       style={{
                         ...css.buyBtn,
-                        background: buying === item.id ? '#1e293b' : canAfford ? tc.color : '#1e293b',
-                        color: buying === item.id ? tc.color : canAfford ? '#000' : '#475569',
-                        border: `1px solid ${canAfford ? tc.color : '#334155'}`,
-                        cursor: canAfford && !buying ? 'pointer' : 'not-allowed',
+                        background: item.locked ? '#3d1f1f' : (buying === item.id ? '#1e293b' : canAfford ? tc.color : '#1e293b'),
+                        color: item.locked ? '#ff416c' : (buying === item.id ? tc.color : canAfford ? '#000' : '#475569'),
+                        border: `1px solid ${item.locked ? '#ff416c' : (canAfford ? tc.color : '#334155')}`,
+                        cursor: item.locked ? 'not-allowed' : (canAfford && !buying ? 'pointer' : 'not-allowed'),
                       }}
-                      disabled={!canAfford || !!buying}
-                      onClick={e => { e.stopPropagation(); handleBuy(item); }}
+                      disabled={item.locked || !canAfford || !!buying}
+                      onClick={e => { e.stopPropagation(); if (!item.locked) handleBuy(item); }}
                     >
-                      {buying === item.id ? '處理中…' : '購買'}
+                      {item.locked ? '🔒 封鎖中' : (buying === item.id ? '處理中…' : '購買')}
                     </button>
                   </div>
                 </div>
@@ -254,8 +254,8 @@ export default function ShopModal({ onClose, pts, onBuy, onAdRevive, adReviveRem
                   ))}
                 </div>
 
-                <div style={css.detailSection}>💡 使用建議</div>
-                <div style={css.tipBox}>
+                <div style={css.detailSection}>{selectedItem.locked ? '🚫 管理員公告' : '💡 使用建議'}</div>
+                <div style={{ ...css.tipBox, borderLeft: selectedItem.locked ? '3px solid #ff416c' : '3px solid rgba(251,191,36,0.5)' }}>
                   {selectedItem.tip}
                 </div>
 
@@ -274,15 +274,15 @@ export default function ShopModal({ onClose, pts, onBuy, onAdRevive, adReviveRem
                   <button
                     style={{
                       ...css.detailBuyBtn,
-                      background: canAfford ? tc.color : '#1e293b',
-                      color: canAfford ? '#000' : '#475569',
-                      cursor: canAfford && !buying ? 'pointer' : 'not-allowed',
-                      opacity: canAfford ? 1 : 0.6,
+                      background: selectedItem.locked ? '#3d1f1f' : (canAfford ? tc.color : '#1e293b'),
+                      color: selectedItem.locked ? '#ff416c' : (canAfford ? '#000' : '#475569'),
+                      cursor: selectedItem.locked ? 'not-allowed' : (canAfford && !buying ? 'pointer' : 'not-allowed'),
+                      opacity: selectedItem.locked ? 1 : (canAfford ? 1 : 0.6),
                     }}
-                    disabled={!canAfford || !!buying}
-                    onClick={() => handleBuy(selectedItem)}
+                    disabled={selectedItem.locked || !canAfford || !!buying}
+                    onClick={() => { if (!selectedItem.locked) handleBuy(selectedItem); }}
                   >
-                    {buying === selectedItem.id ? '⏳ 處理中…' : '購買'}
+                    {selectedItem.locked ? '🔒 暫時封鎖' : (buying === selectedItem.id ? '⏳ 處理中…' : '購買')}
                   </button>
                 </div>
               </div>

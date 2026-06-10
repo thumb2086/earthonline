@@ -5,6 +5,11 @@ async function buyItem(username, itemId) {
   const item = SHOP_ITEMS[itemId];
   if (!item) return { success: false, message: '道具不存在！' };
 
+  // Flash Drive temporarily disabled (too OP)
+  if (itemId === 'flash_drive') {
+    return { success: false, message: '⚠️ 神祕隨身碟過於 OP，暫時封鎖中。' };
+  }
+
   // Dead players can only buy generators
   const user = await User.findOne({ username }, 'health');
   if (user && user.health <= 0 && itemId !== 'generator') {
