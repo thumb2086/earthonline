@@ -772,8 +772,8 @@ regions.forEach(regionName => {
 
   // #7: global_stats 廣播頻率降為 5 秒
   setInterval(async () => {
+    state.activeUsers = state.connectedUsers.size;
     try {
-      const pop = await db.getRegionPopulation(regionName);
       const isBoosted = state.connectedUsers.size >= 5;
     state.multiplier = isBoosted ? 1.2 : 1.0;
     
@@ -872,34 +872,35 @@ regions.forEach(regionName => {
         await User.bulkWrite(updates);
       }
     }
-    
-    state.activeUsers = state.connectedUsers.size;
-    
-    // calculate compression logic (simplified to string)
-    let comp = '1.000';
-    if (state.activeUsers > 1000000) comp = '0.001';
-    else if (state.activeUsers > 100000) comp = '0.010';
-    else if (state.activeUsers > 10000) comp = '0.100';
-    state.socialCompression = comp;
-    
-    state.globalProduction = await db.getRegionProduction(regionName);
-    
-    // Fetch real hardware metrics (cached from 10s interval)
-    nsp.emit('global_stats', {
-      activeUsers: state.activeUsers,
-      totalPopulation: pop,
-      globalProduction: state.globalProduction,
-      socialCompression: state.socialCompression,
-      multiplier: state.multiplier,
-      systemHardware: {
-        cpu: hardwareStats.cpu,
-        uplink: hardwareStats.uplink,
-        downlink: hardwareStats.downlink,
-        loss: 0
-      }
-    });
     } catch (err) {
-      console.error('[SYS] Interval error:', err);
+      console.error('[SYS] Game logic error:', err);
+    }
+
+    // Stats emission — always runs regardless of game logic errors
+    try {
+      let comp = '1.000';
+      if (state.activeUsers > 1000000) comp = '0.001';
+      else if (state.activeUsers > 100000) comp = '0.010';
+      else if (state.activeUsers > 10000) comp = '0.100';
+      state.socialCompression = comp;
+      
+      state.globalProduction = await db.getRegionProduction(regionName);
+      
+      nsp.emit('global_stats', {
+        activeUsers: state.activeUsers,
+        totalPopulation: await db.getRegionPopulation(regionName).catch(() => 0),
+        globalProduction: state.globalProduction,
+        socialCompression: state.socialCompression,
+        multiplier: state.multiplier,
+        systemHardware: {
+          cpu: hardwareStats.cpu,
+          uplink: hardwareStats.uplink,
+          downlink: hardwareStats.downlink,
+          loss: 0
+        }
+      });
+    } catch (err) {
+      console.error('[SYS] Stats emission error:', err);
     }
   }, 5000);
 
