@@ -1076,25 +1076,21 @@ function Dashboard({ token, onLogout, region }) {
     };
   }, [token, onLogout]);
 
-  // Lifespan display: server base + local estimate for smooth 1s counting
-  const SERVER_TICK_MS = 2000;
-  const SERVER_INTERVAL_MS = 5000;
-  const TIME_RATE = SERVER_TICK_MS / SERVER_INTERVAL_MS; // 0.4
-  const serverTimeRef = useRef({ base: 0, syncAt: 0 });
-
+  // Lifespan display: 1:1 real-time count from server's initial accumulatedTime
+  // Only reads server base once to avoid backward jumps on re-sync
   useEffect(() => {
     if (!myNode || myNode.accumulatedTime === undefined) return;
-    const base = myNode.accumulatedTime || 0;
-    serverTimeRef.current = { base, syncAt: Date.now() };
-    setLifespan(Math.floor(base / 1000));
+    if (lifespanIntervalRef.current) return; // already running
+    const baseSeconds = Math.floor((myNode.accumulatedTime || 0) / 1000);
+    const startAt = Date.now();
+    setLifespan(baseSeconds);
 
     lifespanIntervalRef.current = setInterval(() => {
-      const { base, syncAt } = serverTimeRef.current;
-      const elapsed = (Date.now() - syncAt) * TIME_RATE;
-      setLifespan(Math.floor((base + elapsed) / 1000));
+      const elapsed = Math.floor((Date.now() - startAt) / 1000);
+      setLifespan(baseSeconds + elapsed);
       if (window.electronAPI) {
         window.electronAPI.updatePresence({
-          details: `生存時間: ${formatTime((base + elapsed) / 1000)}`,
+          details: `生存時間: ${formatTime(baseSeconds + elapsed)}`,
           state: `區域: ${region === 'asia' ? 'Asia' : region === 'us' ? 'US' : 'EU'} | 積分: ${Math.floor((myNode?.accumulatedBonusPoints || 0))} PT`,
           username: myNode.username
         });
