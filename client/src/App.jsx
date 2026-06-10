@@ -1608,6 +1608,8 @@ function Dashboard({ token, onLogout, region }) {
             playerCounts={{ asia: Math.floor((globalStats.activeUsers || 0) * 0.4), us: Math.floor((globalStats.activeUsers || 0) * 0.35), eu: Math.floor((globalStats.activeUsers || 0) * 0.25) }}
             activeEvent={currentEvent?.type || null}
             multiplier={globalStats.multiplier || 1}
+            nodes={nodes}
+            myNodeId={myNode?.userId}
           />
 
           {/* Bottom Console Log Module */}

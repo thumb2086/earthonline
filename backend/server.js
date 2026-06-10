@@ -1191,16 +1191,23 @@ regions.forEach(regionName => {
       }
 
       // #4: 改用 nspIo.emit，只廣播給當前命名空間（不跨區域洩漏）
+      const countryRegion = { TW: 'asia', CN: 'asia', JP: 'asia', KR: 'asia', HK: 'asia', SG: 'asia', IN: 'asia', US: 'us', CA: 'us', MX: 'us', GB: 'eu', DE: 'eu', FR: 'eu', IT: 'eu', ES: 'eu', NL: 'eu', SE: 'eu', NO: 'eu', DK: 'eu', FI: 'eu', PL: 'eu', PT: 'eu', BE: 'eu', AT: 'eu', CH: 'eu', IE: 'eu', CZ: 'eu', AU: 'other', BR: 'other', RU: 'other', ZA: 'other' };
       nspIo.emit('node_connected', {
         id: user.id,
+        username: user.username,
         lat: user.lat,
-        lon: user.lon
+        lon: user.lon,
+        country: user.country,
+        region: countryRegion[user.country] || 'other'
       });
 
       const allNodes = Array.from(connectedUsers.values()).map(u => ({
         id: u.id,
+        username: u.username,
         lat: u.lat,
-        lon: u.lon
+        lon: u.lon,
+        country: u.country,
+        region: countryRegion[u.country] || 'other'
       }));
       socket.emit('all_nodes', allNodes);
     } catch (err) {
