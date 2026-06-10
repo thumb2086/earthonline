@@ -94,18 +94,18 @@ async function useItem(username, itemId) {
 
   } else if (item.effect === 'random') {
     const rand = Math.random();
-    if (rand < 0.3) {
+    if (rand < 0.25) {
       extraUpdate = { $inc: { accumulatedTime: 86400 * 1000 } };
       message = '🏆 大吉！獲得 1 天生存時間！';
-    } else if (rand < 0.6) {
-      extraUpdate = { $inc: { accumulatedBonusPoints: 2000 } };
-      message = '💰 中吉！獲得 2000 PT！';
-    } else if (rand < 0.9) {
-      extraUpdate = { $inc: { accumulatedBonusPoints: 500 } };
-      message = '🎁 小吉！回本 500 PT！';
+    } else if (rand < 0.50) {
+      extraUpdate = { $inc: { accumulatedBonusPoints: 1000 } };
+      message = '💰 中吉！獲得 1000 PT！';
+    } else if (rand < 0.80) {
+      extraUpdate = { $inc: { accumulatedBonusPoints: 300 } };
+      message = '🎁 小吉！回本 300 PT！';
     } else {
-      extraUpdate = { $inc: { health: -50 }, $max: { health: 1 } };
-      message = '💀 大凶！電腦病毒爆發，健康度 -50%（強制保留 1% 存活）！';
+      extraUpdate = { $inc: { health: -30 }, $max: { health: 1 } };
+      message = '💀 大凶！電腦病毒爆發，健康度 -30%（強制保留 1% 存活）！';
     }
   } else if (item.effect === 'passive') {
     extraUpdate = { $set: { [`cosmetics.${itemId}`]: true } };

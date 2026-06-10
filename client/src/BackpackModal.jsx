@@ -82,12 +82,12 @@ const ITEM_INFO = {
     color: '#fbbf24',
     bg: 'rgba(251,191,36,0.10)',
     border: 'rgba(251,191,36,0.30)',
-    shortDesc: '抽獎，內建保底機制',
+    shortDesc: '抽獎，高風險高回報',
     effects: [
-      { text: '40% 獲得 1 天生存時間' },
-      { text: '25% 獲得 2000 PT' },
-      { text: '25% 獲得 500 PT' },
-      { text: '10% 健康度 -50%（保留 1%）' },
+      { text: '25% 獲得 1 天生存時間' },
+      { text: '25% 獲得 1000 PT' },
+      { text: '30% 獲得 300 PT' },
+      { text: '20% 健康度 -30%（保留 1%）' },
     ],
   },
   speed_drive: {
