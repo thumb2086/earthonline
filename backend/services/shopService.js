@@ -5,6 +5,12 @@ async function buyItem(username, itemId) {
   const item = SHOP_ITEMS[itemId];
   if (!item) return { success: false, message: '道具不存在！' };
 
+  // Dead players can only buy generators
+  const user = await User.findOne({ username }, 'health');
+  if (user && user.health <= 0 && itemId !== 'generator') {
+    return { success: false, message: '⚠️ 伺服器已死機！僅能購買「備用發電機」或觀看廣告復活。' };
+  }
+
   const result = await User.findOneAndUpdate(
     { username, accumulatedBonusPoints: { $gte: item.cost } },
     { $inc: { accumulatedBonusPoints: -item.cost, [`inventory.${itemId}`]: 1 } },
@@ -24,6 +30,12 @@ async function buyItem(username, itemId) {
 async function useItem(username, itemId) {
   const item = SHOP_ITEMS[itemId];
   if (!item) return { success: false, message: '道具不存在！' };
+
+  // Dead players can only use generators (revive)
+  const userCheck = await User.findOne({ username }, 'health');
+  if (userCheck && userCheck.health <= 0 && item.effect !== 'revive') {
+    return { success: false, message: '⚠️ 伺服器已死機！請先使用「備用發電機」復活。' };
+  }
 
   const userBefore = await User.findOneAndUpdate(
     { username, [`inventory.${itemId}`]: { $gte: 1 } },
