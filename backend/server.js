@@ -135,13 +135,10 @@ async function sendDiscordWebhook(message) {
 }
 
 const app = express();
-const apiRouter = express.Router({ mergeParams: true });
-app.use('/api/:region', apiRouter);
-
 // Health check for Render
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() }));
 
-// Discord OAuth
+// Discord OAuth — must be BEFORE :region route mounts to avoid Express 5 path conflict
 app.get('/api/auth/discord', (req, res) => {
   const state = req.query.state;
   if (!state) return res.status(400).send('Missing state');
