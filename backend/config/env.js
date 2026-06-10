@@ -1,7 +1,12 @@
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  console.error('[SYS] FATAL: JWT_SECRET environment variable is required');
-  process.exit(1);
+  const isDev = process.env.BACKEND_URL?.includes('localhost');
+  if (isDev) {
+    console.warn('[SYS] WARNING: JWT_SECRET not set, using dev fallback. Set JWT_SECRET for production.');
+  } else {
+    console.error('[SYS] FATAL: JWT_SECRET environment variable is required');
+    process.exit(1);
+  }
 }
 
 ['DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'MONGODB_URI'].forEach(key => {
