@@ -8,7 +8,7 @@ import ShopModal from './ShopModal';
 import BackpackModal from './BackpackModal';
 import LeaderboardModal from './components/Modals/LeaderboardModal';
 import Console from './components/Dashboard/Console';
-import { GameProvider } from './context/GameContext';
+import { GameProvider, useGame } from './context/GameContext';
 import './index.css';
 
 const VITE_API = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
