@@ -4,7 +4,7 @@ import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Users } from 'lucid
 import EarthGlobe from './EarthGlobe';
 import './datacenter.css';
 
-export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage, region, onOpenSocial, playerCounts, activeEvent, multiplier, nodes, myNodeId }) {
+export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage, region, onOpenSocial, activeEvent, multiplier, nodes, myNodeId }) {
   const cardRef = useRef(null);
 
   const level = useMemo(() => {
@@ -139,7 +139,6 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
           <EarthGlobe
             onlineCount={onlineCount}
             region={region}
-            playerCounts={playerCounts}
             activeEvent={activeEvent}
             multiplier={multiplier}
             nodes={nodes}

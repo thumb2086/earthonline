@@ -239,16 +239,34 @@
   background: radial-gradient(ellipse at 50% 50%, #0d1b2a, #050810);
   cursor: grab;
   user-select: none;
+  isolation: isolate;
 }
 
 .earth-globe-wrapper:active {
   cursor: grabbing;
 }
 
+/* CRT scanline overlay */
+.globe-scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+}
+
 .earth-globe-canvas {
   display: block;
   width: 100%;
   height: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .globe-top-left {
@@ -266,41 +284,144 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px 12px;
   backdrop-filter: blur(4px);
 }
 
 .globe-stat-label {
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-family: monospace;
+  letter-spacing: 1.5px;
+}
+
+.globe-stat-value {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #00ffaa;
   font-family: monospace;
   letter-spacing: 1px;
 }
 
-.globe-stat-value {
-  font-size: 1.3rem;
-  font-weight: bold;
-  color: #00ffaa;
-  font-family: monospace;
-}
-
 .globe-event-badge {
-  background: rgba(255, 215, 0, 0.15);
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.8rem;
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px dashed rgba(255, 215, 0, 0.35);
+  padding: 5px 10px;
+  font-size: 0.75rem;
   color: #ffd700;
   font-family: monospace;
+  letter-spacing: 1px;
   animation: globeEventPulse 2s ease-in-out infinite;
 }
 
 @keyframes globeEventPulse {
   0%, 100% { box-shadow: 0 0 4px rgba(255, 215, 0, 0.1); }
-  50% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.3); }
+  50% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.25); }
+}
+
+/* Control panel (right side) */
+.globe-controls-panel {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 8px;
+  gap: 6px;
+}
+
+.globe-controls-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.globe-controls-divider {
+  width: 20px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.globe-ctrl-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.7);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+  font-family: monospace;
+  padding: 0;
+}
+
+.globe-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.globe-ctrl-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.globe-locate-btn.locating svg {
+  animation: locatePulse 0.6s ease-in-out infinite;
+}
+
+@keyframes locatePulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.globe-zoom-indicator {
+  width: 4px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.06);
+  position: relative;
+  margin: 2px 0;
+}
+
+.globe-zoom-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.globe-zoom-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(0, 255, 170, 0.25);
+  transition: height 0.1s;
+}
+
+.globe-scale-label {
+  position: absolute;
+  right: 12px;
+  bottom: 60px;
+  z-index: 15;
+  font-size: 0.55rem;
+  font-family: monospace;
+  color: rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+  text-align: center;
+  width: 46px;
 }
 
 .globe-bottom-right {
@@ -317,26 +438,34 @@
   align-items: flex-end;
   gap: 2px;
   background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 6px 12px;
-  color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 6px 10px;
+  color: rgba(255, 255, 255, 0.35);
   font-family: monospace;
   backdrop-filter: blur(4px);
 }
 
+.globe-nasa-label {
+  font-size: 0.5rem;
+  letter-spacing: 2px;
+}
+
+.globe-nasa-date {
+  font-size: 0.65rem;
+}
+
+/* Legend (bottom-left) */
 .globe-legend {
   position: absolute;
   bottom: 16px;
   left: 16px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   z-index: 10;
   background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 8px 12px;
   backdrop-filter: blur(4px);
   pointer-events: none;
 }
@@ -344,25 +473,159 @@
 .globe-legend-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
+  gap: 6px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
   font-family: monospace;
 }
 
 .globe-legend-item.active {
-  color: #fff;
+  color: rgba(255, 255, 255, 0.85);
 }
 
-.globe-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.globe-region-dot {
+  width: 6px;
+  height: 6px;
+  border: 2px solid;
+  border-radius: 0;
   flex-shrink: 0;
+  background: transparent;
 }
 
-.globe-count {
+.globe-region-name {
+  letter-spacing: 0.5px;
+}
+
+.globe-region-count {
   margin-left: auto;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.65rem;
+}
+
+/* Info Card */
+.globe-info-card {
+  position: absolute;
+  bottom: 80px;
+  left: 16px;
+  min-width: 210px;
+  max-width: 270px;
+  background: rgba(8, 10, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px;
+  backdrop-filter: blur(12px);
+  z-index: 20;
+  pointer-events: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+  animation: infoCardIn 0.15s ease-out;
+}
+
+@keyframes infoCardIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.globe-info-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: transparent;
+  color: rgba(255,255,255,0.25);
+  font-size: 0.6rem;
+  font-family: monospace;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+  line-height: 1;
+}
+
+.globe-info-close:hover {
+  color: rgba(255,255,255,0.7);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.globe-info-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.globe-info-username {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #fff;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+}
+
+.globe-info-level {
+  font-size: 0.65rem;
+  font-weight: bold;
+  font-family: monospace;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+}
+
+.level-1 { color: #8e9eab; }
+.level-2 { color: #3b82f6; }
+.level-3 { color: #a855f7; }
+.level-4 { color: #ffd700; }
+.level-5 { color: #ff416c; }
+
+.globe-info-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.globe-info-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+}
+
+.globe-info-label {
+  color: rgba(255,255,255,0.2);
+  font-family: monospace;
+  font-size: 0.6rem;
+  min-width: 60px;
+  flex-shrink: 0;
+  letter-spacing: 1px;
+}
+
+.globe-info-val {
+  color: rgba(255,255,255,0.7);
+  font-family: monospace;
+  font-size: 0.72rem;
+}
+
+.pt-value {
+  color: #ffd700;
+}
+
+.globe-info-val.health-ok {
+  color: #00ffaa;
+}
+
+.globe-info-val.health-warn {
+  color: #ff416c;
+}
+
+.globe-info-self {
+  margin-top: 6px;
+  font-size: 0.6rem;
+  color: rgba(59, 130, 246, 0.5);
+  font-family: monospace;
+  letter-spacing: 2px;
+  text-align: center;
+  border-top: 1px solid rgba(59, 130, 246, 0.1);
+  padding-top: 6px;
 }

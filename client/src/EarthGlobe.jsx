@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 
 const NASA_EARTH_TEXTURE = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg';
 const NASA_EPIC_API = 'https://epic.gsfc.nasa.gov/api/natural';
@@ -9,22 +9,33 @@ const REGION_POSITIONS = {
   eu: { lat: 50.1, lng: 8.7, name: 'Europe', color: '#a855f7' },
 };
 
-const REGION_COUNTRY_MAP = {
-  TW: 'asia', CN: 'asia', JP: 'asia', KR: 'asia', HK: 'asia', SG: 'asia', IN: 'asia',
-  US: 'us', CA: 'us', MX: 'us',
-  GB: 'eu', DE: 'eu', FR: 'eu', IT: 'eu', ES: 'eu', NL: 'eu', SE: 'eu', NO: 'eu', DK: 'eu', FI: 'eu', PL: 'eu', PT: 'eu', BE: 'eu', AT: 'eu', CH: 'eu', IE: 'eu', CZ: 'eu',
+const LEVEL_NAMES = ['', 'T1 個人測試節點', 'T2 塔式運算伺服器', 'T3 標準伺服器機櫃', 'T4 區域級數據群集', 'T5 無限矩陣資料中心'];
+
+const formatAccTime = (ms) => {
+  const totalSeconds = Math.floor((ms || 0) / 1000);
+  const d = Math.floor(totalSeconds / 86400);
+  const h = Math.floor((totalSeconds % 86400) / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  return `${d > 0 ? d + 'd ' : ''}${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m`;
 };
 
-const countryToRegion = (country) => REGION_COUNTRY_MAP[country] || 'other';
+const regionColors = { asia: '#00ffaa', us: '#3b82f6', eu: '#a855f7', other: '#666' };
 
-export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCounts = {}, activeEvent, multiplier, nodes = [], myNodeId }) {
+export default function EarthGlobe({ onlineCount = 0, region = 'asia', activeEvent, multiplier, nodes = [], myNodeId }) {
   const canvasRef = useRef(null);
   const imageRef = useRef(null);
-  const mouseRef = useRef({ down: false, x: 0, y: 0 });
+  const mouseRef = useRef({ down: false, x: 0, y: 0, moved: false });
   const rotationRef = useRef({ x: 0.3, y: 0 });
+  const targetRef = useRef(null);
+  const animatingRef = useRef(false);
   const lastTimeRef = useRef(0);
   const animRef = useRef(null);
+  const scaleRef = useRef(1);
+  const projectedRef = useRef([]);
   const [nasaInfo, setNasaInfo] = useState(null);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [scaleDisplay, setScaleDisplay] = useState(1);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     const img = new Image();
@@ -45,6 +56,13 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!selectedNode || !nodes) return;
+    if (!nodes.find(n => n.id === selectedNode.id)) {
+      setSelectedNode(null);
+    }
+  }, [nodes, selectedNode]);
+
   const project = (lat, lng, radius) => {
     const phi = (90 - lat) * Math.PI / 180;
     const theta = lng * Math.PI / 180;
@@ -63,6 +81,25 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
     const rrz = rx * Math.sin(rotY) + rz * Math.cos(rotY);
     const scale = focalLength / (focalLength + rrz);
     return { sx: rrx * scale + cx, sy: -ry * scale + cy, z: rrz };
+  };
+
+  const calcTargetRotation = (lat, lon) => {
+    const p = project(lat, lon, 1);
+    const rotX = Math.atan2(p.y, p.z || 0.0001);
+    const clampedRotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
+    const rz = p.y * Math.sin(clampedRotX) + p.z * Math.cos(clampedRotX);
+    const rotY = Math.atan2(p.x, rz || 0.0001);
+    return { x: clampedRotX, y: rotY };
+  };
+
+  const locateMe = () => {
+    if (!myNodeId || !nodes) return;
+    const myNode = nodes.find(n => n.id === myNodeId);
+    if (!myNode || !myNode.lat || !myNode.lon) return;
+    const target = calcTargetRotation(myNode.lat, myNode.lon);
+    targetRef.current = target;
+    animatingRef.current = true;
+    setLocating(true);
   };
 
   useEffect(() => {
@@ -88,13 +125,28 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
       const dt = Math.min(time - lastTimeRef.current, 50);
       lastTimeRef.current = time;
 
-      rotationRef.current.y += dt * 0.00012;
+      if (animatingRef.current && targetRef.current) {
+        const t = 1 - Math.pow(0.0005, dt / 1000);
+        const prevX = rotationRef.current.x;
+        const prevY = rotationRef.current.y;
+        rotationRef.current.x += (targetRef.current.x - rotationRef.current.x) * t;
+        rotationRef.current.y += (targetRef.current.y - rotationRef.current.y) * t;
+        if (Math.abs(prevX - targetRef.current.x) < 0.0001 &&
+            Math.abs(rotationRef.current.x - targetRef.current.x) < 0.0001 &&
+            Math.abs(rotationRef.current.y - targetRef.current.y) < 0.0001) {
+          rotationRef.current.x = targetRef.current.x;
+          rotationRef.current.y = targetRef.current.y;
+          animatingRef.current = false;
+          setLocating(false);
+        }
+      }
 
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
       const cx = w / 2;
       const cy = h / 2;
-      const radius = Math.min(w, h) * 0.38;
+      const scale = scaleRef.current;
+      const radius = Math.min(w, h) * 0.38 * scale;
       const focalLength = radius * 3;
       const rotX = rotationRef.current.x;
       const rotY = rotationRef.current.y;
@@ -121,9 +173,7 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.clip();
 
-      const imgSize = img.width / 2;
-      const ox = cx - imgSize / 2;
-      const oy = cy - imgSize / 2;
+      const imgSize = img.width / 2 * scale;
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(-rotY + Math.PI);
@@ -151,8 +201,6 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
       ctx.beginPath();
       ctx.arc(cx, cy, radius * 1.15, 0, Math.PI * 2);
       ctx.fill();
-
-      const regionColors = { asia: '#00ffaa', us: '#3b82f6', eu: '#a855f7', other: '#666' };
 
       Object.entries(REGION_POSITIONS).forEach(([key, r]) => {
         const p = project(r.lat, r.lng, radius);
@@ -185,82 +233,49 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
         ctx.fillText(r.name, rp.sx, rp.sy - baseRadius * pulse - 8);
       });
 
+      const projected = [];
       if (nodes && nodes.length > 0) {
         nodes.forEach(node => {
           if (!node.lat || !node.lon) return;
           const p = project(node.lat, node.lon, radius);
           const rp = rotatePoint(p, rotX, rotY, focalLength, cx, cy);
+          projected.push({ sx: rp.sx, sy: rp.sy, z: rp.z, node });
           if (rp.z < 0) return;
 
           const isMe = node.id === myNodeId;
-          const dotRadius = isMe ? 4 : 2;
+          const isSelected = selectedNode && selectedNode.id === node.id;
+          const dotRadius = isMe ? 5 : isSelected ? 5 : 3;
           const color = regionColors[node.region] || '#666';
 
           ctx.shadowColor = color;
-          ctx.shadowBlur = isMe ? 15 : 4;
+          ctx.shadowBlur = isMe ? 15 : isSelected ? 15 : 4;
           ctx.fillStyle = color;
           ctx.globalAlpha = isMe ? 1 : 0.6;
           ctx.beginPath();
           ctx.arc(rp.sx, rp.sy, dotRadius, 0, Math.PI * 2);
           ctx.fill();
 
-          if (isMe) {
+          if (isMe || isSelected) {
             ctx.globalAlpha = 0.2;
             ctx.beginPath();
-            ctx.arc(rp.sx, rp.sy, 12, 0, Math.PI * 2);
+            ctx.arc(rp.sx, rp.sy, 16, 0, Math.PI * 2);
             ctx.fill();
+          }
+
+          if (isSelected) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.arc(rp.sx, rp.sy, 20, 0, Math.PI * 2);
+            ctx.stroke();
           }
 
           ctx.shadowBlur = 0;
           ctx.globalAlpha = 1;
         });
       }
-
-      const arcs = [
-        ['asia', 'us', '#00ffaa'],
-        ['us', 'eu', '#3b82f6'],
-        ['eu', 'asia', '#a855f7'],
-      ];
-
-      arcs.forEach(([from, to, color], idx) => {
-        const f = REGION_POSITIONS[from];
-        const t = REGION_POSITIONS[to];
-        if (!f || !t) return;
-
-        const p1 = rotatePoint(project(f.lat, f.lng, radius), rotX, rotY, focalLength, cx, cy);
-        const p2 = rotatePoint(project(t.lat, t.lng, radius), rotX, rotY, focalLength, cx, cy);
-        if (p1.z < 0 || p2.z < 0) return;
-
-        const midX = (p1.sx + p2.sx) / 2;
-        const midY = (p1.sy + p2.sy) / 2 - radius * 0.4;
-
-        ctx.globalAlpha = 0.4 + 0.2 * Math.sin(time * 0.001 + idx);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.moveTo(p1.sx, p1.sy);
-        ctx.quadraticCurveTo(midX, midY, p2.sx, p2.sy);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
-
-        const dotProgress = ((time * 0.0003 + idx * 0.33) % 1);
-        const dotT = dotProgress;
-        const dotX = (1 - dotT) * (1 - dotT) * p1.sx + 2 * (1 - dotT) * dotT * midX + dotT * dotT * p2.sx;
-        const dotY = (1 - dotT) * (1 - dotT) * p1.sy + 2 * (1 - dotT) * dotT * midY + dotT * dotT * p2.sy;
-
-        ctx.fillStyle = '#fff';
-        ctx.globalAlpha = 0.9;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.arc(dotX, dotY, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
-      });
+      projectedRef.current = projected;
 
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
@@ -274,18 +289,23 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
       window.removeEventListener('resize', resize);
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, [nodes, myNodeId, region]);
+  }, [nodes, myNodeId, region, selectedNode]);
 
   const handleMouseDown = (e) => {
     mouseRef.current.down = true;
     mouseRef.current.x = e.clientX;
     mouseRef.current.y = e.clientY;
+    mouseRef.current.moved = false;
   };
 
   const handleMouseMove = (e) => {
     if (!mouseRef.current.down) return;
+    if (animatingRef.current) return;
     const dx = e.clientX - mouseRef.current.x;
     const dy = e.clientY - mouseRef.current.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      mouseRef.current.moved = true;
+    }
     rotationRef.current.y += dx * 0.005;
     rotationRef.current.x += dy * 0.005;
     rotationRef.current.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationRef.current.x));
@@ -293,7 +313,60 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
     mouseRef.current.y = e.clientY;
   };
 
-  const handleMouseUp = () => { mouseRef.current.down = false; };
+  const handleMouseUp = (e) => {
+    const wasDown = mouseRef.current.down;
+    const wasMoved = mouseRef.current.moved;
+    mouseRef.current.down = false;
+    if (wasDown && !wasMoved) {
+      handleClick(e.clientX, e.clientY);
+    }
+  };
+
+  const handleClick = (clientX, clientY) => {
+    if (animatingRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+
+    const projected = projectedRef.current;
+    let closest = null;
+    let closestDist = 12;
+    projected.forEach(({ sx, sy, z, node }) => {
+      if (z < 0) return;
+      const dx = sx - mx;
+      const dy = sy - my;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = node;
+      }
+    });
+
+    if (closest) {
+      setSelectedNode(closest);
+    } else {
+      setSelectedNode(null);
+    }
+  };
+
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.15 : 0.15;
+    scaleRef.current = Math.max(0.4, Math.min(5, scaleRef.current + delta));
+    setScaleDisplay(Math.round(scaleRef.current * 100));
+  }, []);
+
+  const zoomIn = () => {
+    scaleRef.current = Math.min(5, scaleRef.current + 0.3);
+    setScaleDisplay(Math.round(scaleRef.current * 100));
+  };
+
+  const zoomOut = () => {
+    scaleRef.current = Math.max(0.4, scaleRef.current - 0.3);
+    setScaleDisplay(Math.round(scaleRef.current * 100));
+  };
 
   const regionCounts = {};
   if (nodes && nodes.length > 0) {
@@ -303,13 +376,19 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
     });
   }
 
+  const closeInfoCard = () => setSelectedNode(null);
+
+  const myNodeExists = myNodeId && nodes && nodes.some(n => n.id === myNodeId);
+
   return (
     <div className="earth-globe-wrapper"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onWheel={handleWheel}
     >
+      <div className="globe-scanlines"></div>
       <canvas ref={canvasRef} className="earth-globe-canvas" />
 
       <div className="globe-top-left">
@@ -325,20 +404,60 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
         </div>
         {activeEvent && (
           <div className="globe-event-badge">
-            ⚡ {activeEvent}
+            &#9889; {activeEvent}
           </div>
         )}
       </div>
 
+      <div className="globe-controls-panel">
+        <div className="globe-controls-group">
+          <button className="globe-ctrl-btn" onClick={zoomIn} title="ZOOM IN">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <line x1="7" y1="2" x2="7" y2="12" stroke="currentColor" strokeWidth="1.5"/>
+              <line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+          </button>
+          <div className="globe-zoom-indicator">
+            <div className="globe-zoom-track">
+              <div className="globe-zoom-fill" style={{ height: `${Math.min(100, ((scaleRef.current - 0.4) / 4.6) * 100)}%` }}></div>
+            </div>
+          </div>
+          <button className="globe-ctrl-btn" onClick={zoomOut} title="ZOOM OUT">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+          </button>
+        </div>
+        <div className="globe-controls-divider"></div>
+        <div className="globe-controls-group">
+          <button
+            className={`globe-ctrl-btn globe-locate-btn ${locating ? 'locating' : ''}`}
+            onClick={locateMe}
+            disabled={!myNodeExists}
+            title="LOCATE MY NODE"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <circle cx="7" cy="7" r="3" stroke="currentColor" strokeWidth="1.3"/>
+              <line x1="7" y1="1" x2="7" y2="3.5" stroke="currentColor" strokeWidth="1.3"/>
+              <line x1="7" y1="10.5" x2="7" y2="13" stroke="currentColor" strokeWidth="1.3"/>
+              <line x1="1" y1="7" x2="3.5" y2="7" stroke="currentColor" strokeWidth="1.3"/>
+              <line x1="10.5" y1="7" x2="13" y2="7" stroke="currentColor" strokeWidth="1.3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="globe-scale-label">{scaleDisplay}%</div>
+
       <div className="globe-bottom-right">
         <div className="globe-nasa-badge">
-          <span style={{ fontSize: '0.65rem', opacity: 0.4 }}>NASA EARTH OBSERVATORY</span>
+          <span className="globe-nasa-label">NASA EARTH OBSERVATORY</span>
           {nasaInfo ? (
-            <span style={{ fontSize: '0.7rem' }}>
+            <span className="globe-nasa-date">
               {new Date(nasaInfo.date).toLocaleDateString()}
             </span>
           ) : (
-            <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>receiving telemetry...</span>
+            <span className="globe-nasa-date" style={{ opacity: 0.5 }}>receiving telemetry...</span>
           )}
         </div>
       </div>
@@ -346,12 +465,55 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', playerCou
       <div className="globe-legend">
         {Object.entries(REGION_POSITIONS).map(([key, r]) => (
           <div key={key} className={`globe-legend-item ${key === region ? 'active' : ''}`}>
-            <span className="globe-dot" style={{ background: r.color }}></span>
-            <span>{r.name}</span>
-            <span className="globe-count">{regionCounts[key] || 0}</span>
+            <span className="globe-region-dot" style={{ borderColor: r.color }}></span>
+            <span className="globe-region-name">{r.name}</span>
+            <span className="globe-region-count">{String(regionCounts[key] || 0).padStart(2, '0')}</span>
           </div>
         ))}
       </div>
+
+      {selectedNode && (
+        <div className="globe-info-card" onClick={(e) => e.stopPropagation()}>
+          <button className="globe-info-close" onClick={closeInfoCard}>x</button>
+          <div className="globe-info-header">
+            <span className="globe-info-username">{selectedNode.username || 'Unknown'}</span>
+            <span className={`globe-info-level level-${selectedNode.level || 1}`}>Lv{selectedNode.level || 1}</span>
+          </div>
+          <div className="globe-info-body">
+            <div className="globe-info-row">
+              <span className="globe-info-label">REGION</span>
+              <span className="globe-info-val" style={{ color: regionColors[selectedNode.region] || '#666' }}>
+                {(selectedNode.region || 'other').toUpperCase()}
+              </span>
+            </div>
+            <div className="globe-info-row">
+              <span className="globe-info-label">COORDS</span>
+              <span className="globe-info-val">{selectedNode.lat?.toFixed(2)}, {selectedNode.lon?.toFixed(2)}</span>
+            </div>
+            <div className="globe-info-row">
+              <span className="globe-info-label">CLASS</span>
+              <span className="globe-info-val">{LEVEL_NAMES[selectedNode.level] || '—'}</span>
+            </div>
+            <div className="globe-info-row">
+              <span className="globe-info-label">CREDITS</span>
+              <span className="globe-info-val pt-value">{(selectedNode.accumulatedBonusPoints || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} PT</span>
+            </div>
+            <div className="globe-info-row">
+              <span className="globe-info-label">UPTIME</span>
+              <span className="globe-info-val">{formatAccTime(selectedNode.accumulatedTime)}</span>
+            </div>
+            <div className="globe-info-row">
+              <span className="globe-info-label">HEALTH</span>
+              <span className={`globe-info-val ${(selectedNode.health || 0) > 50 ? 'health-ok' : 'health-warn'}`}>
+                {selectedNode.health ?? 100}%
+              </span>
+            </div>
+            {selectedNode.id === myNodeId && (
+              <div className="globe-info-self"><< YOU</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
