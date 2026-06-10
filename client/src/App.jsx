@@ -190,6 +190,7 @@ function LoginGateway({ onLogin }) {
           ))}
         </div>
         <div className="nasa-earth"></div>
+        <div className="nasa-earth-night"></div>
         <div className="nasa-glow"></div>
       </div>
 

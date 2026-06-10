@@ -332,6 +332,22 @@ body {
   100% { background-position: 200% 0; }
 }
 
+.nasa-earth-night {
+  position: absolute;
+  width: 700px;
+  height: 700px;
+  bottom: -250px;
+  right: -150px;
+  border-radius: 50%;
+  background-color: transparent;
+  background-image: url('https://raw.githubusercontent.com/nickrussler/earth-globe/master/src/assets/textures/earth_lights_4800.png');
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  mix-blend-mode: screen;
+  animation: nasaEarthSpin 60s linear infinite;
+  opacity: 0.9;
+}
+
 .nasa-glow {
   position: absolute;
   width: 750px;
