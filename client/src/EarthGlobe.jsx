@@ -509,7 +509,7 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', activeEve
               </span>
             </div>
             {selectedNode.id === myNodeId && (
-              <div className="globe-info-self"><< YOU</div>
+              <div className="globe-info-self">&#60;&#60; YOU</div>
             )}
           </div>
         </div>

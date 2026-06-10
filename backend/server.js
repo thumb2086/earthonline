@@ -812,8 +812,15 @@ regions.forEach(regionName => {
               filter: { username: user.username },
               update: { $inc: incFields }
             }
-  });
-
+          });
+          for (const [sid, cu] of connectedUsers) {
+            if (cu.username === user.username) {
+              if (decay > 0) cu.health = (cu.health || 0) - decay;
+              if (ptPerTick > 0) cu.accumulatedBonusPoints = (cu.accumulatedBonusPoints || 0) + ptPerTick;
+              if (timeEarned > 0) cu.accumulatedTime = (cu.accumulatedTime || 0) + timeEarned;
+              break;
+            }
+          }
         }
       }
       
@@ -873,6 +880,12 @@ regions.forEach(regionName => {
         activeBuffs: dbUser.activeBuffs ? Object.fromEntries(dbUser.activeBuffs) : {},
         inventory: dbUser.inventory ? Object.fromEntries(dbUser.inventory) : {}
       });
+      if (connectedUsers.has(socket.id)) {
+        const cu = connectedUsers.get(socket.id);
+        cu.health = dbUser.health;
+        cu.accumulatedBonusPoints = dbUser.accumulatedBonusPoints;
+        cu.accumulatedTime = dbUser.accumulatedTime;
+      }
     }
   });
 
@@ -914,6 +927,9 @@ regions.forEach(regionName => {
         pts: result.accumulatedBonusPoints,
         inventory: result.inventory ? Object.fromEntries(result.inventory) : {}
       });
+      if (connectedUsers.has(socket.id)) {
+        connectedUsers.get(socket.id).accumulatedBonusPoints = result.accumulatedBonusPoints;
+      }
     } catch (err) {
       console.error(err);
       socket.emit('buy_result', { success: false, message: '系統錯誤' });
@@ -1022,6 +1038,11 @@ regions.forEach(regionName => {
         activeBuffs: finalUser.activeBuffs ? Object.fromEntries(finalUser.activeBuffs) : {},
         inventory: finalUser.inventory ? Object.fromEntries(finalUser.inventory) : {}
       });
+      if (connectedUsers.has(socket.id)) {
+        const cu = connectedUsers.get(socket.id);
+        cu.health = finalUser.health;
+        cu.accumulatedBonusPoints = finalUser.accumulatedBonusPoints;
+      }
     } catch (err) {
       console.error('[SYS] use_item error:', err);
       socket.emit('use_item_result', { success: false, message: '系統錯誤，請稍後再試。' });
@@ -1051,6 +1072,9 @@ regions.forEach(regionName => {
     reviveCounts.set(adCountKey, count + 1);
     socket.emit('ad_revive_result', { success: true, health: newHealth, remaining: 2 - count });
     socket.emit('user_state_update', { health: newHealth });
+    if (connectedUsers.has(socket.id)) {
+      connectedUsers.get(socket.id).health = newHealth;
+    }
   });
 
   socket.on('authenticate', async (data) => {
@@ -1419,6 +1443,7 @@ regions.forEach(regionName => {
       for (const [sid, u] of connectedUsers.entries()) {
         if (u.username === data.targetUsername) {
           nspIo.to(sid).emit('user_state_update', { pts: target.accumulatedBonusPoints });
+          u.accumulatedBonusPoints = target.accumulatedBonusPoints;
           break;
         }
       }

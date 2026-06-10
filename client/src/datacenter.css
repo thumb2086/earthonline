@@ -198,25 +198,6 @@
   min-height: 500px;
 }
 
-.data-flow-grid {
-  width: 100%;
-  aspect-ratio: 16/9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.svg-equipment {
-  width: 300px;
-  height: 300px;
-}
-
-.svg-equipment-wide {
-  width: 100%;
-  max-width: 600px;
-  height: auto;
-}
-
 @media (max-width: 1024px) {
   .dc-layout {
     flex-direction: column-reverse;
