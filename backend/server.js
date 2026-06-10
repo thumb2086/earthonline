@@ -658,7 +658,7 @@ regions.forEach(regionName => {
     // Delegate to extracted socket handlers
   registerChatHandlers(socket, nspIo, state, connectedUsers, chatCooldowns);
   registerSocialHandlers(socket, nspIo, connectedUsers);
-  registerTerminalHandlers(socket, nspIo, connectedUsers);
+  registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionStates);
 // Handle Disconnect
   socket.on('disconnect', async () => {
     const disconnectedUser = connectedUsers.get(socket.id);

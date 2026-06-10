@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const discordBot = require('../discordBot');
+const db = require('../db');
 const { setPaused } = require('../state/tickState');
 
 async function sendDiscordWebhook(message) {
@@ -17,7 +18,7 @@ async function sendDiscordWebhook(message) {
   }
 }
 
-function registerTerminalHandlers(socket, nspIo, connectedUsers) {
+function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionStates) {
   socket.on('terminal_command', async (data) => {
     const user = connectedUsers.get(socket.id);
     if (!user || !data || typeof data.command !== 'string') return;
@@ -107,6 +108,21 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers) {
         socket.emit('terminal_response', `[SYS] 已重置 ${count} 位玩家（time/PT/血量歸零，背包/buff 清除）`);
         nspIo.emit('force_sync');
         nspIo.emit('social_data_updated');
+        // Broadcast updated global_stats to all regions
+        if (io && regionStates) {
+          Object.keys(regionStates).forEach(async r => {
+            const state = regionStates[r];
+            const nsp = io.of('/' + r);
+            const pop = await db.getRegionPopulation(r).catch(() => 0);
+            const production = await db.getRegionProduction(r).catch(() => 0);
+            nsp.emit('global_stats', {
+              activeUsers: state.activeUsers, totalPopulation: pop,
+              globalProduction: production, socialCompression: state.socialCompression || '1.000',
+              multiplier: state.multiplier || 1.0,
+              systemHardware: { cpu: 0, uplink: 0, downlink: 0, loss: 0 }
+            });
+          });
+        }
       } catch (err) { socket.emit('terminal_response', `[ERROR] 重置失敗: ${err.message}`); }
     } else if (cmdUpper === 'PAUSE_TICK') {
       if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
