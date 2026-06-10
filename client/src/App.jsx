@@ -1076,30 +1076,21 @@ function Dashboard({ token, onLogout, region }) {
     };
   }, [token, onLogout]);
 
-  // Lifespan display: 1:1 real-time count, ref-based like session timer
-  const lifespanStartRef = useRef(null);
-  const lifespanBaseRef = useRef(0);
+  // Lifespan display: runs once myNode is available, interval never re-created
+  const lifespanMetaRef = useRef({ started: false, base: 0, startAt: 0 });
 
   useEffect(() => {
     if (!myNode || myNode.accumulatedTime === undefined) return;
-    if (!lifespanStartRef.current) {
-      lifespanBaseRef.current = Math.floor((myNode.accumulatedTime || 0) / 1000);
-      lifespanStartRef.current = Date.now();
-      setLifespan(lifespanBaseRef.current);
-    }
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - lifespanStartRef.current) / 1000);
-      setLifespan(lifespanBaseRef.current + elapsed);
-      if (window.electronAPI) {
-        window.electronAPI.updatePresence({
-          details: `生存時間: ${formatTime(lifespanBaseRef.current + elapsed)}`,
-          state: `區域: ${region === 'asia' ? 'Asia' : region === 'us' ? 'US' : 'EU'} | 積分: ${Math.floor((myNode?.accumulatedBonusPoints || 0))} PT`,
-          username: myNode.username
-        });
-      }
+    if (lifespanMetaRef.current.started) return;
+    const base = Math.floor((myNode.accumulatedTime || 0) / 1000);
+    const startAt = Date.now();
+    lifespanMetaRef.current = { started: true, base, startAt };
+    setLifespan(base);
+    const id = setInterval(() => {
+      setLifespan(base + Math.floor((Date.now() - startAt) / 1000));
     }, 1000);
-    return () => clearInterval(interval);
-  }, [myNode, region]);
+    return () => clearInterval(id);
+  }, [myNode?.accumulatedTime === undefined ? undefined : 'ready']);
 
   // Session timer — counts from the moment user connects
   useEffect(() => {
