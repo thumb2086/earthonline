@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Users, Trophy } from 'lucide-react';
 import EarthGlobe from './EarthGlobe';
@@ -147,7 +147,14 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
         {/* Right Side: NASA Earth Globe */}
         <div className="dc-visual-area">
           {bgStyle && bgStyle !== 'globe' ? (
-            <div style={{ width: '100%', height: '100%', background: '#0a0e17', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontFamily: 'monospace', fontSize: '1.5rem' }}>{bgStyle.toUpperCase()} MODE</div>
+            <div style={{ width: '100%', height: '100%', background: '#0a0e17', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}>
+                <AnimatedBg variant={bgStyle} />
+              </div>
+              <div style={{ position: 'absolute', top: '10px', left: '10px', color: 'rgba(0,255,170,0.3)', fontFamily: 'monospace', fontSize: '0.7rem', zIndex: 1 }}>
+                {bgStyle === 'server' ? '■ SERVER FARM' : bgStyle === 'nebula' ? '◆ NEBULA' : bgStyle === 'radar' ? '◉ RADAR' : '☰ CYBER'} ● {onlineCount} NODES
+              </div>
+            </div>
           ) : (
             <EarthGlobe onlineCount={onlineCount} region={region} activeEvent={activeEvent} multiplier={multiplier} nodes={nodes} myNodeId={myNodeId} />
           )}
@@ -156,6 +163,65 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
       </div>
     </div>
   );
+}
+
+function AnimatedBg({ variant }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let w = canvas.width = canvas.parentElement.clientWidth;
+    let h = canvas.height = canvas.parentElement.clientHeight;
+    const colors = { server: '0,255,170', nebula: '147,51,234', radar: '0,200,255', cyber: '255,0,128' };
+    const c = colors[variant] || '0,255,170';
+    if (variant === 'server') {
+      const blades = Array.from({length: 30}, () => ({ x: Math.random() * w, h: 20 + Math.random() * 40, g: Math.random() > 0.5 }));
+      const draw = () => {
+        ctx.fillStyle = '#0a0e17'; ctx.fillRect(0, 0, w, h);
+        blades.forEach(b => {
+          ctx.fillStyle = b.g ? `rgba(${c},0.05)` : 'rgba(255,255,255,0.02)';
+          ctx.fillRect(b.x, h - b.h, 15, b.h);
+          if (b.g) { ctx.fillStyle = `rgb(${c})`; ctx.fillRect(b.x + 6, h - b.h - 2, 3, 3); }
+        });
+      };
+      draw();
+    } else if (variant === 'nebula') {
+      const particles = Array.from({length: 80}, () => ({ x: Math.random() * w, y: Math.random() * h, r: Math.random() * 2, dx: (Math.random()-0.5)*0.3, dy: (Math.random()-0.5)*0.3 }));
+      let anim;
+      const draw = () => {
+        ctx.fillStyle = 'rgba(10,14,23,0.15)'; ctx.fillRect(0, 0, w, h);
+        particles.forEach(p => { p.x += p.dx; p.y += p.dy; if(p.x<0||p.x>w)p.dx*=-1; if(p.y<0||p.y>h)p.dy*=-1;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fillStyle = `rgba(${c},0.5)`; ctx.fill();
+        });
+        anim = requestAnimationFrame(draw);
+      };
+      anim = requestAnimationFrame(draw);
+      return () => cancelAnimationFrame(anim);
+    } else if (variant === 'radar') {
+      let angle = 0;
+      let anim;
+      const draw = () => {
+        ctx.fillStyle = '#0a0e17'; ctx.fillRect(0, 0, w, h);
+        const cx = w/2, cy = h/2;
+        for (let r = 40; r < 200; r += 40) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.strokeStyle = `rgba(${c},0.15)`; ctx.stroke(); }
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, 200, angle-0.5, angle); ctx.closePath(); ctx.fillStyle = `rgba(${c},0.05)`; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx+Math.cos(angle)*200, cy+Math.sin(angle)*200); ctx.strokeStyle = `rgb(${c})`; ctx.lineWidth = 2; ctx.stroke();
+        angle += 0.02;
+        anim = requestAnimationFrame(draw);
+      };
+      anim = requestAnimationFrame(draw);
+      return () => cancelAnimationFrame(anim);
+    } else {
+      const buildings = Array.from({length: 20}, (_, i) => ({ x: (i/20)*w, w: 15+Math.random()*25, h: 50+Math.random()*150 }));
+      const draw = () => {
+        ctx.fillStyle = 'rgba(10,14,23,0.2)'; ctx.fillRect(0, 0, w, h);
+        buildings.forEach(b => { ctx.fillStyle = `rgba(${c},0.15)`; ctx.fillRect(b.x, h - b.h, b.w, b.h); });
+      };
+      draw();
+    }
+  }, [variant]);
+  return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;
 }
 
 // Social Icons SVGs
