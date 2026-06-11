@@ -74,7 +74,7 @@ function LoginGateway({ onLogin }) {
     const verifyToken = params.get('verifyToken');
     if (verifyToken) {
       window.history.replaceState({}, document.title, window.location.pathname);
-      const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
+      const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
       fetch(`${BASE_URL}/api/${region}/auth/verify-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -97,12 +97,12 @@ function LoginGateway({ onLogin }) {
     }
   }, [onLogin, region]);
 
-  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
+  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
   const API_URL = `${BASE_URL}/api/${region}`;
 
   const handleDiscordLogin = () => {
     const state = btoa(JSON.stringify({ action: 'login', returnTo: window.location.href.split('?')[0] }));
-    const BACKEND_DOMAIN = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).origin : 'https://earthonline.onrender.com';
+    const BACKEND_DOMAIN = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).origin : BASE_URL;
     window.location.href = `${BACKEND_DOMAIN}/api/auth/discord?state=${state}`;
   };
 
