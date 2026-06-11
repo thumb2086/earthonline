@@ -2,9 +2,11 @@ import React, { useMemo, useRef } from 'react';
 import Draggable from 'react-draggable';
 import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Users } from 'lucide-react';
 import EarthGlobe from './EarthGlobe';
+import { useLanguage } from './LanguageContext';
 import './datacenter.css';
 
 export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage, region, onOpenSocial, activeEvent, multiplier, nodes, myNodeId }) {
+  const { t } = useLanguage();
   const cardRef = useRef(null);
 
   const level = useMemo(() => {
@@ -26,12 +28,12 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
 
   const stats = useMemo(() => {
     switch(level) {
-      case 1: return { title: '個人測試節點', desc: '基礎網路連線環境' };
-      case 2: return { title: '塔式運算伺服器', desc: '雙向熱備援工作站' };
-      case 3: return { title: '標準伺服器機櫃', desc: '企業級 42U 實體機房' };
-      case 4: return { title: '區域級數據群集', desc: '高可用性叢集運算架構' };
-      case 5: return { title: '無限矩陣資料中心', desc: '超大型可擴展叢集' };
-      default: return { title: '未連線', desc: '等待初始化' };
+      case 1: return { title: t('個人測試節點'), desc: t('基礎網路連線環境') };
+      case 2: return { title: t('塔式運算伺服器'), desc: t('雙向熱備援工作站') };
+      case 3: return { title: t('標準伺服器機櫃'), desc: t('企業級 42U 實體機房') };
+      case 4: return { title: t('區域級數據群集'), desc: t('高可用性叢集運算架構') };
+      case 5: return { title: t('無限矩陣資料中心'), desc: t('超大型可擴展叢集') };
+      default: return { title: t('未連線'), desc: t('等待初始化') };
     }
   }, [level]);
 
@@ -56,7 +58,7 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
           <div ref={cardRef} className="dc-status-card" style={{ position: 'absolute', top: '40px', left: '40px', zIndex: 100 }}>
             <div className="dc-card-header drag-handle" style={{ cursor: 'move' }}>
               <Server size={18} color="#3b82f6" />
-              <h2>我的雲端伺服器</h2>
+              <h2>{t('我的雲端伺服器')}</h2>
             </div>
           
           <div className="dc-level-badge">
@@ -70,40 +72,40 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
           <div className="dc-metrics">
             <div className="metric-row">
               <Clock size={16} color="#64748b" />
-              <span>總生存時間</span>
+              <span>{t('總生存時間')}</span>
               <strong className="data-value">{formatTime(lifespan || 0)}</strong>
             </div>
             <div className="metric-row">
               <ShieldCheck size={16} color="#64748b" />
-              <span>PT 信用積分</span>
+              <span>{t('PT 信用積分')}</span>
               <strong className="data-value">{Number(bonusPoints || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} PT</strong>
             </div>
             <div className="metric-row">
               <Cpu size={16} color="#64748b" />
-              <span>伺服器負載</span>
+              <span>{t('伺服器負載')}</span>
               <strong className="data-value">{(cpuUsage || 0).toFixed(1)}%</strong>
             </div>
             <div className="metric-row">
               <Network size={16} color="#64748b" />
-              <span>全球在線節點</span>
+              <span>{t('全球在線節點')}</span>
               <strong className="data-value">{onlineCount || 0}</strong>
             </div>
             <div className="metric-row">
               <Activity size={16} color="#64748b" />
-              <span>連線延遲 (Ping)</span>
+              <span>{t('連線延遲')}</span>
               <strong className="data-value">{ping || 0} ms</strong>
             </div>
           </div>
 
           <div className="dc-progress-section">
             <div className="progress-labels">
-              <span>設施擴建進度</span>
+              <span>{t('設施擴建進度')}</span>
               <span>{Math.floor(progressToNext)}%</span>
             </div>
             <div className="progress-track">
               <div className="progress-fill" style={{ width: `${Math.min(100, progressToNext)}%` }}></div>
             </div>
-            <p className="progress-hint">累積生存時間或積分以解鎖擴建</p>
+            <p className="progress-hint">{t('累積生存時間或積分以解鎖擴建')}</p>
           </div>
 
           {/* Social Links & Github Badge */}
@@ -115,15 +117,15 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
             <a href="https://www.threads.net/@earthonline6?xmt=AQG048ez1j6AMkcDGAG_U01pj1JoVoCFFMvWnZ5MZGYhgfk" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex', alignItems: 'center', color: 'var(--text-color)', textDecoration: 'none' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.1) rotate(2deg)'} onMouseOut={e => e.currentTarget.style.transform='scale(1) rotate(0)'}>
               <ThreadsIcon size={28} />
             </a>
-            <button onClick={onOpenSocial} title="社群討論" style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', padding: '0', fontWeight: 'bold', marginLeft: '10px' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='var(--text-color)'; e.currentTarget.style.textShadow='0 0 8px rgba(59, 130, 246, 0.8)'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='var(--text-dim)'; e.currentTarget.style.textShadow='none'; }}>
-              <Users size={22} /> <span>討論區</span>
+            <button onClick={onOpenSocial} title={t('社群討論')} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', padding: '0', fontWeight: 'bold', marginLeft: '10px' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='var(--text-color)'; e.currentTarget.style.textShadow='0 0 8px rgba(59, 130, 246, 0.8)'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='var(--text-dim)'; e.currentTarget.style.textShadow='none'; }}>
+              <Users size={22} /> <span>{t('討論區')}</span>
             </button>
           </div>
 
           {/* GitHub Contribution Wall */}
           <div className="dc-contribution-wall" style={{ marginTop: '10px', paddingTop: '15px', borderTop: '1px solid #2d313b' }}>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <GithubIcon size={14} /> <span>開發者貢獻紀錄</span>
+              <GithubIcon size={14} /> <span>{t('開發者貢獻紀錄')}</span>
             </div>
             <img 
               src="https://ghchart.rshah.org/3b82f6/huchialun9-ctrl" 
