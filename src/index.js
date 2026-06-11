@@ -11,10 +11,10 @@ export default {
       });
     }
 
-    // Serve static assets
+    // Serve static assets — SPA fallback: serve index.html for unknown paths
     const response = await env.ASSETS.fetch(request);
-    if (!response && url.pathname.startsWith('/assets/')) {
-      return new Response('Not Found', { status: 404 });
+    if (response.status === 404) {
+      return env.ASSETS.fetch(new Request(new URL('/index.html', request.url)));
     }
     return response;
   },

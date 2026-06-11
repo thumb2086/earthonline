@@ -198,6 +198,13 @@
   min-height: 500px;
 }
 
+.background-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
 @media (max-width: 1024px) {
   .dc-layout {
     flex-direction: column-reverse;
