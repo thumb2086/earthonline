@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import useTimer from '../hooks/useTimer';
 import useSocket from '../hooks/useSocket';
 import useGameState from '../hooks/useGameState';
+import { getTranslation } from '../i18n';
 
 const GameContext = createContext(null);
 
@@ -9,10 +10,12 @@ export function GameProvider({ children, token, onLogout, region, SOCKET_URL, AP
   const { socket, isConnected, ping } = useSocket(SOCKET_URL, region, token, onLogout);
   const { nodes, myNode, setMyNode, myRole, globalStats, hubStats, leaderboard, currentEvent } = useGameState(socket, API_URL, BASE_URL);
   const { lifespan, sessionTime } = useTimer(myNode, socket, region);
+  const lang = typeof window !== 'undefined' ? localStorage.getItem('eo_lang') || 'zh' : 'zh';
+  const t = (key) => getTranslation(lang, key);
 
   const [logs, setLogs] = useState([
-    { text: '[SYS] 地球在線連線建立中...', time: new Date().toISOString().substring(11, 19) },
-    { text: '[SYS] 進入全球節點網路...', time: new Date().toISOString().substring(11, 19) }
+    { text: `[SYS] ${t('地球在線連線建立中...')}`, time: new Date().toISOString().substring(11, 19) },
+    { text: `[SYS] ${t('進入全球節點網路...')}`, time: new Date().toISOString().substring(11, 19) }
   ]);
 
   const addLog = useCallback((msg, extra = {}) => {

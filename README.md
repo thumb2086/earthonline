@@ -1,44 +1,79 @@
-# 🌍 地球在線 (Earth Online)
+# Earth Online 🌍
 
-歡迎來到 **地球在線 (Earth Online)** ── 這是一個將網頁端數據、專屬桌面端與 Discord 社群體系完美聯動的全域掛機與虛擬生存社會實驗。
+全球節點觀測與管理中心 — 一款基於《三體》概念與賽博龐克美學的實驗性全球網路觀測掛機遊戲。
 
-本專案採用極簡的賽博朋克（Cyberpunk）風格網頁架構，讓來自全球的玩家化身為共享網絡中的一個個「連線節點」。你保持在線的時間越長，為本伺服器貢獻的「生存時長」與榮譽點數（PT）就越多！數據不說謊，名次決定一切。
+## 快速開始
 
----
-
-## 🚀 核心功能與特色
-
-- 📊 **全實時聯動排行榜 (Global Live Leaderboard)**：即時同步全服前 10 名的掛機大佬，依據累積生存時間與榮譽點數（PT）精準排序。
-- 🔑 **Discord OAuth 深度綁定**：整合 Discord 第三方登入，即時同步玩家的頭像、暱稱，並每秒實時調用 API 讀取玩家在社群中的真實最高等級身分組（如 `@【勉強夠付房租的平民】`）。
-- ⏱️ **外掛級永久登入 (Persistent Login)**：前端快取導入 `localStorage` 機制，一次登入、永久記住節點，實現無縫掛機。
-- 💬 **低延遲即時世界聊天室**：基於 Socket.io 技術，讓全球所有在線節點達成零延遲的跨時區實時交流。
-- ⚡ **全域事件動態倍率 (Global Events)**：後台隨機觸發「量子爆發 (3.0x)」、「數據淘金潮 (5.0x)」、「太陽風暴」或「系統維護」等全域突發事件，考驗島民的連線耐力。
-- 🖥️ **專屬 Electron 桌面客戶端**：支援全自動 Discord RPC 狀態寫入，打破瀏覽器背景休眠限制，並配有專屬「橘色地球」工作列圖示。
-
----
-
-## 🛠️ 技術棧 (Tech Stack)
-
-- **前端 (Frontend)**：React + Vite + Vanilla CSS (賽博朋克視覺、極致行動端響應式排版)
-- **桌面端 (Desktop Client)**：Electron (整合 Discord Rich Presence / RPC)
-- **後端 (Backend)**：Node.js + Express + Socket.io + NodeMailer (Gmail 驗證信自動發送)
-- **資料庫 (Database)**：MongoDB + Mongoose (支援高效批次 `updateMany` 數據遷移)
-
----
-
-## 📦 本地環境部署 (Running Locally)
-
-### 📋 前置準備
-1. 確保本地已安裝 **Node.js** (推薦 LTS 版本) 以及 **MongoDB**。
-2. 至 [Discord Developer Portal](https://discord.com/developers/applications) 創建應用程式，並取得 OAuth2 Token 與應用程式憑證。
-
-### 🔧 1. 配置環境變數 (`.env`)
-請分別在 `/backend` 以及 `/client` 資料夾下建立 `.env` 檔案並填入對應的密鑰：
-* `/backend/.env`：包含 `MONGODB_URI`、`DISCORD_CLIENT_ID`、`DISCORD_CLIENT_SECRET`、`GMAIL_NODEMAILER_PASS` 等。
-* `/client/.env`：包含 `VITE_API_URL` 與 `VITE_DISCORD_REDIRECT_URI`。
-
-### 🚀 2. 啟動後端伺服器 (Backend)
 ```bash
-cd backend
-npm install
-npm start
+# 後端
+cd backend && npm install && node server.js
+
+# 前端開發
+cd client && npm install && npm run dev
+```
+
+## 架構
+
+- **後端**: Express 5 + Socket.io + MongoDB
+- **前端**: React 19 + Vite 8 + vanilla CSS
+- **部署**: Cloudflare Pages (前端) + Render (後端)
+- **Discord**: discord.js bot (slash commands, role assignment, chat bridge)
+
+## 功能
+
+- 🌐 即時全球節點地圖
+- ⏱️ 放置掛機生存系統
+- 🏪 黑市商城（道具購買/使用）
+- 🎲 隨身碟抽獎系統
+- 🌍 3D 地球視覺化
+- 🖥️ 5 種背景風格切換（地球/機房/星雲/雷達/賽博城市）
+- 📊 即時排行榜
+- 🤝 好友系統 + 私訊
+- 🎯 每日任務 + 成就系統
+- 🏆 週結算 + 榮譽值
+- ⚡ 天賦系統（3 系 × 12 天賦）
+- 🌍 區域對抗系統
+- 🗳️ 全域事件投票 + 互動選擇
+- 🔗 Discord 整合（登入、聊天橋接、身分組）
+- 📱 離線收益補償
+
+## 版本歷史
+
+### v1.14.0 — 正式發布
+- 完整安全修正（CORS/helmet/secrets）
+- MongoDB 索引優化
+- App.jsx 拆分為獨立組件（-439 行）
+- 5 種背景風格系統
+- 壓力測試腳本
+
+### v1.13.x — 系統優化
+- 安全修正（secrets/CORS/helmet/IP）
+- 效能優化（快取、索引）
+- ESLint 設定
+
+### v1.12.x — 新功能
+- 離線收益系統
+- 天賦系統（3 系 × 12 天賦）
+- 區域對抗系統
+- 多背景風格
+
+### v1.11.x — 事件與目標
+- 全域事件互動化（投票/選擇/連鎖）
+- 每日任務
+- 成就里程碑（18 項）
+- 週結算 + 榮譽值
+
+### v1.10.x — 經濟重塑
+- 健康系統重設計
+- 道具重平衡 + 新道具
+- 節點升級 + 區域投資
+
+### v1.9.x — 前端重構
+- hooks 提取、modals 獨立、GameContext
+
+### v1.8.x — 後端重構
+- services/socket/routes/config 提取
+
+## License
+
+MIT

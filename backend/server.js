@@ -5,6 +5,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const discordAuthLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: 'Too many requests, please try again later.' } });
 const geoip = require('geoip-lite');
 const path = require('path');
 const fs = require('fs');
@@ -162,6 +163,7 @@ app.use(helmet({
 // Health check for Render
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() }));
 
+app.use('/api/auth/discord', discordAuthLimiter);
 // Discord OAuth — must be BEFORE :region route mounts to avoid Express 5 path conflict
 app.get('/api/auth/discord', (req, res) => {
   const state = req.query.state;
@@ -258,6 +260,7 @@ process.on('unhandledRejection', (reason) => { writeCrashLog('UNHANDLED_REJECTIO
 // Runtime state
 const heartbeatTimestamps = new Map();
 let reviveCounts = new Map();
+const lastCompTime = new Map();
 startCleanupInterval(heartbeatTimestamps, reviveCounts, chatCooldowns, roleCache);
 
 const server = http.createServer(app);
@@ -617,9 +620,12 @@ regions.forEach(regionName => {
       // Disconnect compensation: calculate missed time
       const lastHeartbeat = heartbeatTimestamps.get(decoded.username);
       let offlineEarnings = null;
-      if (lastHeartbeat) {
+      const lastComp = lastCompTime.get(decoded.username) || 0;
+      const canCompensate = Date.now() - lastComp >= 300000;
+      if (lastHeartbeat && canCompensate) {
         const offlineDuration = Date.now() - lastHeartbeat;
         if (offlineDuration > 30000 && offlineDuration < 86400000) {
+          lastCompTime.set(decoded.username, Date.now());
           // Time compensation (existing, max 4h)
           const compensatedTime = Math.min(offlineDuration, 4 * 60 * 60 * 1000);
           const incFields = { accumulatedTime: compensatedTime };
@@ -757,6 +763,16 @@ regions.forEach(regionName => {
   registerTalentHandlers(socket, connectedUsers);
   socket.on('get_war_stats', () => {
     socket.emit('war_stats', getWarStats());
+  });
+  socket.on('switch_region', async ({ newRegion }) => {
+    if (!socket.user || !newRegion || !['asia','us','eu'].includes(newRegion)) return;
+    if (newRegion === regionName) { socket.emit('region_switched', { success: false, message: '已在該區域' }); return; }
+    try {
+      await User.updateOne({ username: socket.user.username }, { $set: { homeRegion: newRegion } });
+      socket.emit('region_switched', { success: true, newRegion, message: `已切換至 ${newRegion.toUpperCase()}，重新連線中...` });
+    } catch (err) {
+      socket.emit('region_switched', { success: false, message: '切換失敗' });
+    }
   });
 // Handle Disconnect
   socket.on('disconnect', async () => {
