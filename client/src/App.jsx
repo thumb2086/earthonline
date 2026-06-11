@@ -1510,6 +1510,7 @@ function Dashboard({ token, onLogout, region }) {
             cpuUsage={globalStats.systemHardware?.cpu || 0}
             region={region}
             onOpenSocial={() => setShowSocialModal(true)}
+            onOpenAchievements={() => setShowAchievements(true)}
             activeEvent={currentEvent?.type || null}
             multiplier={globalStats.multiplier || 1}
             nodes={nodes}

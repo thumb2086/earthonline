@@ -1,11 +1,11 @@
 import React, { useMemo, useRef } from 'react';
 import Draggable from 'react-draggable';
-import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Users } from 'lucide-react';
+import { Server, Activity, Cpu, Network, Clock, ShieldCheck, Users, Trophy } from 'lucide-react';
 import EarthGlobe from './EarthGlobe';
 import { useLanguage } from './LanguageContext';
 import './datacenter.css';
 
-export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage, region, onOpenSocial, activeEvent, multiplier, nodes, myNodeId }) {
+export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onlineCount, cpuUsage, region, onOpenSocial, onOpenAchievements, activeEvent, multiplier, nodes, myNodeId }) {
   const { t } = useLanguage();
   const cardRef = useRef(null);
 
@@ -109,7 +109,7 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
           </div>
 
           {/* Social Links & Github Badge */}
-          <div className="dc-social-section" style={{ display: 'flex', gap: '25px', justifyContent: 'flex-start', alignItems: 'center', marginTop: '20px', padding: '0' }}>
+          <div className="dc-social-section" style={{ display: 'flex', gap: '15px', justifyContent: 'flex-start', alignItems: 'center', marginTop: '20px', padding: '0', flexWrap: 'wrap' }}>
             <a href="https://github.com/huchialun9-ctrl/earthonline.git" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex', alignItems: 'center', color: 'var(--text-color)', textDecoration: 'none', gap: '8px' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.1) rotate(-2deg)'} onMouseOut={e => e.currentTarget.style.transform='scale(1) rotate(0)'}>
               <GithubIcon size={28} />
               <span style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'Arial, sans-serif' }}>GitHub</span>
@@ -117,8 +117,11 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
             <a href="https://www.threads.net/@earthonline6?xmt=AQG048ez1j6AMkcDGAG_U01pj1JoVoCFFMvWnZ5MZGYhgfk" target="_blank" rel="noreferrer" style={{ transition: 'transform 0.2s', display: 'flex', alignItems: 'center', color: 'var(--text-color)', textDecoration: 'none' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.1) rotate(2deg)'} onMouseOut={e => e.currentTarget.style.transform='scale(1) rotate(0)'}>
               <ThreadsIcon size={28} />
             </a>
-            <button onClick={onOpenSocial} title={t('社群討論')} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', padding: '0', fontWeight: 'bold', marginLeft: '10px' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='var(--text-color)'; e.currentTarget.style.textShadow='0 0 8px rgba(59, 130, 246, 0.8)'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='var(--text-dim)'; e.currentTarget.style.textShadow='none'; }}>
+            <button onClick={onOpenSocial} title={t('社群討論')} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', padding: '0', fontWeight: 'bold' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='var(--text-color)'; e.currentTarget.style.textShadow='0 0 8px rgba(59, 130, 246, 0.8)'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='var(--text-dim)'; e.currentTarget.style.textShadow='none'; }}>
               <Users size={22} /> <span>{t('討論區')}</span>
+            </button>
+            <button onClick={onOpenAchievements} title={t('成就')} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', padding: '0', fontWeight: 'bold' }} onMouseOver={e => { e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.color='#FFD700'; e.currentTarget.style.textShadow='0 0 8px rgba(255, 215, 0, 0.8)'; }} onMouseOut={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.color='var(--text-dim)'; e.currentTarget.style.textShadow='none'; }}>
+              <Trophy size={22} /> <span>{t('成就')}</span>
             </button>
           </div>
 
