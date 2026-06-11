@@ -29,6 +29,7 @@ const { JWT_SECRET, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, BACKEND_URL, DISCO
 const { startCleanupInterval } = require('./jobs/cleanup');
 const { runStartupMigrations } = require('./jobs/migration');
 const { processTick } = require('./services/gameLoop');
+const { getWarStats, recordEventCompletion, resetWarStats } = require('./state/regionState');
   const { getRandomEvent, getEventDuration, getEventMultiplier, applyEventEndRewards, createVoteSession, tallyVote } = require('./services/eventSystem');
 const { buyItem, useItem } = require('./services/shopService');
 const { registerChatHandlers } = require('./socket/chatHandler');
@@ -334,6 +335,7 @@ regions.forEach(regionName => {
         const endedType = state.currentGlobalEvent.type;
         await applyEventEndRewards(endedType, state.connectedUsers, state.eventChoices);
         nsp.emit('global_event_ended', { type: endedType });
+        recordEventCompletion(regionName);
         state.currentGlobalEvent = null;
         state.eventChoices = null;
         // Chain: 5% chance of data black market after gold rush
@@ -358,7 +360,7 @@ regions.forEach(regionName => {
 
     // Process game tick for connected users
     try {
-      await processTick(state, state.connectedUsers);
+      await processTick(state, state.connectedUsers, regionName);
     } catch (err) {
       console.error('[SYS] Game logic error:', err);
     }
@@ -733,6 +735,9 @@ regions.forEach(regionName => {
   registerAchievementHandlers(socket, connectedUsers);
   registerSettlementHandlers(socket, connectedUsers);
   registerTalentHandlers(socket, connectedUsers);
+  socket.on('get_war_stats', () => {
+    socket.emit('war_stats', getWarStats());
+  });
 // Handle Disconnect
   socket.on('disconnect', async () => {
     const disconnectedUser = connectedUsers.get(socket.id);

@@ -1,12 +1,13 @@
 const User = require('../models/User');
 const { updateQuestProgress } = require('./questService');
+const { updateWarStats } = require('../state/regionState');
 
 const BASE_DECAY_PER_TICK = 0.2 / 30; // ~0.00667
 const TIME_EARNED_PER_TICK = 2000;
 const BASE_PT_MULTIPLIER = 0.1;
 const COLLECTIVE_LOAD_THRESHOLD = 20;
 
-async function processTick(state, connectedUsers) {
+async function processTick(state, connectedUsers, regionName) {
   if (connectedUsers.size === 0) return { updates: [], usernamesProcessed: 0 };
 
   const usernames = Array.from(connectedUsers.values()).map(u => u.username);
@@ -90,6 +91,13 @@ async function processTick(state, connectedUsers) {
       }
     }
   }
+
+  // Track war stats
+  let totalPT = 0;
+  for (const u of users) {
+    totalPT += (u.accumulatedBonusPoints || 0);
+  }
+  updateWarStats(regionName, onlineCount, totalPT, !!state.currentGlobalEvent);
 
   if (updates.length > 0) {
     await User.bulkWrite(updates);
