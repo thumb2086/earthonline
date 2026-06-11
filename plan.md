@@ -1,60 +1,249 @@
-﻿🌍 《地球在線 Earth Online》專案陳述書 (Project Statement)
-📌 一、 專案核心定位 (Project Overview)
-《地球在線 Earth Online》是一款去 AI 化、純粹回歸復古美式點陣美學的「全球文明開採模擬掛機網頁遊戲」。
-本專案的核心精髓在於：機制極致單純（放置掛機、升級、抽獎），但利用「全服限量絕版神物」的 FOMO 心理，以及「三大伺服器氣運對抗」的集體榮譽感，驅使玩家 24 小時瘋狂掛機並深度黏著於社群。
+﻿# Earth Online — Development Plan (v1.12.4 → v1.14.0 → v2.0.0)
+
+> 本 plan 整合 v2.0.0-planning.md 與 2025-06-11 專案審計結果
+> 每個 v 包含 2~5 個 task，可獨立執行、可驗證
+> v1.14.0 完成後即為 v2.0.0
 
 ---
 
-🎨 二、 視覺美術風格 (Visual & Aesthetic Style)
-本網站徹底拋棄所有冷冰冰的科技線條、科幻霓虹與平滑的 AI 風格，全面採用美式重工業復古點陣（Pixel Art）與極具厚重感的像素配色。
+## 目前進度
 
-登入與條約頁： 背景採用深褐色粗糙礦岩點陣紋理。中央登入框為深灰色半透明面板，四周圍繞薄薄的亮綠色發光邊框。底部條約使用深邃的草地綠點陣條，文字一律採用粗白點陣體加黑色陰影。
-頂部固定導航欄： 材質採用「深石磚灰色」點陣紋理，上方壓有一條草地綠細線。左側 LOGO 為黃色立體爆裂紋藝術字。
-分類拉頁選單： 背景完全比照經典的「深灰色格子物品欄」清單視覺。滑鼠懸停時，方格會亮起標誌性的亮青色（Cyan）像素外框，並伴隨機械按鍵音效。
-3D 立體像素藝術字 (Pixel WordArt)： 網站內的所有核心標題與陣營名稱，一律採用重度渲染、帶有黑色粗邊框與飽和渐層色的 3D 像素立體街機藝術字，展現重工業與資源開採的宏大力量感。
+已完成：v1.8.x ~ v1.12.3（後端重構、前端重構、經濟重塑、事件目標、離線收益、天賦系統）
+進行中：無
 
 ---
 
-🗺️ 三、 前端核心流程與玩法機制 (Core Gameplay Flow)
-第一關：門神與公約
-玩家進入網站後，必須先通過「身分綁定/登入區」（支援 Discord 一鍵登入）。強制閱讀並勾選同意底部的《市民公約條約》，立體的灰色按鈕才會亮起允許進入。
+## 優先級矩陣
 
-第二關：引導式文檔與陣營介紹
-通過登入後，進入單頁向下滾動的引導頁。
-全球開採指南： 以深色硬質合金面板呈現獨立世界觀文檔，徹底切割市面其他遊戲的機制字眼。
-實景點陣化陣營圖： 展示三張經過「高飽和度點陣化濾鏡」處理的真實世界巨型建築照片（台北101、自由女神、巴黎鐵塔），作為三大陣營的引導：
-🔴 🚩 亞 洲 陣 營 (大本營：台北/東京) — 盛產地心深層礦脈。
-🔵 🔷 美 洲 陣 營 (大本營：紐約) — 金融與商業帝國。
-🟢 🟢 歐 洲 陣 營 (大本營：倫敦/巴黎) — 埋藏極高的遠古氣運。
-
-第三關：滿版滑動大地圖與派遣掛機
-點擊底部閃爍的「踏入世界」金幣按鈕後，正式展現主遊戲畫面：
-自由滑動與縮放： 滿畫面的 2D 像素真實世界地圖（包含各國國旗）。玩家可自由拖曳、並透過滾輪放大查看微觀國家，或縮小俯瞰全球局勢。
-跨國派遣掛機： 點擊任何一個國家，會跳出該國的真實數據情報窗。玩家點擊「在此建立我的礦場」，右側掛機面板即開始自動跳錢。
-五大礦層升級： 玩家唯一的基礎目標是累積資金，由淺入深升級礦層（Lv.1 碎石地層 $\rightarrow$ Lv.2 沉積礦脈 $\rightarrow$ Lv.3 閃耀鑽石 $\rightarrow$ Lv.4 暗物質礦 $\rightarrow$ Lv.5 地球星核），產出速度呈指數級飆升。
-萬人開採反饋： 玩家派遣礦場至某國後，世界地圖上該國國旗上方會實時冒出無數小小的「十字鎬」像素敲擊動畫，形成壯觀的全球開採畫面。
-
-第四關：全服限量秘寶抽獎 (賭狗與絕版機制)
-當玩家手握地心開採的巨額資金時，可消耗百億資金點擊中央的【探尋地球秘寶】按鈕，隨機抽取不同稀有度的神物：
-普通 (Common) [89.99%]： 古老恐龍化石（無特效，可一鍵熔煉為「幸運晶石」進行礦場轉生，永久提升下一輪開採速度）。
-史詩 (Epic) [9.9%]： 摩艾石像、埃及木乃伊等（個人掛機速度永久 $+5%$）。
-神話 (Mythic) [0.1%]： 每個國家限量 1 個（如：台北101模型、自由女神火炬）。個人掛機速度 $+20%$，且對應國家地圖會亮起專屬特效。
-獨特 (Unique) [0.001%]： 全伺服器僅此 1 個（如：【始皇帝的傳國玉璽】）。擁有全服唯一的地圖懸浮動態特效與 Discord 閃爍身分組。
-⚠️ 錯失恐懼機制 (FOMO)： 一旦全服唯一的神物被某位玩家抽走，全服抽獎池的該庫存立刻歸零，徹底絕版。
+| 優先級 | 定義 | 對應版本 |
+|--------|------|---------|
+| Critical | 可能 crash / 資料遺失 / 安全漏洞 | v3 |
+| High | 功能缺陷 / 重大程式碼品質 | v1, v2, v4 |
+| Medium | 程式碼品質 / 重構 | v4, v5 |
+| Low | UX / 邊界情況 | v6, v7 |
 
 ---
 
-📊 四、 100% 真實數據底層架構 (Real-Time Data Integrity)
-為了確保遊戲的硬核性質與對抗體驗，本專案承諾所有數據拒絕黑箱與隨機敷衍，100% 採用後端實時數據連動與公示：
+## v1 — 區域對抗系統
 
-真實在線人數： 利用高速快取資料庫 (Redis Set) 實時監聽與統計玩家當前將礦場掛在哪個國家。玩家離線或切換國家，地圖數據實時 $+1$ 或 $-1$。
-真實國家 GDP： 點擊國家顯示的「總資源產出/秒」，是由當前在線且派遣在該國的所有玩家的「真實開採時薪」實時加總計算而成。高階玩家轉移陣地，會直接引發世界地圖上該國數據的暴漲。
-真・限量庫存鎖 (Database Row Lock)： 全服唯一神物在資料庫採用嚴格的行級鎖定。一旦扣減成功，不論多高併發的毫秒級抽獎，後端檢查到庫存為 0 即拒絕發放，保證絕版神物的稀缺與真實性。
-全服氣運值實時加總： 系統每 5 分鐘實時重新計算（SUM）三大伺服器陣營玩家所擁有的神物總權重與轉生次數。氣運排行榜第一名的陣營板塊，網頁大地圖上會真實渲染出比其他板塊更耀眼的金色粒子發光特效。
+### v1.1 區域指標收集 (backend)
+- **做什麼：** 在 gameLoop.js 中收集每區域總存活時間、平均在線人數、事件參與率
+- **改哪個檔案：**
+  - `backend/services/gameLoop.js` — 每 tick 更新區域統計
+  - `backend/state/regionState.js` — 新增區域統計欄位
+  - `backend/models/User.js` (如需要)
+- **驗證：** 區域統計數據正確累積，socket 查詢返回即時三區對比
+
+### v1.2 區域對抗排行 (backend)
+- **做什麼：** 實現跨週區域排名計算與獎勵發放，整合到 settlementService
+- **改哪個檔案：**
+  - `backend/services/settlementService.js` — 加入區域對抗結算
+  - `backend/socket/settlementHandler.js` — 加入區域排行查詢
+- **驗證：** 結算時區域排名正確、獎勵正確發放
+
+### v1.3 區域對抗前端面板 (frontend)
+- **做什麼：** 新增區域即時對比面板 UI
+- **改哪個檔案：**
+  - `client/src/App.jsx` — 新增 RegionWarPanel 按鈕與 modal
+  - `client/src/i18n.js` — 新增翻譯
+- **驗證：** 三欄即時對比顯示、個人貢獻正確
+
+✅ v1 全部完成
 
 ---
 
-🔒 五、 反作弊與安全性承諾 (Anti-Cheat Security)
-由於遊戲數據 100% 真實，本專案防範一切前端外掛與 F12 竄改網頁代碼之作弊行為：
-資產權限在後端： 前端（瀏覽器）數字跳動僅為視覺效果。玩家點擊升級或抽獎時，後端會根據資料庫記錄的「上次存檔時間」與「理論每秒產出」在伺服器端重新計算，防範按鍵精靈與代碼修改。
-安全抽獎校驗： 抽獎隨機數由後端伺服器安全生成，前端網頁僅負責播放方塊加載與金光閃爍的動畫。 這全部
+## v2 — 多背景風格系統
+
+### v2.1 背景架構 + Style 1 (3D 地球保留)
+- **做什麼：** 建立背景選擇架構，保留現有 EarthGlobe 為 Style 1
+- **改哪個檔案：**
+  - `client/src/components/Backgrounds/index.jsx` — 新建背景 router
+  - 將現有 EarthGlobe.jsx 標記為 Style 1
+- **驗證：** 背景切換不影響 EarthGlobe 功能
+
+### v2.2 Style 2: 伺服器機房
+- **做什麼：** 新增 ServerRoom.jsx 背景動畫
+- **改哪個檔案：**
+  - `client/src/components/Backgrounds/ServerRoom.jsx` — 新建
+- **驗證：** 機房動畫正常渲染，節點對應刀片閃爍
+
+### v2.3 Style 3~5 與切換 UI
+- **做什麼：** 加入星雲/雷達/賽博城市背景 + 設定面板切換按鈕
+- **改哪個檔案：**
+  - `client/src/components/Backgrounds/Nebula.jsx` — 新建
+  - `client/src/components/Backgrounds/RadarTerminal.jsx` — 新建
+  - `client/src/components/Backgrounds/CyberCity.jsx` — 新建
+  - `client/src/App.jsx` — 設定面板加入背景切換
+  - `client/src/i18n.js` — 新增翻譯
+- **驗證：** 5 種背景可自由切換、儲存在 localStorage
+
+✅ v2 全部完成
+
+---
+
+## v3 — 安全修正 (Critical)
+
+### v3.1 修復洩漏的 secrets
+- **做什麼：** 將 `.env` 從 git 中移除，輪換所有 exposed secrets（JWT_SECRET、DISCORD_CLIENT_SECRET）
+- **改哪個檔案：**
+  - `.gitignore` — 新增 `.env`
+  - `backend/.env` — 更新 JWT_SECRET 為強密碼（crypto.randomBytes(64).toString('hex')）
+  - `backend/config/env.js` — 強化 env 驗證
+- **驗證：** `git status` 顯示 .env 不再被追蹤
+
+### v3.2 修復 CORS 與 helmet
+- **做什麼：** 限制 Socket.io CORS 為特定域名，重新啟用 helmet
+- **改哪個檔案：**
+  - `backend/server.js` — CORS 改為白名單 + 啟用 helmet
+- **驗證：** 外部域名無法連接 WebSocket，安全 headers 正確發送
+
+### v3.3 修復 crash.log 與 IP 洩漏
+- **做什麼：** 將 crash.log 加入 gitignore，移除 stdout IP 日誌
+- **改哪個檔案：**
+  - `.gitignore` — 新增 `crash.log`
+  - `backend/server.js` — 移除 IP logging 行
+- **驗證：** crash.log 不再被 git 追蹤
+
+### v3.4 修復 terminalHandler 未定義變數
+- **做什麼：** 修正 INVEST_MAX_LEVEL 和 INVEST_COSTS 未定義問題
+- **改哪個檔案：**
+  - `backend/socket/terminalHandler.js` — 加入缺少的常數
+- **驗證：** `/INVEST` 指令不再噴 ReferenceError
+
+✅ v3 全部完成
+
+---
+
+## v4 — 程式碼品質 (High/Medium)
+
+### v4.1 移除重複程式碼
+- **做什麼：** 移除 `obfuscateIp()`、`getEventDuration()`、`sendDiscordWebhook()` 重複定義
+- **改哪個檔案：**
+  - `backend/server.js` — 刪除重複函數，改為 require
+  - `backend/routes/auth.js` — 刪除重複 obfuscateIp
+  - `backend/services/eventSystem.js` — 刪除重複 getEventDuration
+  - `backend/socket/terminalHandler.js` — 刪除重複 sendDiscordWebhook
+- **驗證：** 共用函數只定義一次，所有引用處正常工作
+
+### v4.2 清理未使用 import
+- **做什麼：** 移除 server.js 中未使用的 import（helmet, bcrypt, jwt, nodemailer 等）
+- **改哪個檔案：**
+  - `backend/server.js` — 移除未使用的 require
+- **驗證：** Node.js 啟動無警告
+
+### v4.3 App.jsx 瘦身 — 組件拆分
+- **做什麼：** 將 LoginGateway、CountdownBanner、DonateBanner、FourPetalSpiral 抽出到獨立檔案
+- **改哪個檔案：**
+  - `client/src/components/LoginGateway.jsx` — 新建
+  - `client/src/components/CountdownBanner.jsx` — 新建
+  - `client/src/components/DonateBanner.jsx` — 新建
+  - `client/src/components/FourPetalSpiral.jsx` — 新建
+  - `client/src/App.jsx` — 刪除抽出部分，改為 import
+- **驗證：** UI 行為與拆分前完全一致
+
+### v4.4 重構重複的 Discord 角色分配邏輯
+- **做什麼：** 統一 `assignExclusiveRole` 和 `assignWeeklyRoles`
+- **改哪個檔案：**
+  - `backend/discordBot.js` — 整合兩個角色分配函數
+- **驗證：** 週 cron 正常執行，角色正確發放
+
+✅ v4 全部完成
+
+---
+
+## v5 — 開發體驗與基礎建設
+
+### v5.1 ESLint + Prettier 設定
+- **做什麼：** 加入 linting 與格式化設定
+- **改哪個檔案：**
+  - `.eslintrc.cjs` — 新建
+  - `.prettierrc` — 新建
+  - `backend/package.json` — 加入 lint script
+  - `client/package.json` — 加入 lint script
+- **驗證：** `npm run lint` 正常執行
+
+### v5.2 MongoDB Indexes 補齊
+- **做什麼：** 加入遺漏的查詢索引
+- **改哪個檔案：**
+  - `backend/models/User.js` — 加入 homeRegion、accumulatedTime、weeklyScore 索引
+- **驗證：** MongoDB 查詢使用正確索引
+
+### v5.3 GameContext 整併
+- **做什麼：** 將 App.jsx 中的 50+ useState 逐步搬進 GameContext
+- **改哪個檔案：**
+  - `client/src/context/GameContext.jsx` — 擴充狀態管理
+  - `client/src/App.jsx` — 改用 context
+- **驗證：** 狀態同步與拆分前一致
+
+✅ v5 全部完成
+
+---
+
+## v6 — 最終優化與壓力測試
+
+### v6.1 Rate Limiting 補完
+- **做什麼：** 為 Discord OAuth 端點加入 rate limit
+- **改哪個檔案：**
+  - `backend/server.js` — 加入 Discord OAuth rate limiter
+- **驗證：** 短時間大量請求被正確限制
+
+### v6.2 離線補償防重複
+- **做什麼：** 限制每 5min 最多一次離線補償
+- **改哪個檔案：**
+  - `backend/server.js` — 加入補償冷卻檢查
+- **驗證：** 短時間重複連線只補償一次
+
+### v6.3 大量連線模擬
+- **做什麼：** 測試 100/500 同時連線，確認 tick delay < 100ms
+- **改哪個檔案：**
+  - `backend/scripts/stress-test.js` — 新建壓力測試腳本
+- **驗證：** 高併發下 tick 正常、資料一致
+
+### v6.4 邊界情況驗證
+- **做什麼：** 檢查健康度 <0/>100、背包負數、Buff 過期等邊界
+- **改哪個檔案：**
+  - `backend/services/gameLoop.js` — 加入邊界防護
+  - `backend/services/shopService.js` — 加入邊界防護
+- **驗證：** 所有邊界情況正確處理
+
+✅ v6 全部完成
+
+---
+
+## v7 — 正式發布 (v1.14.0)
+
+### v7.1 更新 README.md
+- **做什麼：** 完整遊戲規則說明 + 新功能使用指南
+- **改哪個檔案：**
+  - `README.md` — 重寫
+- **驗證：** 文件涵蓋所有功能
+
+### v7.2 更新 AGENTS.md
+- **做什麼：** 更新開發指引為新架構
+- **改哪個檔案：**
+  - `AGENTS.md` — 更新
+- **驗證：** 開發指引準確反映當前架構
+
+### v7.3 回歸測試
+- **做什麼：** 完整跑一遍所有功能（登入、掛機、商城、背包、事件、任務、成就、天賦）
+- **驗證：** 所有功能正常
+
+### v7.4 部署至 main
+- **做什麼：** dev → main merge，確認 Cloudflare Pages 部署成功
+- **驗證：** `earthonline1.pages.dev` 可正常訪問
+
+✅ v7 全部完成
+
+---
+
+## 🎉 v1.14.0 全部完成！以下為 v2.0.0 規劃
+
+---
+
+## v2.0.0 — 全面重構 (第二階段)
+
+- 前端全面改用 Pixel Art 點陣美學
+- 多國派遣掛機系統
+- 全服限量秘寶抽獎
+- 真實國家 GDP 連動
+- 反作弊安全系統
