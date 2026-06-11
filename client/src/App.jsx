@@ -204,7 +204,7 @@ function DocumentationOverlay({ onClose }) {
             </div>
             <div className="doc-grid">
               <div className="doc-grid-label">Author</div>
-              <div className="doc-grid-value">{t('胡家綸')}</div>
+              <div className="doc-grid-value">{t('胡家綸')} & {t('大拇哥科技')}</div>
             </div>
             <div className="doc-grid">
               <div className="doc-grid-label">Contact</div>
