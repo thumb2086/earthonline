@@ -1799,16 +1799,16 @@ function Dashboard({ token, onLogout, region }) {
               <select value={region} onChange={e => {
                 const newRegion = e.target.value;
                 if (newRegion !== region && socket?.connected) {
-                  socket.emit('switch_region', { newRegion });
                   socket.once('region_switched', (data) => {
                     if (data.success) {
                       sessionStorage.setItem('eo_region', newRegion);
                       localStorage.setItem('eo_region', newRegion);
-                      setTimeout(() => window.location.reload(), 1000);
+                      window.location.reload();
                     } else {
                       alert(data.message);
                     }
                   });
+                  socket.emit('switch_region', { newRegion });
                 }
               }} style={{ background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--accent-color)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)' }}>
                 <option value="asia">{t('亞洲')}</option>

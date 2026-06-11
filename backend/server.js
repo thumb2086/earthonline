@@ -761,7 +761,6 @@ regions.forEach(regionName => {
     try {
       await User.updateOne({ username: socket.user.username }, { $set: { homeRegion: newRegion } });
       socket.emit('region_switched', { success: true, newRegion, message: `已切換至 ${newRegion.toUpperCase()}，重新連線中...` });
-      setTimeout(() => { try { socket.disconnect(true); } catch(e) {} }, 500);
     } catch (err) {
       socket.emit('region_switched', { success: false, message: '切換失敗' });
     }
