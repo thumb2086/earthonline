@@ -174,7 +174,7 @@ app.get('/api/auth/discord', (req, res) => {
 app.get('/api/auth/discord/callback', async (req, res) => {
   const { code, state, error } = req.query;
   const redirectUri = `${BACKEND_URL}/api/auth/discord/callback`;
-  if (error || !code || !state) return res.status(400).send(`Discord Authentication Failed. <a href="/">Return to app</a>`);
+  if (error || !code || !state) return res.status(400).send(`Discord Authentication Failed. <a href="${FRONTEND_URL}">Return to app</a>`);
   let action = 'bind', decoded = null, returnTo = null;
   try {
     const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
@@ -183,14 +183,18 @@ app.get('/api/auth/discord/callback', async (req, res) => {
     if (returnTo) {
       try {
         const returnUrl = new URL(returnTo);
+        const frontendHost = FRONTEND_URL ? new URL(FRONTEND_URL).hostname : null;
         const isDev = process.env.NODE_ENV === 'development' || process.env.BACKEND_URL?.includes('localhost');
-        const allowedHosts = isDev
-          ? ['localhost', '127.0.0.1', 'earthonline.onrender.com', 'earthonline1.pages.dev', 'earthonline-2m7.pages.dev', 'earthonline.qzz.io']
-          : ['earthonline.onrender.com', 'earthonline1.pages.dev', 'earthonline-2m7.pages.dev', 'earthonline.qzz.io'];
+        const allowedHosts = [
+          ...(isDev ? ['localhost', '127.0.0.1'] : []),
+          'earthonline.onrender.com', 'earthonline1.pages.dev',
+          'earthonline-2m7.pages.dev', 'earthonline.qzz.io',
+        ];
+        if (frontendHost && !allowedHosts.includes(frontendHost)) allowedHosts.push(frontendHost);
         if (!allowedHosts.includes(returnUrl.hostname)) returnTo = null;
       } catch { returnTo = null; }
     }
-    if (!returnTo) returnTo = '/';
+    if (!returnTo) returnTo = action === 'login' ? FRONTEND_URL : '/';
     if (action === 'bind') decoded = jwt.verify(stateData.token, JWT_SECRET);
   } catch (err) { return res.status(401).send('Invalid state payload or expired token.'); }
   try {
@@ -216,10 +220,10 @@ app.get('/api/auth/discord/callback', async (req, res) => {
         user = await db.findUserByUsername(finalName);
       }
       const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET, { expiresIn: '30d' });
-      return res.redirect(`${returnTo || '/'}#token=${token}`);
+      return res.redirect(`${returnTo}#token=${token}`);
     } else {
       const success = await db.updateUserDiscord(decoded.username, profile);
-      if (success) res.redirect(returnTo || '/');
+      if (success) res.redirect(returnTo);
       else res.status(404).send('User not found in Earth Online database');
     }
   } catch (err) { console.error(err); res.status(500).send('Internal Server Error during Discord OAuth2 callback'); }
