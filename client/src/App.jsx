@@ -1430,31 +1430,9 @@ function Dashboard({ token, onLogout, region }) {
                         color: '#64748b', marginLeft: 'auto',
                       }}>{t('↺ 刷新')}</button>
             </div>
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('切換伺服器')}</span>
-              <select value={region} onChange={e => {
-                const newRegion = e.target.value;
-                if (newRegion !== region && socket?.connected) {
-                  socket.emit('switch_region', { newRegion });
-                  socket.once('region_switched', (data) => {
-                    if (data.success) {
-                      sessionStorage.setItem('eo_region', newRegion);
-                      localStorage.setItem('eo_region', newRegion);
-                      setTimeout(() => window.location.reload(), 1000);
-                    } else {
-                      alert(data.message);
-                    }
-                  });
-                }
-              }} style={{ background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--accent-color)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)' }}>
-                <option value="asia">{t('亞洲')}</option>
-                <option value="us">{t('美洲')}</option>
-                <option value="eu">{t('歐洲')}</option>
-              </select>
-            </div>
           </div>
 
-                  {/* Player List */}
+          {/* Player List */}
                   <div style={{ flex: 1, overflowY: 'auto' }}>
                     {filtered.length === 0 && (
                       <div style={{ color: '#475569', fontSize: '0.8rem', textAlign: 'center', padding: '24px 12px' }}>
@@ -1814,6 +1792,28 @@ function Dashboard({ token, onLogout, region }) {
                 <option value="nebula">🌌 星雲</option>
                 <option value="radar">📡 雷達終端</option>
                 <option value="cyber">🏙️ 賽博城市</option>
+              </select>
+            </div>
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('切換伺服器')}</span>
+              <select value={region} onChange={e => {
+                const newRegion = e.target.value;
+                if (newRegion !== region && socket?.connected) {
+                  socket.emit('switch_region', { newRegion });
+                  socket.once('region_switched', (data) => {
+                    if (data.success) {
+                      sessionStorage.setItem('eo_region', newRegion);
+                      localStorage.setItem('eo_region', newRegion);
+                      setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                      alert(data.message);
+                    }
+                  });
+                }
+              }} style={{ background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--accent-color)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)' }}>
+                <option value="asia">{t('亞洲')}</option>
+                <option value="us">{t('美洲')}</option>
+                <option value="eu">{t('歐洲')}</option>
               </select>
             </div>
           </div>
