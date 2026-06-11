@@ -71,15 +71,14 @@ const SHOP_ITEMS = [
   {
     id: 'flash_drive',
     name: '神秘隨身碟', cost: 500, type: 'random',
-    icon: 'flash_drive.png', tagLabel: 'RANDOM',
-    shortDesc: '抽獎，高風險高回報',
+    icon: 'flash_drive.png', tagLabel: 'LOCKED',
+    shortDesc: '⚠️ 暫時封鎖中',
+    locked: true,
     effects: [
-      { icon: '🏆', text: '25% 獲得 1 天生存時間' },
-      { icon: '💰', text: '25% 獲得 1000 PT' },
-      { icon: '🎁', text: '30% 獲得 300 PT（小虧）' },
-      { icon: '💀', text: '20% 健康度 -30%（保留 1%）' },
+      { icon: '🔒', text: '此道具因平衡問題暫時下架' },
+      { icon: '📦', text: '已持有的節點仍可從背包使用' },
     ],
-    tip: '總期望值約 100 PT，運氣決定一切。',
+    tip: '神秘隨身碟因平衡問題已被管理員暫時封鎖。',
   },
   {
     id: 'speed_drive',
