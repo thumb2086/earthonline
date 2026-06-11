@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const discordBot = require('../discordBot');
 
 const RESET_HOUR = 16; // UTC 16:00 = Taipei 00:00 Monday
 
@@ -62,7 +63,7 @@ async function processWeeklySettlement() {
   const topUsers = await User.find({ weeklyScore: { $gt: 0 } })
     .sort({ weeklyScore: -1 })
     .limit(50)
-    .select('username weeklyScore honor');
+    .select('username weeklyScore honor discord.id');
 
   const results = [];
   for (let i = 0; i < topUsers.length; i++) {
@@ -76,6 +77,15 @@ async function processWeeklySettlement() {
     });
     results.push({ username: u.username, honorEarned: totalHonor, rank: i + 1, bonus });
   }
+
+  // Assign Discord roles for top performers
+  const topForRoles = topUsers.slice(0, 10).map(u => ({
+    username: u.username,
+    discordId: u.discord?.id,
+    rank: topUsers.indexOf(u) + 1
+  }));
+  discordBot.assignWeeklyRoles(topForRoles).catch(console.error);
+
   return results;
 }
 

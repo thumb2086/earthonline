@@ -9,7 +9,9 @@ const ROLES = {
   HOMELESS: '1512362779380678699', // 【24小時在線 the 無業遊民】
   NORMIE: '1512363018145497088',   // 【現充（有現實生活的人）】
   RICH: '1512362819167981670',      // 【已實現財務自由的人】
-  POOR: '1512362849341538384'       // 【戶頭剩三位數的月光族】
+  POOR: '1512362849341538384',       // 【戶頭剩三位數的月光族】
+  WEEKLY_TOP3: null,                 // 週結算前三名（需設定 role ID）
+  WEEKLY_TOP10: null                 // 週結算前十名（需設定 role ID）
 };
 
 const client = new Client({
@@ -212,6 +214,7 @@ cron.schedule('0 0 * * 1', async () => {
     if (users.length === 0) return;
 
     const sortedByTime = [...users].sort((a, b) => (b.accumulatedTime || 0) - (a.accumulatedTime || 0));
+    const sortedByWeekly = [...users].sort((a, b) => (b.weeklyScore || 0) - (a.weeklyScore || 0));
     const sortedByPoints = [...users].sort((a, b) => {
       const pA = (a.accumulatedTime || 0) / 1000 + (a.accumulatedBonusPoints || 0);
       const pB = (b.accumulatedTime || 0) / 1000 + (b.accumulatedBonusPoints || 0);
@@ -249,6 +252,21 @@ cron.schedule('0 0 * * 1', async () => {
     if (lowestTimeUser) await assignExclusiveRole(lowestTimeUser.discord.id, ROLES.NORMIE);
     if (highestPointsUser) await assignExclusiveRole(highestPointsUser.discord.id, ROLES.RICH);
     if (lowestPointsUser) await assignExclusiveRole(lowestPointsUser.discord.id, ROLES.POOR);
+
+    // Assign weekly top roles
+    const topWeekly = sortedByWeekly.slice(0, 10);
+    for (let i = 0; i < topWeekly.length; i++) {
+      const u = topWeekly[i];
+      if (!u.discord?.id) continue;
+      const roleId = i < 3 ? ROLES.WEEKLY_TOP3 : ROLES.WEEKLY_TOP10;
+      if (!roleId) continue;
+      try {
+        const member = await guild.members.fetch(u.discord.id);
+        if (member && !member.roles.cache.has(roleId)) {
+          await member.roles.add(roleId);
+        }
+      } catch (e) {}
+    }
 
     console.log('[SYS] Discord: Weekly Role Assignments Complete!');
   } catch (err) {
@@ -315,10 +333,37 @@ async function getHighestRole(discordId) {
   }
 }
 
+async function assignWeeklyRoles(rankedUsers) {
+  // rankedUsers: [{ username, discordId, rank }]
+  if (!isBotReady || !rankedUsers?.length) return;
+  try {
+    const guild = await client.guilds.fetch(GUILD_ID);
+    for (const u of rankedUsers) {
+      if (!u.discordId) continue;
+      let roleId = null;
+      if (u.rank <= 3) roleId = ROLES.WEEKLY_TOP3;
+      else if (u.rank <= 10) roleId = ROLES.WEEKLY_TOP10;
+      if (!roleId) continue;
+      try {
+        const member = await guild.members.fetch(u.discordId);
+        if (member && !member.roles.cache.has(roleId)) {
+          await member.roles.add(roleId);
+        }
+      } catch (e) {
+        // User not in server
+      }
+    }
+    console.log(`[SYS] Discord: Weekly roles assigned to ${rankedUsers.length} users`);
+  } catch (err) {
+    console.error('[SYS] Discord Weekly Role Assignment Failed:', err);
+  }
+}
+
 module.exports = {
   updateBotPresence,
   updateChannelName,
   setIoInstance,
   sendChatMessageToDiscord,
-  getHighestRole
+  getHighestRole,
+  assignWeeklyRoles
 };
