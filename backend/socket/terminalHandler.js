@@ -21,7 +21,7 @@ async function sendDiscordWebhook(message) {
   }
 }
 
-function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionStates) {
+function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionStates, state, triggerEvent) {
   socket.on('terminal_command', async (data) => {
     const user = connectedUsers.get(socket.id);
     if (!user || !data || typeof data.command !== 'string') return;
@@ -72,6 +72,7 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionState
       socket.emit('terminal_response', `[SYS] /RESET_ALL       — 重置伺服器`);
       socket.emit('terminal_response', `[SYS] /SET_MULTIPLIER <n>`);
       socket.emit('terminal_response', `[SYS] /TRIGGER_EVENT <type>`);
+      socket.emit('terminal_response', `[SYS] /SET_PT_SPEED <val>  — 調整 PT/tick`);
     } else if (cmdUpper === 'REPORT') {
       try {
         const allUsers = await User.find({}).lean().limit(2000);
@@ -228,7 +229,21 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionState
       socket.emit('terminal_response', `[SYS] 已設定全域倍率為 ${val}`);
     } else if (cmdUpper.startsWith('TRIGGER_EVENT ')) {
       if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
-      socket.emit('terminal_response', `[SYS] 事件觸發功能需透過管理面板操作`);
+      const eventType = rawCmd.substring(14).trim().toUpperCase();
+      const validEvents = ['QUANTUM_BURST', 'SOLAR_STORM', 'DATA_GOLD_RUSH', 'SATELLITE_ALIGNMENT', 'SYSTEM_MAINTENANCE', 'DATA_BLACK_MARKET'];
+      if (!validEvents.includes(eventType)) { socket.emit('terminal_response', `[ERROR] 未知事件類型。可用: ${validEvents.join(', ')}`); return; }
+      if (state?.currentGlobalEvent) { socket.emit('terminal_response', `[SYS] 已有進行中的事件: ${state.currentGlobalEvent.type}`); return; }
+      triggerEvent(eventType);
+      socket.emit('terminal_response', `[SYS] 已觸發事件: ${eventType}`);
+      nspIo.emit('chat_system_message', { message: `[系統] 管理員 ${user.username} 手動觸發了 ${eventType}！` });
+    } else if (cmdUpper.startsWith('SET_PT_SPEED ')) {
+      if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      const val = parseFloat(rawCmd.substring(12).trim());
+      if (isNaN(val) || val < 0) { socket.emit('terminal_response', '[ERROR] 用法: SET_PT_SPEED <每tick PT量>'); return; }
+      const region = nspIo.name?.replace('/', '') || 'asia';
+      const st = regionStates[region];
+      if (st) st.customPTSpeed = val;
+      socket.emit('terminal_response', `[SYS] 已設定 PT 速度為 ${val}/tick（目前 ${st?.customPTSpeed || '預設'}）`);
     } else if (cmdUpper.startsWith('BET ')) {
       const amount = parseInt(rawCmd.substring(4).trim());
       if (isNaN(amount) || amount < 100) { socket.emit('terminal_response', '[ERROR] 用法: BET <金額(最少100)>'); return; }

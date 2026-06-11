@@ -4,7 +4,7 @@ const { updateWarStats } = require('../state/regionState');
 
 const BASE_DECAY_PER_TICK = 0.2 / 30; // ~0.00667
 const TIME_EARNED_PER_TICK = 5000;
-const BASE_PT_MULTIPLIER = 0.1;
+const BASE_PT_MULTIPLIER = 25;
 const COLLECTIVE_LOAD_THRESHOLD = 20;
 
 async function processTick(state, connectedUsers, regionName) {
@@ -53,7 +53,7 @@ async function processTick(state, connectedUsers, regionName) {
     let timeEarned = 0;
 
     if (!isDead) {
-      ptPerTick = (user.health / 100) * BASE_PT_MULTIPLIER * ptBonus;
+      ptPerTick = (user.health / 100) * (state.customPTSpeed || BASE_PT_MULTIPLIER) * ptBonus;
       ptPerTick += eventBonus * 0.05;
 
       if (user.activeBuffs && user.activeBuffs.get('overclock') > Date.now()) {

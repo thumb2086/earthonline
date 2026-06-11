@@ -745,7 +745,7 @@ regions.forEach(regionName => {
     // Delegate to extracted socket handlers
   registerChatHandlers(socket, nspIo, state, connectedUsers, chatCooldowns);
   registerSocialHandlers(socket, nspIo, connectedUsers);
-  registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionStates);
+  registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionStates, state, triggerEvent);
   registerEventHandlers(socket, nspIo, state);
   registerQuestHandlers(socket, connectedUsers);
   registerAchievementHandlers(socket, connectedUsers);
