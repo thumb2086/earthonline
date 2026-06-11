@@ -939,7 +939,6 @@ function Dashboard({ token, onLogout, region }) {
     });
 
     return () => {
-      try { clearInterval(syncInterval); } catch(e) {}
       if (adTimerRef?.current) clearInterval(adTimerRef.current);
       if (adSloganTimerRef?.current) clearInterval(adSloganTimerRef.current);
       s.removeAllListeners();
