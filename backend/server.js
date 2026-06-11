@@ -37,6 +37,7 @@ const { registerTerminalHandlers } = require('./socket/terminalHandler');
 const { registerEventHandlers } = require('./socket/eventHandler');
 const { registerQuestHandlers } = require('./socket/questHandler');
 const { registerAchievementHandlers } = require('./socket/achievementHandler');
+const { registerSettlementHandlers } = require('./socket/settlementHandler');
 
 const REINCARNATE_COUNTRIES = [
   { code: 'US', name: '美國', lat: 39.8, lon: -98.6, spread: 15 },
@@ -621,6 +622,8 @@ regions.forEach(regionName => {
         cosmetics: dbUser?.cosmetics ? Object.fromEntries(dbUser.cosmetics) : {},
         level: calcLevel(user.accumulatedTime),
         levelProgress: calcLevelProgress(user.accumulatedTime),
+        honor: user.honor || 0,
+        weeklyScore: user.weeklyScore || 0,
         createdAt: user.createdAt,
         connectedAt: user.connectedAt,
         activeUsers: connectedUsers.size,
@@ -699,6 +702,7 @@ regions.forEach(regionName => {
   registerEventHandlers(socket, nspIo, state);
   registerQuestHandlers(socket, connectedUsers);
   registerAchievementHandlers(socket, connectedUsers);
+  registerSettlementHandlers(socket, connectedUsers);
 // Handle Disconnect
   socket.on('disconnect', async () => {
     const disconnectedUser = connectedUsers.get(socket.id);
