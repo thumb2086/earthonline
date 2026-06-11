@@ -147,7 +147,9 @@ app.use(cors());
 app.use(express.json());
 app.use('/downloads', express.static(path.join(__dirname, 'public/downloads')));
 app.use(morgan('short'));
-app.use(helmet());
+// Helmet disabled — its default CSP blocks cross-origin Socket.io connections to Render
+// If re-enabling, must add explicit connectSrc for all backend URLs
+// app.use(helmet());
 
 // Health check for Render
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() }));
