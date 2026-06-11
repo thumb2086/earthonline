@@ -281,7 +281,7 @@ function DocumentationOverlay({ onClose }) {
 
 function Dashboard({ token, onLogout, region }) {
   const { t, language, setLanguage } = useLanguage();
-  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
+  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
   const API_URL = `${BASE_URL}/api/${region}`;
   const SOCKET_URL = BASE_URL;
   const game = useGame();
@@ -2055,7 +2055,7 @@ function App() {
   const { t, language, setLanguage } = useLanguage();
   const [token, setToken] = useState(localStorage.getItem('eo_token'));
   const [region, setRegion] = useState(localStorage.getItem('eo_region') || 'asia');
-  const APP_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
+  const APP_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
   const handleLogin = (newToken, username, selectedRegion) => {
     localStorage.setItem('eo_token', newToken);
