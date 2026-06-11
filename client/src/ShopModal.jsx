@@ -43,7 +43,6 @@ const SHOP_ITEMS = [
     effects: [
       { icon: '🛡️', text: '45 分鐘內健康度不再自然衰減' },
       { icon: '🌪️', text: '太陽風暴期間斷線不扣 PT' },
-      { icon: '🔇', text: '管理員不能對你禁言' },
     ],
     tip: '全方位防護，太陽風暴期間必備。',
   },

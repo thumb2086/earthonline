@@ -49,7 +49,6 @@ const ITEM_INFO = {
     effects: [
       { text: '45 分鐘內健康度不再自然衰減' },
       { text: '太陽風暴斷線不扣 PT' },
-      { text: '管理員不能對你禁言' },
     ],
   },
   generator: {

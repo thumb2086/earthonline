@@ -77,7 +77,7 @@ async function useItem(username, itemId) {
       : item.type === 'cooling'
         ? `❄️ 液態氮冷卻啟動，衰減 -50% 且免疫維護懲罰，持續 ${minLabel} 分鐘！`
         : item.type === 'firewall'
-          ? `🛡️ 防火牆啟動，${minLabel} 分鐘內免疫衰減、太陽風暴與管理員禁言！`
+          ? `🛡️ 防火牆啟動，${minLabel} 分鐘內免疫衰減、太陽風暴！`
           : `⚡ 網路加速器啟動，${minLabel} 分鐘內 tick 加速 +66%！`;
 
   } else if (item.effect === 'revive') {
