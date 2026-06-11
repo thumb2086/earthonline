@@ -1,248 +1,23 @@
-import { useEffect, useState, useRef } from 'react';
+﻿import { useEffect, useState, useRef } from 'react';
 import { Globe2, Activity, User, Link as LinkIcon, ShieldCheck, Shield, Info, Database, X, Star, Clock, Volume2, VolumeX, Coffee, Users, ChevronDown, Zap, Tornado, Coins, Satellite, Settings, AlertTriangle, CheckCircle, MapPin, Monitor, ShoppingCart, Palette, Trophy } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
 import { useTheme } from './ThemeContext';
 import Draggable from 'react-draggable';
 import DataCenterVisualizer from './DataCenterVisualizer';
-import BackgroundRouter from './components/Backgrounds';
 import ShopModal from './ShopModal';
 import BackpackModal from './BackpackModal';
 import LeaderboardModal from './components/Modals/LeaderboardModal';
 import Console from './components/Dashboard/Console';
 import { GameProvider, useGame } from './context/GameContext';
+import CountdownBanner from './components/CountdownBanner';
+import DonateBanner from './components/DonateBanner';
+import LoginGateway from './components/LoginGateway';
+import FourPetalSpiral from './components/FourPetalSpiral';
 import './index.css';
 
 const VITE_API = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
 
 
-function LoginGateway({ onLogin }) {
-  const { t, language, setLanguage } = useLanguage();
-  const [isRegister, setIsRegister] = useState(false);
-  const [isForgot, setIsForgot] = useState(false);
-  
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [recoveryKey, setRecoveryKey] = useState('');
-  const [region, setRegion] = useState('asia');
-  const [rememberMe, setRememberMe] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('saved_username');
-    if (saved) {
-      setUsername(saved);
-      setRememberMe(true);
-    }
-  }, []);
-  
-  const [isDaytime, setIsDaytime] = useState(() => {
-    const h = new Date().getHours();
-    return h >= 6 && h < 18;
-  });
-
-  useEffect(() => {
-    const check = () => {
-      const h = new Date().getHours();
-      setIsDaytime(h >= 6 && h < 18);
-    };
-    const intv = setInterval(check, 60000);
-    return () => clearInterval(intv);
-  }, []);
-  
-  const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-
-  const getAudioCtx = () => {
-    if (!window.__eoAudioCtx) window.__eoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    return window.__eoAudioCtx;
-  };
-  const playBeep = (freq = 800, duration = 100, type = 'sine') => {
-    try {
-      const ctx = getAudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = type;
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration / 1000);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + duration / 1000);
-    } catch(e) {}
-  };
-
-  // Check for discord token in URL (query or hash fragment)
-  useEffect(() => {
-    let token = null;
-    const params = new URLSearchParams(window.location.search);
-    token = params.get('token');
-    if (!token && window.location.hash.startsWith('#token=')) {
-      token = window.location.hash.replace('#token=', '').split('&')[0];
-    }
-    if (token) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      onLogin(token, 'Discord User', region); 
-    }
-    const verifyToken = params.get('verifyToken');
-    if (verifyToken) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
-      fetch(`${BASE_URL}/api/${region}/auth/verify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: verifyToken })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setSuccessMsg('電子郵件驗證成功！');
-          setTimeout(() => setSuccessMsg(''), 5000);
-        } else {
-          setError(data.error || '驗證失敗');
-          setTimeout(() => setError(''), 5000);
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        setError('連線失敗');
-      });
-    }
-  }, [onLogin, region]);
-
-  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline.onrender.com';
-  const API_URL = `${BASE_URL}/api/${region}`;
-
-  const handleDiscordLogin = () => {
-    const state = btoa(JSON.stringify({ action: 'login', returnTo: window.location.href.split('?')[0] }));
-    const BACKEND_DOMAIN = import.meta.env.VITE_API_URL ? new URL(import.meta.env.VITE_API_URL).origin : 'https://earthonline.onrender.com';
-    window.location.href = `${BACKEND_DOMAIN}/api/auth/discord?state=${state}`;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccessMsg('');
-    
-    if (isForgot) {
-      try {
-        const res = await fetch(`${API_URL}/reset-password`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, recoveryKey, newPassword: password })
-        });
-        const data = await res.json();
-        if (!res.ok) return setError(data.error || '重置失敗');
-        setSuccessMsg('密碼重置成功，請使用新密碼登入');
-        setIsForgot(false);
-        setPassword('');
-      } catch (err) {
-        setError('伺服器連線失敗');
-      }
-      return;
-    }
-
-    const endpoint = isRegister ? '/register' : '/login';
-    try {
-      const res = await fetch(`${API_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-      
-      if (!res.ok) {
-        setError(data.error || 'Request failed');
-        playBeep(300, 300, 'sawtooth');
-        return;
-      }
-      
-      if (isRegister) {
-        alert(`註冊成功！\n【請務必保存您的恢復金鑰】\n${data.recoveryKey}\n\n如果您忘記密碼，這是唯一找回帳號的方式！`);
-        onLogin(data.token, data.username, region);
-      } else {
-        onLogin(data.token, data.user.username, region);
-      }
-      playBeep(523, 150);
-      setTimeout(() => playBeep(659, 150), 170);
-      setTimeout(() => playBeep(784, 200), 370);
-      if (rememberMe) {
-        localStorage.setItem('saved_username', username);
-      } else {
-        localStorage.removeItem('saved_username');
-      }
-    } catch (err) {
-      setError('伺服器連線失敗');
-    }
-  };
-
-  return (
-    <div className="login-gateway">
-      <div className="login-bg">
-        <div className="nasa-bg"></div>
-        <div className="nasa-stars">
-          {Array.from({ length: 80 }, (_, i) => (
-            <div key={i} className="nasa-star" style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              width: `${1 + Math.random() * 2}px`,
-              height: `${1 + Math.random() * 2}px`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${2 + Math.random() * 4}s`,
-            }} />
-          ))}
-        </div>
-        <div className="nasa-earth"></div>
-        <div className="nasa-earth-night"></div>
-        <div className="nasa-glow"></div>
-      </div>
-
-      <div className="login-box">
-        <div style={{textAlign: 'center', marginBottom: '25px', zIndex: 10, position: 'relative'}}>
-          <div className="login-earth"></div>
-          <h2 style={{fontFamily: 'var(--font-sans)', color: 'var(--text-main)', fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}}>
-            <Globe2 className="icon-glow icon-spin" size={32} /> {t('地球在線')}
-          </h2>
-          <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '5px'}}>{t('全球節點觀測與管理中心')}</p>
-        </div>
-        
-        <form className="login-form">
-          {error && <div className="error-message">{error}</div>}
-           {successMsg && <div style={{color: 'var(--success-color)', marginBottom: '10px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold'}}>{successMsg}</div>}
-          
-          <div className="form-group" style={{marginBottom: '15px'}}>
-            <label style={{color: 'var(--accent-color)'}}>{t('GLOBAL REGION (伺服器分區)')}</label>
-            <select value={region} onChange={e => setRegion(e.target.value)} className="terminal-input" style={{appearance: 'auto', background: 'var(--surface-color)', color: 'var(--accent-color)', fontWeight: 'bold'}}>
-              <option value="asia">{t('[Asia-East] 亞洲樞紐')}</option>
-              <option value="us">{t('[US-West] 美洲中樞')}</option>
-              <option value="eu">{t('[EU-Central] 歐洲陣列')}</option>
-            </select>
-          </div>
-
-           <div style={{textAlign: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(37,99,235,0.06)', borderRadius: '6px', border: '1px solid rgba(37,99,235,0.15)'}}>
-             <span style={{color: 'var(--accent-color)', fontSize: '0.85rem'}}>{t('帳號/密碼 或 Discord 均可登入')}</span>
-          </div>
-
-          <button 
-            type="button" 
-            onClick={handleDiscordLogin}
-            style={{
-              width: '100%', padding: '14px', background: '#5865F2', color: '#fff',
-              border: 'none', borderRadius: '6px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer',
-              marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-              fontFamily: 'monospace', transition: 'all 0.15s',
-              boxShadow: '0 4px 15px rgba(88,101,242,0.4)',
-            }}
-            onMouseOver={e => e.target.style.background = '#4752C4'}
-            onMouseOut={e => e.target.style.background = '#5865F2'}
-          >
-            <svg width="22" height="22" viewBox="0 0 127.14 96.36" fill="#fff"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a67.59,67.59,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
-            {t('使用 Discord 快速登入')}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 function DocumentationOverlay({ onClose }) {
   const { t, language, setLanguage } = useLanguage();
@@ -501,108 +276,8 @@ function DocumentationOverlay({ onClose }) {
   );
 }
 
-function CountdownBanner() {
-  const { t, language, setLanguage } = useLanguage();
-  const [timeLeft, setTimeLeft] = useState({ d: 0, h: 0, m: 0, s: 0 });
-
-  useEffect(() => {
-    const calcTime = () => {
-      const now = new Date();
-      const currentDayUTC = now.getUTCDay();
-      const currentHourUTC = now.getUTCHours();
-      
-      // We are looking for Sunday (0) 16:00:00 UTC (Which is Monday 00:00:00 Asia/Taipei)
-      let daysUntilTarget = (0 - currentDayUTC + 7) % 7;
-      if (daysUntilTarget === 0 && currentHourUTC >= 16) {
-         daysUntilTarget = 7;
-      }
-      
-      const nextTarget = new Date(now);
-      nextTarget.setUTCDate(now.getUTCDate() + daysUntilTarget);
-      nextTarget.setUTCHours(16, 0, 0, 0);
-      
-      const diff = nextTarget.getTime() - now.getTime();
-      if (diff <= 0) return { d: 0, h: 0, m: 0, s: 0 };
-
-      return {
-        d: Math.floor(diff / (1000 * 60 * 60 * 24)),
-        h: Math.floor((diff / (1000 * 60 * 60)) % 24),
-        m: Math.floor((diff / 1000 / 60) % 60),
-        s: Math.floor((diff / 1000) % 60)
-      };
-    };
-
-    setTimeLeft(calcTime());
-    const intv = setInterval(() => {
-      setTimeLeft(calcTime());
-    }, 1000);
-    return () => clearInterval(intv);
-  }, []);
-
-  const format = (num) => num.toString().padStart(2, '0');
-
-  return (
-    <div style={{
-      width: '100%',
-      background: 'linear-gradient(90deg, #1B2845, #274060, #335C81)',
-      color: '#fff',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '10px 20px',
-      fontFamily: '"Inter", "Segoe UI", sans-serif',
-      boxSizing: 'border-box',
-      borderBottom: '1px solid rgba(255,255,255,0.1)',
-      gap: '15px',
-      flexWrap: 'wrap',
-      flexShrink: 0
-    }}>
-      <div style={{display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.95rem', fontWeight: '600'}}>
-        <span style={{color: '#ffcc00'}}>✧</span> 
-        {t('每週任務結算 — 獲取 ')}<span style={{background: '#ed4245', padding: '2px 6px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold'}}>{t('專屬身分組')}</span>{t(' | 距離結算剩餘:')}
-      </div>
-      <div style={{display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '1rem'}}>
-        <div style={{background: '#f2f3f5', color: '#23272a', padding: '4px 8px', borderRadius: '6px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.d)}</div>
-        <span>:</span>
-        <div style={{background: '#f2f3f5', color: '#23272a', padding: '4px 8px', borderRadius: '6px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.h)}</div>
-        <span>:</span>
-        <div style={{background: '#f2f3f5', color: '#23272a', padding: '4px 8px', borderRadius: '6px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.m)}</div>
-        <span>:</span>
-        <div style={{background: '#f2f3f5', color: '#23272a', padding: '4px 8px', borderRadius: '6px', minWidth: '28px', textAlign: 'center'}}>{format(timeLeft.s)}</div>
-      </div>
-    </div>
-  );
-}
 
 
-const DonateBanner = () => {
-  const { t, language, setLanguage } = useLanguage();
-  return (
-    <div className="floating-panel" style={{ padding: '15px 20px', background: 'rgba(255, 65, 108, 0.1)', border: '1px solid #ff416c', width: '100%', marginTop: '15px' }}>
-      <div style={{ fontSize: '0.9rem', color: '#ff416c', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
-        <Database size={16} /> {t('伺服器微服務升級募資計畫')}
-      </div>
-      <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', marginBottom: '15px', lineHeight: '1.6' }}>
-        {t('為了打造真正的全球無上限微服務架構，我們計畫在 Render 上建立硬體分流叢集（包含獨立的 Redis 與三大洲 Web Service）。')}<br/>
-        <span style={{color: '#38ef7d'}}>{t('優點')}：</span>{t('真實硬體分流，乘載量無上限。')}<br/>
-        <span style={{color: '#ff416c'}}>{t('缺點')}：</span>{t('設定較複雜，且 Render 的 Redis 與多台伺服器將產生高昂月費。')}
-      </div>
-      <a 
-        href="https://buymeacoffee.com/lucas1126" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: '8px',
-          background: '#ff416c', color: '#fff', padding: '8px 15px',
-          borderRadius: '4px', textDecoration: 'none', fontSize: '0.8rem', fontWeight: 'bold',
-          transition: 'all 0.3s ease'
-        }}
-      >
-        <Coffee size={14} /> {t('贊助伺服器升級 (Buy Me a Coffee)')}
-      </a>
-    </div>
-  );
-};
 
 function Dashboard({ token, onLogout, region }) {
   const { t, language, setLanguage } = useLanguage();
@@ -683,6 +358,7 @@ function Dashboard({ token, onLogout, region }) {
     const val = localStorage.getItem('eo_notifications');
     return val === null ? true : val === 'true';
   });
+  const [bgStyle, setBgStyle] = useState(() => localStorage.getItem('eo_bg_style') || 'globe');
   const getAudioCtx = () => {
     if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
     return audioCtxRef.current;
@@ -732,7 +408,6 @@ function Dashboard({ token, onLogout, region }) {
   const terminalEndRef = useRef(null);
   const logEndRef = useRef(null);
   const dropdownRef = useRef(null);
-  const [activePage, setActivePage] = useState('dashboard');
   // #11: 廣告計時器 ref，用於 cleanup
   const adTimerRef = useRef(null);
   const adSloganTimerRef = useRef(null);
@@ -843,11 +518,12 @@ function Dashboard({ token, onLogout, region }) {
     if (!socket) return;
     const s = socket;
 
-    addLog('驗證金鑰已發送，等待授權...');
+    addLog(t('驗證金鑰已發送，等待授權...'));
     s.on('auth_error', (data) => {
-      const msg = data?.message || '授權已過期，請重新登入';
+      const msg = data?.message || t('授權已過期，請重新登入');
       addLog(`[SYSTEM] ${msg}`);
       alert(msg);
+      setIsConnected(false);
       onLogout();
     });
 
@@ -1376,46 +1052,7 @@ function Dashboard({ token, onLogout, region }) {
           <span style={{fontWeight: '900', fontSize: '1.3rem', letterSpacing: '0'}}>{t('地球在線')}</span> 
           <span style={{color: '#64748b', fontSize: '0.9rem', marginLeft: '10px'}}>{t('伺服器')}: {region.toUpperCase()} | {t('你的位置')}: {myNode?.country || t('連線中..')}</span>
         </div>
-        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {/* Page Tabs */}
-          <div style={{ display: 'flex', gap: '2px', marginRight: '12px' }}>
-            <button onClick={() => setActivePage('dashboard')} style={{
-              padding: '6px 14px', borderRadius: '6px', border: 'none',
-              background: activePage === 'dashboard' ? 'var(--accent-color)' : 'transparent',
-              color: activePage === 'dashboard' ? '#fff' : 'var(--text-secondary)',
-              fontWeight: activePage === 'dashboard' ? 600 : 400,
-              cursor: 'pointer', fontSize: '0.85rem', transition: 'all 0.15s',
-            }}>{t('儀錶板')}</button>
-            <button onClick={() => setActivePage('map')} style={{
-              padding: '6px 14px', borderRadius: '6px', border: 'none',
-              background: activePage === 'map' ? 'var(--accent-color)' : 'transparent',
-              color: activePage === 'map' ? '#fff' : 'var(--text-secondary)',
-              fontWeight: activePage === 'map' ? 600 : 400,
-              cursor: 'pointer', fontSize: '0.85rem', transition: 'all 0.15s',
-            }}>{t('地圖')}</button>
-            <button onClick={() => setShowSocialModal(true)} style={{
-              padding: '6px 14px', borderRadius: '6px', border: 'none',
-              background: 'transparent', color: 'var(--text-secondary)',
-              cursor: 'pointer', fontSize: '0.85rem',
-            }}>{t('社交')}</button>
-            <button onClick={() => setShowShopModal(true)} style={{
-              padding: '6px 14px', borderRadius: '6px', border: 'none',
-              background: 'transparent', color: 'var(--text-secondary)',
-              cursor: 'pointer', fontSize: '0.85rem',
-            }}>{t('商城')}</button>
-            <button onClick={() => setShowBackpack(true)} style={{
-              padding: '6px 14px', borderRadius: '6px', border: 'none',
-              background: 'transparent', color: 'var(--text-secondary)',
-              cursor: 'pointer', fontSize: '0.85rem',
-            }}>{t('背包')}</button>
-            <button onClick={() => setShowSettings(true)} style={{
-              padding: '6px 14px', borderRadius: '6px', border: 'none',
-              background: 'transparent', color: 'var(--text-secondary)',
-              cursor: 'pointer', fontSize: '0.85rem',
-            }}><Settings size={14} /></button>
-          </div>
-
-          <div className="system-stats" style={{display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-color)', padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem'}}>
+        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {!window.electronAPI && (
             <a href="https://drive.google.com/uc?export=download&id=1Xji_z7dB5Q16FfSyRvnm2mXqn3n0cAQ2" target="_blank" rel="noopener noreferrer" style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', background: 'var(--success-color)', color: 'white', border: 'none', borderRadius: '6px', textDecoration: 'none', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)', fontSize: '0.9rem'}}>
               <Monitor size={16} /> {t('下載專屬電腦版')}
@@ -1431,7 +1068,53 @@ function Dashboard({ token, onLogout, region }) {
             {!isConnected && <span style={{color: 'var(--danger-color)', fontWeight: 'bold'}}>[{t('已斷線')}]</span>}
           </div>
 
-           <button onClick={toggleBgm} style={{padding: '5px 10px', borderRadius: '6px', background: bgmEnabled ? 'rgba(37,99,235,0.08)' : 'rgba(224,62,62,0.08)', border: bgmEnabled ? '1px solid rgba(37,99,235,0.2)' : '1px solid rgba(224,62,62,0.2)', color: bgmEnabled ? 'var(--accent-color)' : 'var(--danger-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'var(--font-sans)', fontSize: '0.8rem'}} title={bgmEnabled ? t('關閉背景音樂') : t('開啟背景音樂')}>
+          <div className={`header-dropdown${dropdownOpen ? ' open' : ''}`} ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen(prev => !prev)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 15px', borderRadius: '8px',
+                background: dropdownOpen ? 'var(--bg-light)' : 'var(--surface-color)',
+                border: '1px solid var(--border-color)', color: 'var(--text-color)',
+                cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s', fontFamily: 'var(--font-sans)'
+              }}
+            >
+              {t('選單 (Menu)')} <ChevronDown size={16} style={{ transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+            </button>
+            <div className="header-dropdown-content">
+
+              <div style={{width: '100%', height: '1px', background: 'rgba(255,255,255,0.1)', margin: '5px 0'}}></div>
+              <button onClick={() => { setShowSocialModal(true); setDropdownOpen(false); }} className="dropdown-item">
+                <Users size={16} /> {t('社交網路 (Social)')}
+              </button>
+              <button onClick={() => { setShowShopModal(true); setDropdownOpen(false); }} className="dropdown-item" style={{color: '#38bdf8'}}>
+                <ShoppingCart size={16} /> {t('黑市商城 (Shop)')}
+              </button>
+              <button onClick={() => { setShowBackpack(true); setDropdownOpen(false); }} className="dropdown-item" style={{color: '#22c55e'}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><polyline points="8 8 8 5 16 5 16 8"/><line x1="12" y1="14" x2="12" y2="17"/><line x1="9" y1="14" x2="9" y2="17"/><line x1="15" y1="14" x2="15" y2="17"/></svg>
+                {t('裝備背包 (Backpack)')}
+              </button>
+              <button className="dropdown-item" onClick={() => { setShowThemeMenu(!showThemeMenu); setDropdownOpen(false); }}>
+                <Palette size={16} /> {t('主題配色 (Themes)')}
+              </button>
+              <button className="dropdown-item" onClick={() => { setShowSettings(true); setDropdownOpen(false); }}>
+                <Settings size={16} /> {t('設定 (Settings)')}
+              </button>
+              {(myRole === 'admin' || myRole === 'moderator') && (
+                <button className="dropdown-item" style={{color: 'var(--danger-color)'}} onClick={() => { setShowAdminPanel(true); setDropdownOpen(false); }}>
+                  <Shield size={16} /> {t('管理員功能 (Admin)')}
+                </button>
+              )}
+              <a href="https://discord.gg/6P6NG49Mus" target="_blank" rel="noreferrer" className="dropdown-item" style={{color: 'var(--info-color)'}} onClick={() => setDropdownOpen(false)}>
+                <svg width="16" height="16" viewBox="0 0 127.14 96.36" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a67.58,67.58,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+                {t('官方 Discord')}
+              </a>
+              <a href="https://buymeacoffee.com/lucas1126" target="_blank" rel="noreferrer" className="dropdown-item" style={{color: '#FFDD00'}} onClick={() => setDropdownOpen(false)}>
+                <Coffee size={16} /> {t('贊助支持 (Donate)')}
+              </a>
+            </div>
+          </div>
+
+          <button onClick={toggleBgm} style={{padding: '5px 12px', borderRadius: '8px', background: bgmEnabled ? 'rgba(0,255,136,0.1)' : 'rgba(255,50,50,0.1)', border: bgmEnabled ? '1px solid rgba(0,255,136,0.3)' : '1px solid rgba(255,50,50,0.3)', color: bgmEnabled ? 'var(--success-color)' : 'var(--danger-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'monospace'}} title={bgmEnabled ? t('關閉背景音樂') : t('開啟背景音樂')}>
 {bgmEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
 {bgmEnabled ? 'BGM ON' : 'BGM OFF'}
 </button>
@@ -1440,13 +1123,13 @@ function Dashboard({ token, onLogout, region }) {
       </header>
 
       <div className="main-content">
-        {activePage === 'dashboard' && (
-        <aside className="metrics-terminal" style={{width: '100%', maxWidth: '420px', margin: '0 auto', borderRight: 'none'}}>
-          <div className="brand-banner" style={{ textAlign: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-color)', marginBottom: '12px' }}>
+        {/* Left Metrics Terminal */}
+        <aside className="metrics-terminal floating-panel">
+          <div className="brand-banner" style={{ textAlign: 'center', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '12px' }}>
             <div style={{display: 'flex', justifyContent: 'center', marginBottom: '6px'}}>
-              <Globe2 size={40} color="var(--accent-color)" />
+              <Globe2 size={40} color="var(--accent-color)" className="icon-glow icon-spin" />
             </div>
-            <h3 style={{margin: '0', color: 'var(--text-color)', fontWeight: 700, fontSize: '1.1rem'}}>EARTH ONLINE</h3>
+            <h3 style={{margin: '0', color: 'var(--text-primary)', letterSpacing: '2px', fontSize: '1.1rem'}}>EARTH ONLINE</h3>
           </div>
 
           <div className="metric-group" style={{padding: '10px 12px', marginBottom: '8px'}}>
@@ -1459,7 +1142,7 @@ function Dashboard({ token, onLogout, region }) {
                   style={{width: '40px', height: '40px', borderRadius: '50%', border: '2px solid var(--accent-color)', objectFit: 'cover'}} 
                 />
               ) : (
-                <div style={{width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)'}}>
+                <div style={{width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)'}}>
                   <User size={20} color="var(--text-secondary)" />
                 </div>
               )}
@@ -1471,26 +1154,26 @@ function Dashboard({ token, onLogout, region }) {
                     {t('已連結 Discord')}
                   </div>
                 ) : (
-<a href="#" onClick={(e) => { e.preventDefault(); setShowDiscordModal(true); }} style={{fontSize: '0.8rem', color: 'var(--accent-color)', fontWeight: 500}}>
+<a href="#" onClick={(e) => { e.preventDefault(); setShowDiscordModal(true); }} style={{fontSize: '0.8rem', color: 'var(--info-color)'}}>
                      {t('連結 Discord')}
                    </a>
                 )}
               </div>
             </div>
             <div style={{display: 'flex', gap: '12px', marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)'}}>
-              <div><span style={{color: 'var(--text-secondary)'}}>ping </span><strong style={{color: 'var(--text-color)'}}>{ping}ms</strong></div>
-               <div><span style={{color: 'var(--text-secondary)'}}>{t('session')} </span><strong style={{color: 'var(--accent-color)'}}>{formatTime(sessionTime)}</strong></div>
-              <div><span style={{color: 'var(--text-secondary)'}}>{t('status')} </span><strong style={{color: isConnected ? 'var(--success-color)' : 'var(--danger-color)'}}>{isConnected ? t('on') : t('off')}</strong></div>
+              <div><span style={{color: '#888'}}>ping </span><strong style={{color: 'var(--text-main)'}}>{ping}ms</strong></div>
+              <div><span style={{color: '#888'}}>{t('session')} </span><strong style={{color: '#00ffaa'}}>{formatTime(sessionTime)}</strong></div>
+              <div><span style={{color: '#888'}}>{t('status')} </span><strong style={{color: isConnected ? 'var(--success-color)' : 'var(--danger-color)'}}>{isConnected ? t('on') : t('off')}</strong></div>
             </div>
           </div>
 
           <div style={{display: 'flex', gap: '10px', marginBottom: '8px'}}>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
-              <div className="metric-title">{t('上線人數')}</div>
-              <div className="metric-value" style={{fontSize: '1.3rem', color: 'var(--accent-color)'}}>{globalStats.activeUsers}</div>
+              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('上線人數')}</div>
+              <div style={{fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--success-color)'}}>{globalStats.activeUsers}</div>
             </div>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
-              <div className="metric-title">{t('倍率')}</div>
+              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('倍率')}</div>
               {(() => {
                 const isOverclock = myNode?.activeBuffs?.overclock > Date.now();
                 const baseMult = globalStats.multiplier || 1.0;
@@ -1505,64 +1188,63 @@ function Dashboard({ token, onLogout, region }) {
               })()}
             </div>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
-              <div className="metric-title">{t('生命')}</div>
-              <div className="metric-value" style={{fontSize: '1.3rem', color: calculateHealthPercentage(lifespan) > 30 ? 'var(--accent-color)' : 'var(--danger-color)'}}>{Math.floor(calculateHealthPercentage(lifespan))}%</div>
+              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('生命')}</div>
+              <div style={{fontSize: '1.3rem', fontWeight: 'bold', color: calculateHealthPercentage(lifespan) > 30 ? 'var(--accent-color)' : 'var(--danger-color)'}}>{Math.floor(calculateHealthPercentage(lifespan))}%</div>
             </div>
           </div>
 
           <div className="metric-group" style={{padding: '10px 12px', marginBottom: '8px'}}>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px'}}>
-              <span className="metric-title">{t('節點等級')}</span>
-              <span style={{fontSize: '1rem', fontWeight: 600, color: 'var(--accent-color)'}}>
+              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('節點等級')}</span>
+              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-color)'}}>
                 Lv.{myNode?.level || 1}
-                {myNode?.levelProgress?.nextSec && <span style={{fontSize:'0.75rem', color:'var(--text-secondary)', marginLeft:'5px'}}>(+{(myNode.levelProgress.progress * 100).toFixed(0)}%)</span>}
+                {myNode?.levelProgress?.nextSec && <span style={{fontSize:'0.75rem', color:'#888', marginLeft:'5px'}}>(+{(myNode.levelProgress.progress * 100).toFixed(0)}%)</span>}
               </span>
             </div>
             {myNode?.levelProgress?.nextSec > 0 && (
-              <div style={{width:'100%', height:'4px', background:'var(--bg-color)', borderRadius:'2px', marginTop:'4px', overflow:'hidden'}}>
+              <div style={{width:'100%', height:'4px', background:'rgba(255,255,255,0.1)', borderRadius:'2px', marginTop:'4px', overflow:'hidden'}}>
                 <div style={{width:`${(myNode.levelProgress.progress * 100).toFixed(1)}%`, height:'100%', background:'var(--accent-color)', borderRadius:'2px', transition:'width 0.3s'}} />
               </div>
             )}
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px'}}>
-              <span className="metric-title">{t('總生存時間')}</span>
-              <span style={{fontSize: '1rem', fontWeight: 600, color: 'var(--accent-color)'}}>{formatTime(lifespan)}</span>
+              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('總生存時間')}</span>
+              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-color)'}}>{formatTime(lifespan)}</span>
             </div>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-              <span className="metric-title">{t('累積點數')}</span>
-              <span style={{fontSize: '1rem', fontWeight: 600, color: 'var(--text-color)'}}>{(myNode?.accumulatedBonusPoints || 0).toLocaleString()}</span>
+              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('累積點數')}</span>
+              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)'}}>{(myNode?.accumulatedBonusPoints || 0).toLocaleString()}</span>
             </div>
           </div>
 
           <div style={{display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px'}}>
-            <div style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px'}}>{t('伺服器：')}{region === 'asia' ? t('亞洲') : region === 'us' ? t('美洲') : t('歐洲')} | node: {myNode?.userId} | {myNode?.country || '--'}</div>
+            <div style={{fontSize: '0.8rem', color: '#888', marginBottom: '4px'}}>{t('伺服器：')}{region === 'asia' ? t('亞洲') : region === 'us' ? t('美洲') : t('歐洲')} | node: {myNode?.userId} | {myNode?.country || '--'}</div>
             {globalStats.multiplier > 1.0 && (
               <div style={{fontSize: '0.8rem', color: 'var(--accent-color)'}}>{t('超載中：')}{globalStats.activeUsers} / 5 {t('人')}</div>
             )}
           </div>
 
           <div style={{ marginTop: 'auto', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <button className="terminal-btn" onClick={() => setShowLeaderboard(true)}>
+            <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(255,215,0,0.1)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)'}} onClick={() => setShowLeaderboard(true)}>
               <Activity size={14} /> {t('排行榜')}
             </button>
-            <button className="terminal-btn" onClick={() => setShowAchievements(true)}>
+            <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(255,215,0,0.05)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.2)'}} onClick={() => setShowAchievements(true)}>
               <Trophy size={14} /> {t('成就')}
             </button>
             {(myNode?.level || 1) >= 10 && (
-              <button className="terminal-btn" onClick={() => { setShowTalentModal(true); if (socket?.connected) socket.emit('get_talent_data'); }}>
+              <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(147,51,234,0.1)', color: '#9333EA', border: '1px solid rgba(147,51,234,0.3)'}} onClick={() => { setShowTalentModal(true); if (socket?.connected) socket.emit('get_talent_data'); }}>
                 <Zap size={14} /> {t('天賦')}
               </button>
             )}
-            <button className="terminal-btn" onClick={() => { setShowWarPanel(true); if (socket?.connected) socket.emit('get_war_stats'); }}>
+            <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)'}} onClick={() => { setShowWarPanel(true); if (socket?.connected) socket.emit('get_war_stats'); }}>
               <Globe2 size={14} /> {t('區域對抗')}
             </button>
-            <button className="terminal-btn" onClick={() => setShowAboutModal(true)}>
+            <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}} onClick={() => setShowAboutModal(true)}>
               <Info size={14} /> {t('系統資訊')}
             </button>
           </div>
         </aside>
-        )}
 
-        {activePage === 'map' && (
+        {/* Right Geographic Matrix */}
         <main className="geographic-matrix">
           <div className="map-overlays" style={{display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'flex-start'}}>
             <div className="floating-panel" style={{padding: '15px 25px'}}>
@@ -1585,6 +1267,7 @@ function Dashboard({ token, onLogout, region }) {
             onOpenAchievements={() => setShowAchievements(true)}
             honor={myNode?.honor || 0}
             weeklyScore={myNode?.weeklyScore || 0}
+            bgStyle={bgStyle}
             activeEvent={currentEvent?.type || null}
             multiplier={globalStats.multiplier || 1}
             nodes={nodes}
@@ -1592,8 +1275,7 @@ function Dashboard({ token, onLogout, region }) {
           />
 
                       <Console logs={logs} chatInput={chatInput} setChatInput={setChatInput} socket={socket} pmData={{showPm,pmTarget,pmInput,setPmInput,pmLog}} onClosePm={()=>setShowPm(false)} />
-          </main>
-        )}
+</main>
       </div>
 
             {/* Leaderboard Modal */}
@@ -1677,15 +1359,15 @@ function Dashboard({ token, onLogout, region }) {
         return (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(2px)',
+            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
             display: 'flex', justifyContent: 'flex-end',
           }} onClick={() => setShowAdminPanel(false)}>
             <div onClick={e => e.stopPropagation()} style={{
               width: '680px', maxWidth: '98vw', height: '100vh',
-              background: 'var(--bg-light)', borderLeft: '1px solid rgba(239,68,68,0.3)',
+              background: '#0a0e17', borderLeft: '1px solid rgba(239,68,68,0.3)',
               display: 'flex', flexDirection: 'column',
               fontFamily: '"Inter", "Segoe UI", sans-serif',
-              boxShadow: '-4px 0 12px rgba(0,0,0,0.06)',
+              boxShadow: '-20px 0 60px rgba(0,0,0,0.7)',
             }}>
               {/* Header */}
               <div style={{
@@ -1747,10 +1429,10 @@ function Dashboard({ token, onLogout, region }) {
                         border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
                         color: '#64748b', marginLeft: 'auto',
                       }}>{t('↺ 刷新')}</button>
-                    </div>
-                  </div>
+            </div>
+          </div>
 
-                  {/* Player List */}
+          {/* Player List */}
                   <div style={{ flex: 1, overflowY: 'auto' }}>
                     {filtered.length === 0 && (
                       <div style={{ color: '#475569', fontSize: '0.8rem', textAlign: 'center', padding: '24px 12px' }}>
@@ -1951,7 +1633,7 @@ function Dashboard({ token, onLogout, region }) {
       {showAdRevive && (
         <div className="modal-overlay" onClick={() => { if (adCountdown === 0) setShowAdRevive(false); }} style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001
         }}>
           <div onClick={e => e.stopPropagation()} style={{
@@ -2010,7 +1692,7 @@ function Dashboard({ token, onLogout, region }) {
       {showThemeMenu && (
         <div className="modal-overlay" onClick={() => setShowThemeMenu(false)} style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
         }}>
           <div onClick={e => e.stopPropagation()} style={{
@@ -2089,15 +1771,7 @@ function Dashboard({ token, onLogout, region }) {
                 {language === 'zh' ? 'English' : t('中文')}
               </button>
             </div>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>
-                {t('背景風格')}
-              </label>
-              <div style={{ padding: '8px 12px', background: 'var(--bg-color)', borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                🌍 3D 地球
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('通知音效 (Sound Notifications)')}</span>
               <input
                 type="checkbox"
@@ -2108,6 +1782,39 @@ function Dashboard({ token, onLogout, region }) {
                 }}
                 style={{ accentColor: 'var(--accent-color)', width: '18px', height: '18px', cursor: 'pointer' }}
               />
+            </div>
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('背景風格')}</span>
+              <select value={bgStyle} onChange={e => { setBgStyle(e.target.value); localStorage.setItem('eo_bg_style', e.target.value); }}
+                style={{ background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--accent-color)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)' }}>
+                <option value="globe">🌍 3D 地球</option>
+                <option value="server">🖥️ 伺服器機房</option>
+                <option value="nebula">🌌 星雲</option>
+                <option value="radar">📡 雷達終端</option>
+                <option value="cyber">🏙️ 賽博城市</option>
+              </select>
+            </div>
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('切換伺服器')}</span>
+              <select value={region} onChange={e => {
+                const newRegion = e.target.value;
+                if (newRegion !== region && socket?.connected) {
+                  socket.once('region_switched', (data) => {
+                    if (data.success) {
+                      sessionStorage.setItem('eo_region', newRegion);
+                      localStorage.setItem('eo_region', newRegion);
+                      window.location.reload();
+                    } else {
+                      alert(data.message);
+                    }
+                  });
+                  socket.emit('switch_region', { newRegion });
+                }
+              }} style={{ background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--accent-color)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)' }}>
+                <option value="asia">{t('亞洲')}</option>
+                <option value="us">{t('美洲')}</option>
+                <option value="eu">{t('歐洲')}</option>
+              </select>
             </div>
           </div>
         </div>
@@ -2217,7 +1924,7 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
   return (
     <div className="modal-overlay" onClick={onClose} style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
+      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
     }}>
       <div className="modal-content" onClick={e => e.stopPropagation()} style={{
@@ -2381,7 +2088,7 @@ function WarPanelModal({ data, onClose, region }) {
   if (!data) return null;
   const regions = Object.entries(data).sort(([, a], [, b]) => b.totalOnlineTime - a.totalOnlineTime);
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', maxWidth: '700px', width: '95%' }}>
         <h2 style={{ margin: '0 0 20px', color: 'var(--text-color)', fontSize: '1.3rem' }}>{t('區域對抗')}</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
@@ -2421,14 +2128,14 @@ function TalentModal({ data, onClose, socket }) {
     }
   };
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', maxWidth: '800px', width: '95%', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
           <h2 style={{ margin: 0, color: 'var(--text-color)', fontSize: '1.3rem' }}>{t('天賦樹')}</h2>
           <span style={{ marginLeft: 'auto', fontSize: '0.9rem', color: '#9333EA' }}>{t('可用點數')}: {points || 0}</span>
         </div>
         {result && (
-           <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '6px', background: result.success ? 'rgba(37,99,235,0.06)' : 'rgba(224,62,62,0.06)', border: result.success ? '1px solid rgba(37,99,235,0.15)' : '1px solid rgba(224,62,62,0.15)', color: result.success ? 'var(--accent-color)' : 'var(--danger-color)', fontSize: '0.9rem' }}>
+          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '6px', background: result.success ? 'rgba(0,255,170,0.1)' : 'rgba(255,65,108,0.1)', border: `1px solid ${result.success ? '#00ffaa' : '#ff416c'}`, color: result.success ? '#00ffaa' : '#ff416c', fontSize: '0.9rem' }}>
             {result.message}
           </div>
         )}
@@ -2479,7 +2186,7 @@ function AchievementModal({ data, onClose }) {
   const { t } = useLanguage();
   const { unlocked, all } = data;
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', maxWidth: '500px', width: '95%', maxHeight: '80vh', overflowY: 'auto' }}>
         <h2 style={{ margin: '0 0 20px', color: 'var(--text-color)', fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Trophy size={22} color="#FFD700" /> {t('成就')}
@@ -2510,12 +2217,16 @@ function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket, myN
   const { t, language, setLanguage } = useLanguage();
   const sortedPlayers = [...(socialData.allPlayers || [])].sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+    }}>
       <div className="modal-content" onClick={e => e.stopPropagation()} style={{
-        background: 'var(--bg-light)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px', padding: '20px', width: '90%', maxWidth: '500px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.08)', color: 'var(--text-color)', position: 'relative',
+        background: 'rgba(10, 15, 30, 0.95)',
+        border: '1px solid var(--accent-color)',
+        borderRadius: '10px', padding: '20px', width: '90%', maxWidth: '500px',
+        boxShadow: '0 0 20px rgba(0, 255, 136, 0.2)', color: '#fff', position: 'relative',
         maxHeight: '80vh', display: 'flex', flexDirection: 'column'
       }}>
         <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>
@@ -2552,7 +2263,7 @@ function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket, myN
                       e.target.style.color = '#888';
                       e.target.style.borderColor = '#888';
                     }} 
-                    style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid var(--accent-color)', color: 'var(--accent-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                    style={{ background: 'rgba(0,255,136,0.2)', border: '1px solid var(--accent-color)', color: 'var(--accent-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
                   >
                     {t('加好友')}
                   </button>
@@ -2605,23 +2316,25 @@ function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket, myN
           animation: 'fadeIn 0.15s ease',
         }}>
           <div style={{
-            background: 'var(--bg-light)', border: `1px solid ${toast.type === 'success' ? 'rgba(37,99,235,0.3)' : 'rgba(224,62,62,0.3)'}`,
+            background: '#0a0e17', border: `1px solid ${toast.type === 'success' ? 'rgba(0,255,170,0.3)' : 'rgba(255,65,100,0.3)'}`,
             borderRadius: '16px', padding: '30px 40px',
             textAlign: 'center', maxWidth: '420px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+            boxShadow: toast.type === 'success'
+              ? '0 0 60px rgba(0,255,170,0.12), 0 20px 60px rgba(0,0,0,0.5)'
+              : '0 0 60px rgba(255,65,100,0.12), 0 20px 60px rgba(0,0,0,0.5)',
             animation: 'popIn 0.25s ease',
           }}>
             <div style={{ fontSize: '3rem', marginBottom: '12px' }}>
               {toast.type === 'success' ? '✅' : '⚠️'}
             </div>
             <div style={{
-              color: toast.type === 'success' ? 'var(--accent-color)' : 'var(--danger-color)',
+              color: toast.type === 'success' ? '#00ffaa' : '#ff416c',
               fontWeight: 'bold', fontSize: '1.2rem',
               lineHeight: 1.5, marginBottom: '16px',
             }}>
               {toast.message}
             </div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500 }}>
+            <div style={{ color: '#555', fontSize: '0.8rem', letterSpacing: '1px' }}>
               {t('視窗將自動關閉...')}
             </div>
           </div>
@@ -2640,116 +2353,5 @@ function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket, myN
   );
 }
 
-function FourPetalSpiral({ text }) {
-  const groupRef = useRef(null);
-  const pathRef = useRef(null);
-  const particlesRef = useRef([]);
-
-  useEffect(() => {
-    const SVG_NS = 'http://www.w3.org/2000/svg';
-    const config = {
-      rotate: true,
-      particleCount: 84,
-      trailSpan: 0.34,
-      durationMs: 4600,
-      rotationDurationMs: 28000,
-      pulseDurationMs: 4200,
-      strokeWidth: 4.4,
-      spiralR: 4,
-      spiralr: 1,
-      spirald: 3,
-      spiralScale: 2.2,
-      spiralBreath: 0.45,
-      point(progress, detailScale, cfg) {
-        const t = progress * Math.PI * 2;
-        const d = cfg.spirald + detailScale * 0.25;
-        const baseX = (cfg.spiralR - cfg.spiralr) * Math.cos(t) + d * Math.cos(((cfg.spiralR - cfg.spiralr) / cfg.spiralr) * t);
-        const baseY = (cfg.spiralR - cfg.spiralr) * Math.sin(t) - d * Math.sin(((cfg.spiralR - cfg.spiralr) / cfg.spiralr) * t);
-        const scale = cfg.spiralScale + detailScale * cfg.spiralBreath;
-        return { x: 50 + baseX * scale, y: 50 + baseY * scale };
-      },
-    };
-
-    const group = groupRef.current;
-    const pathEl = pathRef.current;
-    if (!group) return;
-
-    pathEl.setAttribute('stroke-width', String(config.strokeWidth));
-
-    const circles = Array.from({ length: config.particleCount }, () => {
-      const circle = document.createElementNS(SVG_NS, 'circle');
-      circle.setAttribute('fill', 'currentColor');
-      group.appendChild(circle);
-      return circle;
-    });
-    particlesRef.current = circles;
-
-    function normalizeProgress(p) {
-      return ((p % 1) + 1) % 1;
-    }
-
-    function getDetailScale(time) {
-      const pulseProgress = (time % config.pulseDurationMs) / config.pulseDurationMs;
-      const pulseAngle = pulseProgress * Math.PI * 2;
-      return 0.52 + ((Math.sin(pulseAngle + 0.55) + 1) / 2) * 0.48;
-    }
-
-    function getRotation(time) {
-      if (!config.rotate) return 0;
-      return -((time % config.rotationDurationMs) / config.rotationDurationMs) * 360;
-    }
-
-    function buildPath(detailScale, steps = 480) {
-      return Array.from({ length: steps + 1 }, (_, index) => {
-        const pt = config.point(index / steps, detailScale, config);
-        return `${index === 0 ? 'M' : 'L'} ${pt.x.toFixed(2)} ${pt.y.toFixed(2)}`;
-      }).join(' ');
-    }
-
-    function getParticle(index, progress, detailScale) {
-      const tailOffset = index / (config.particleCount - 1);
-      const pt = config.point(normalizeProgress(progress - tailOffset * config.trailSpan), detailScale, config);
-      const fade = Math.pow(1 - tailOffset, 0.56);
-      return { x: pt.x, y: pt.y, radius: 0.9 + fade * 2.7, opacity: 0.04 + fade * 0.96 };
-    }
-
-    const startedAt = performance.now();
-    let animId;
-
-    function render(now) {
-      const time = now - startedAt;
-      const progress = (time % config.durationMs) / config.durationMs;
-      const detailScale = getDetailScale(time);
-      group.setAttribute('transform', `rotate(${getRotation(time)} 50 50)`);
-      pathEl.setAttribute('d', buildPath(detailScale));
-      circles.forEach((node, index) => {
-        const p = getParticle(index, progress, detailScale);
-        node.setAttribute('cx', p.x.toFixed(2));
-        node.setAttribute('cy', p.y.toFixed(2));
-        node.setAttribute('r', p.radius.toFixed(2));
-        node.setAttribute('opacity', p.opacity.toFixed(3));
-      });
-      animId = requestAnimationFrame(render);
-    }
-
-    animId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animId);
-  }, []);
-
-  return (
-    <div className="loading-overlay">
-      <div style={{ textAlign: 'center' }}>
-        <div className="loading-spiral">
-          <svg viewBox="0 0 100 100" fill="none" aria-hidden="true">
-            <g ref={groupRef}>
-              <path ref={pathRef} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" opacity="0.15" />
-            </g>
-          </svg>
-        </div>
-        {text && <div className="loading-text">{text}</div>}
-      </div>
-    </div>
-  );
-}
 
 export default App;
