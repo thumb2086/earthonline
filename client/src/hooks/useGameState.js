@@ -9,12 +9,14 @@ export default function useGameState(socket, API_URL, BASE_URL) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [currentEvent, setCurrentEvent] = useState(null);
 
-  // Fetch hub stats periodically
+  // Fetch hub stats periodically (with race condition protection)
   useEffect(() => {
+    let reqId = 0;
     const fetchHub = async () => {
+      const myId = ++reqId;
       try {
         const res = await fetch(`${BASE_URL}/api/global/stats`);
-        if (res.ok) setHubStats(await res.json());
+        if (res.ok && myId === reqId) setHubStats(await res.json());
       } catch (e) { console.error('[HUB]', e); }
     };
     fetchHub();
@@ -22,12 +24,14 @@ export default function useGameState(socket, API_URL, BASE_URL) {
     return () => clearInterval(inv);
   }, [BASE_URL]);
 
-  // Fetch leaderboard periodically
+  // Fetch leaderboard periodically (with race condition protection)
   useEffect(() => {
+    let reqId = 0;
     const fetchLB = async () => {
+      const myId = ++reqId;
       try {
         const res = await fetch(`${API_URL}/leaderboard`, { cache: 'no-store' });
-        if (res.ok) setLeaderboard(await res.json());
+        if (res.ok && myId === reqId) setLeaderboard(await res.json());
       } catch (e) { console.error('[LB]', e); }
     };
     fetchLB();
