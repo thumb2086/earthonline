@@ -34,6 +34,7 @@ const { buyItem, useItem } = require('./services/shopService');
 const { registerChatHandlers } = require('./socket/chatHandler');
 const { registerSocialHandlers } = require('./socket/socialHandler');
 const { registerTerminalHandlers } = require('./socket/terminalHandler');
+const { registerEventHandlers } = require('./socket/eventHandler');
 
 const REINCARNATE_COUNTRIES = [
   { code: 'US', name: '美國', lat: 39.8, lon: -98.6, spread: 15 },

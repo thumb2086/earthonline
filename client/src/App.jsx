@@ -867,7 +867,7 @@ function Dashboard({ token, onLogout, region }) {
     const showToast = (msg, type) => {
       setToast({ message: msg, type });
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), 4000);
+      toastTimerRef.current = setTimeout(() => setToast(null), 5000);
     };
 
     s.on('buy_result', (data) => {
