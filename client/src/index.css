@@ -1,4 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@400;600;700&display=swap');
+@font-face {
+  font-family: 'MadouFMG';
+  src: url('/fonts/madoufmg.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
 
 :root {
   --bg-color: #0a0e17;
@@ -16,8 +22,8 @@
   --warning-color: #f59e0b;
   --success-color: #10b981;
   --info-color: #3b82f6;
-  --font-mono: 'Nunito', 'Noto Sans TC', sans-serif;
-  --font-sans: 'Nunito', 'Noto Sans TC', sans-serif;
+  --font-mono: 'MadouFMG', 'Nunito', 'Noto Sans TC', sans-serif;
+  --font-sans: 'MadouFMG', 'Nunito', 'Noto Sans TC', sans-serif;
   --terminal-bg: #0a0e17;
   --terminal-surface: #161d2e;
   --terminal-border: #1e293b;
