@@ -13,6 +13,7 @@ import CountdownBanner from './components/CountdownBanner';
 import DonateBanner from './components/DonateBanner';
 import LoginGateway from './components/LoginGateway';
 import FourPetalSpiral from './components/FourPetalSpiral';
+import BackgroundRouter from './components/Backgrounds/BackgroundRouter';
 import './index.css';
 
 const VITE_API = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
@@ -358,6 +359,7 @@ function Dashboard({ token, onLogout, region }) {
     const val = localStorage.getItem('eo_notifications');
     return val === null ? true : val === 'true';
   });
+  const [bgStyle, setBgStyle] = useState(() => localStorage.getItem('eo_bg_style') || 'globe');
   const getAudioCtx = () => {
     if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
     return audioCtxRef.current;
@@ -1042,6 +1044,7 @@ function Dashboard({ token, onLogout, region }) {
       )}
 
 
+      <BackgroundRouter style={bgStyle} nodes={nodes} myNodeId={myNode?.userId} stats={globalStats} />
       <CountdownBanner />
       <GlobalEventBanner />
       {/* Header Panel */}
@@ -1769,7 +1772,7 @@ function Dashboard({ token, onLogout, region }) {
                 {language === 'zh' ? 'English' : t('中文')}
               </button>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('通知音效 (Sound Notifications)')}</span>
               <input
                 type="checkbox"
@@ -1780,6 +1783,17 @@ function Dashboard({ token, onLogout, region }) {
                 }}
                 style={{ accentColor: 'var(--accent-color)', width: '18px', height: '18px', cursor: 'pointer' }}
               />
+            </div>
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('背景風格')}</span>
+              <select value={bgStyle} onChange={e => { setBgStyle(e.target.value); localStorage.setItem('eo_bg_style', e.target.value); }}
+                style={{ background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--accent-color)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)' }}>
+                <option value="globe">🌍 3D 地球</option>
+                <option value="server">🖥️ 伺服器機房</option>
+                <option value="nebula">🌌 星雲</option>
+                <option value="radar">📡 雷達終端</option>
+                <option value="cyber">🏙️ 賽博城市</option>
+              </select>
             </div>
           </div>
         </div>
