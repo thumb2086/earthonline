@@ -3,7 +3,7 @@ const { updateQuestProgress } = require('./questService');
 const { updateWarStats } = require('../state/regionState');
 
 const BASE_DECAY_PER_TICK = 0.2 / 30; // ~0.00667
-const TIME_EARNED_PER_TICK = 2000;
+const TIME_EARNED_PER_TICK = 5000;
 const BASE_PT_MULTIPLIER = 0.1;
 const COLLECTIVE_LOAD_THRESHOLD = 20;
 

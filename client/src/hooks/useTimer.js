@@ -39,7 +39,7 @@ export default function useTimer(myNode, socket, region) {
     setLifespan(Math.floor(baseMs / 1000));
     const id = setInterval(() => {
       if (lifespanPausedRef.current) return;
-      setLifespan(Math.floor((baseMs + (Date.now() - startAt) * 0.4) / 1000));
+      setLifespan(Math.floor((baseMs + (Date.now() - startAt) * 1.0) / 1000));
     }, 250);
     return () => clearInterval(id);
   }, [myNode, lifespanTick]);
