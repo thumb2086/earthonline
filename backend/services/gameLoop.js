@@ -11,6 +11,9 @@ async function processTick(state, connectedUsers) {
   const usernames = Array.from(connectedUsers.values()).map(u => u.username);
   const eventBonus = state.multiplier > 1.0 ? (state.multiplier - 1.0) : 0;
   const onlineCount = connectedUsers.size;
+  const inv = state.investments || {};
+  const decayReduction = 1 - (inv.cooling || 0) * 0.05;
+  const ptBonus = 1 + (inv.bandwidth || 0) * 0.02;
 
   // Collective load: +1% decay per user above threshold
   const loadMultiplier = onlineCount > COLLECTIVE_LOAD_THRESHOLD ? 1 + (onlineCount - COLLECTIVE_LOAD_THRESHOLD) * 0.01 : 1;
@@ -27,7 +30,7 @@ async function processTick(state, connectedUsers) {
         // Survival-based decay curve: longer survival = slower decay
         const survivalHours = (user.accumulatedTime || 0) / 3600000;
         const curveMultiplier = 1 / Math.sqrt(Math.max(survivalHours, 0.1));
-        decay = BASE_DECAY_PER_TICK * curveMultiplier * loadMultiplier;
+        decay = BASE_DECAY_PER_TICK * curveMultiplier * loadMultiplier * decayReduction;
       }
     }
     if (user.health <= 0) {
@@ -48,7 +51,7 @@ async function processTick(state, connectedUsers) {
     let timeEarned = 0;
 
     if (!isDead) {
-      ptPerTick = (user.health / 100) * BASE_PT_MULTIPLIER;
+      ptPerTick = (user.health / 100) * BASE_PT_MULTIPLIER * ptBonus;
       ptPerTick += eventBonus * 0.05;
 
       if (user.activeBuffs && user.activeBuffs.get('overclock') > Date.now()) {

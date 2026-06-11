@@ -246,11 +246,10 @@ discordBot.setIoInstance(io);
 const { isPaused } = require('./state/tickState');
 const { calcLevel, calcLevelProgress } = require('./services/levelService');
 const regions = REGIONS;
-const regionStates = {
-  asia: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' },
-  us: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' },
-  eu: { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000' }
-};
+function makeRegionState() {
+  return { connectedUsers: new Map(), currentGlobalEvent: null, multiplier: 1.0, activeUsers: 0, globalProduction: 0, socialCompression: '1.000', investments: { cooling: 0, bandwidth: 0, shield: 0 } };
+}
+const regionStates = { asia: makeRegionState(), us: makeRegionState(), eu: makeRegionState() };
 
 
 
@@ -375,6 +374,7 @@ regions.forEach(regionName => {
         globalProduction: state.globalProduction,
         socialCompression: state.socialCompression,
         multiplier: state.multiplier,
+        investments: state.investments || { cooling: 0, bandwidth: 0, shield: 0 },
         systemHardware: {
           cpu: hardwareStats.cpu,
           uplink: hardwareStats.uplink,
@@ -701,7 +701,9 @@ regions.forEach(regionName => {
     if (disconnectedUser) {
       if (currentGlobalEvent && currentGlobalEvent.type === 'SOLAR_STORM') {
         // Penalty for disconnecting during solar storm
-        await User.updateOne({ username: disconnectedUser.username }, { $inc: { accumulatedBonusPoints: -100 } }).catch(console.error);
+        const shieldLevel = state.investments?.shield || 0;
+        const penalty = Math.round(100 * (1 - shieldLevel * 0.2));
+        await User.updateOne({ username: disconnectedUser.username }, { $inc: { accumulatedBonusPoints: -penalty } }).catch(console.error);
         console.log(`[SYS] Penalty applied to ${disconnectedUser.username} for Solar Storm disconnect`);
       }
       connectedUsers.delete(socket.id);

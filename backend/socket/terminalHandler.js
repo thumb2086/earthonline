@@ -135,6 +135,22 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionState
       setPaused(false);
       nspIo.emit('tick_resumed');
       socket.emit('terminal_response', `[SYS] 伺服器 tick 已恢復`);
+    } else if (cmdUpper.startsWith('INVEST ')) {
+      const parts = rawCmd.substring(7).trim().split(/ +/);
+      const investType = parts[0]?.toLowerCase();
+      if (!['cooling', 'bandwidth', 'shield'].includes(investType)) { socket.emit('terminal_response', '[ERROR] 用法: INVEST <cooling|bandwidth|shield>'); return; }
+      const region = nspIo.name?.replace('/', '') || 'asia';
+      const state = regionStates[region];
+      if (!state) { socket.emit('terminal_response', '[ERROR] 無法找到區域狀態'); return; }
+      const currentLevel = state.investments[investType] || 0;
+      if (currentLevel >= INVEST_MAX_LEVEL) { socket.emit('terminal_response', `[SYS] ${investType} 已達最高等級 Lv.${INVEST_MAX_LEVEL}`); return; }
+      const cost = INVEST_COSTS[currentLevel + 1];
+      const dbUser = await User.findOne({ username: user.username });
+      if (!dbUser || (dbUser.accumulatedBonusPoints || 0) < cost) { socket.emit('terminal_response', `[ERROR] PT 不足！需要 ${cost} PT（目前 ${dbUser?.accumulatedBonusPoints || 0} PT）`); return; }
+      await User.updateOne({ username: user.username }, { $inc: { accumulatedBonusPoints: -cost } });
+      state.investments[investType] = currentLevel + 1;
+      socket.emit('terminal_response', `[SYS] 已投資 ${investType} Lv.${currentLevel + 1}！花費 ${cost} PT。全區域效果已提升。`);
+      nspIo.emit('chat_system_message', { message: `[系統] ${user.username} 投資了 ${investType} Lv.${currentLevel + 1}！` });
     } else {
       socket.emit('terminal_response', `[ERROR] UNKNOWN OR INVALID COMMAND: ${data.command}`);
     }
