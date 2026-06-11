@@ -20,7 +20,16 @@ export default function useTimer(myNode, socket, region) {
     socket.on('tick_paused', onPause);
     socket.on('tick_resumed', onResume);
     socket.on('force_sync', onForceSync);
-    return () => { socket.off('tick_paused', onPause); socket.off('tick_resumed', onResume); socket.off('force_sync', onForceSync); };
+    // Periodically sync accumulatedTime from server to prevent local timer drift
+    const syncInt = setInterval(() => {
+      if (socket?.connected) socket.emit('sync_user');
+    }, 30000);
+    return () => { 
+      socket.off('tick_paused', onPause); 
+      socket.off('tick_resumed', onResume); 
+      socket.off('force_sync', onForceSync);
+      clearInterval(syncInt);
+    };
   }, [socket]);
 
   useEffect(() => {
