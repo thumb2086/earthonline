@@ -207,7 +207,7 @@ function LoginGateway({ onLogin }) {
         
         <form className="login-form">
           {error && <div className="error-message">{error}</div>}
-          {successMsg && <div style={{color: '#00ffaa', marginBottom: '10px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold'}}>{successMsg}</div>}
+           {successMsg && <div style={{color: 'var(--success-color)', marginBottom: '10px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold'}}>{successMsg}</div>}
           
           <div className="form-group" style={{marginBottom: '15px'}}>
             <label style={{color: 'var(--accent-color)'}}>{t('GLOBAL REGION (伺服器分區)')}</label>
@@ -218,8 +218,8 @@ function LoginGateway({ onLogin }) {
             </select>
           </div>
 
-          <div style={{textAlign: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(0,255,170,0.08)', borderRadius: '6px', border: '1px solid rgba(0,255,170,0.2)'}}>
-            <span style={{color: '#00ffaa', fontSize: '0.85rem'}}>{t('帳號/密碼 或 Discord 均可登入')}</span>
+           <div style={{textAlign: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(37,99,235,0.06)', borderRadius: '6px', border: '1px solid rgba(37,99,235,0.15)'}}>
+             <span style={{color: 'var(--accent-color)', fontSize: '0.85rem'}}>{t('帳號/密碼 或 Discord 均可登入')}</span>
           </div>
 
           <button 
@@ -1437,7 +1437,7 @@ function Dashboard({ token, onLogout, region }) {
             </div>
           </div>
 
-          <button onClick={toggleBgm} style={{padding: '5px 12px', borderRadius: '8px', background: bgmEnabled ? 'rgba(0,255,136,0.1)' : 'rgba(255,50,50,0.1)', border: bgmEnabled ? '1px solid rgba(0,255,136,0.3)' : '1px solid rgba(255,50,50,0.3)', color: bgmEnabled ? 'var(--success-color)' : 'var(--danger-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'monospace'}} title={bgmEnabled ? t('關閉背景音樂') : t('開啟背景音樂')}>
+           <button onClick={toggleBgm} style={{padding: '5px 12px', borderRadius: '6px', background: bgmEnabled ? 'rgba(37,99,235,0.08)' : 'rgba(224,62,62,0.08)', border: bgmEnabled ? '1px solid rgba(37,99,235,0.2)' : '1px solid rgba(224,62,62,0.2)', color: bgmEnabled ? 'var(--accent-color)' : 'var(--danger-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'var(--font-sans)'}} title={bgmEnabled ? t('關閉背景音樂') : t('開啟背景音樂')}>
 {bgmEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
 {bgmEnabled ? 'BGM ON' : 'BGM OFF'}
 </button>
@@ -1485,7 +1485,7 @@ function Dashboard({ token, onLogout, region }) {
             </div>
             <div style={{display: 'flex', gap: '12px', marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)'}}>
               <div><span style={{color: '#888'}}>ping </span><strong style={{color: 'var(--text-main)'}}>{ping}ms</strong></div>
-              <div><span style={{color: '#888'}}>{t('session')} </span><strong style={{color: '#00ffaa'}}>{formatTime(sessionTime)}</strong></div>
+               <div><span style={{color: 'var(--text-secondary)'}}>{t('session')} </span><strong style={{color: 'var(--accent-color)'}}>{formatTime(sessionTime)}</strong></div>
               <div><span style={{color: '#888'}}>{t('status')} </span><strong style={{color: isConnected ? 'var(--success-color)' : 'var(--danger-color)'}}>{isConnected ? t('on') : t('off')}</strong></div>
             </div>
           </div>
@@ -1686,10 +1686,10 @@ function Dashboard({ token, onLogout, region }) {
           }} onClick={() => setShowAdminPanel(false)}>
             <div onClick={e => e.stopPropagation()} style={{
               width: '680px', maxWidth: '98vw', height: '100vh',
-              background: '#0a0e17', borderLeft: '1px solid rgba(239,68,68,0.3)',
+              background: 'var(--bg-light)', borderLeft: '1px solid rgba(239,68,68,0.3)',
               display: 'flex', flexDirection: 'column',
               fontFamily: '"Inter", "Segoe UI", sans-serif',
-              boxShadow: '-20px 0 60px rgba(0,0,0,0.7)',
+              boxShadow: '-4px 0 12px rgba(0,0,0,0.06)',
             }}>
               {/* Header */}
               <div style={{
@@ -1955,7 +1955,7 @@ function Dashboard({ token, onLogout, region }) {
       {showAdRevive && (
         <div className="modal-overlay" onClick={() => { if (adCountdown === 0) setShowAdRevive(false); }} style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)',
+          background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001
         }}>
           <div onClick={e => e.stopPropagation()} style={{
@@ -2014,7 +2014,7 @@ function Dashboard({ token, onLogout, region }) {
       {showThemeMenu && (
         <div className="modal-overlay" onClick={() => setShowThemeMenu(false)} style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+          background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
         }}>
           <div onClick={e => e.stopPropagation()} style={{
@@ -2238,7 +2238,7 @@ function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
   return (
     <div className="modal-overlay" onClick={onClose} style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
+      background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
     }}>
       <div className="modal-content" onClick={e => e.stopPropagation()} style={{
@@ -2402,7 +2402,7 @@ function WarPanelModal({ data, onClose, region }) {
   if (!data) return null;
   const regions = Object.entries(data).sort(([, a], [, b]) => b.totalOnlineTime - a.totalOnlineTime);
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', maxWidth: '700px', width: '95%' }}>
         <h2 style={{ margin: '0 0 20px', color: 'var(--text-color)', fontSize: '1.3rem' }}>{t('區域對抗')}</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
@@ -2442,14 +2442,14 @@ function TalentModal({ data, onClose, socket }) {
     }
   };
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', maxWidth: '800px', width: '95%', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
           <h2 style={{ margin: 0, color: 'var(--text-color)', fontSize: '1.3rem' }}>{t('天賦樹')}</h2>
           <span style={{ marginLeft: 'auto', fontSize: '0.9rem', color: '#9333EA' }}>{t('可用點數')}: {points || 0}</span>
         </div>
         {result && (
-          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '6px', background: result.success ? 'rgba(0,255,170,0.1)' : 'rgba(255,65,108,0.1)', border: `1px solid ${result.success ? '#00ffaa' : '#ff416c'}`, color: result.success ? '#00ffaa' : '#ff416c', fontSize: '0.9rem' }}>
+           <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '6px', background: result.success ? 'rgba(37,99,235,0.06)' : 'rgba(224,62,62,0.06)', border: result.success ? '1px solid rgba(37,99,235,0.15)' : '1px solid rgba(224,62,62,0.15)', color: result.success ? 'var(--accent-color)' : 'var(--danger-color)', fontSize: '0.9rem' }}>
             {result.message}
           </div>
         )}
@@ -2500,7 +2500,7 @@ function AchievementModal({ data, onClose }) {
   const { t } = useLanguage();
   const { unlocked, all } = data;
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', maxWidth: '500px', width: '95%', maxHeight: '80vh', overflowY: 'auto' }}>
         <h2 style={{ margin: '0 0 20px', color: 'var(--text-color)', fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Trophy size={22} color="#FFD700" /> {t('成就')}
@@ -2531,16 +2531,12 @@ function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket, myN
   const { t, language, setLanguage } = useLanguage();
   const sortedPlayers = [...(socialData.allPlayers || [])].sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
   return (
-    <div className="modal-overlay" onClick={onClose} style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
-    }}>
+    <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()} style={{
-        background: 'rgba(10, 15, 30, 0.95)',
-        border: '1px solid var(--accent-color)',
-        borderRadius: '10px', padding: '20px', width: '90%', maxWidth: '500px',
-        boxShadow: '0 0 20px rgba(0, 255, 136, 0.2)', color: '#fff', position: 'relative',
+        background: 'var(--bg-light)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '12px', padding: '20px', width: '90%', maxWidth: '500px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.08)', color: 'var(--text-color)', position: 'relative',
         maxHeight: '80vh', display: 'flex', flexDirection: 'column'
       }}>
         <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>
@@ -2577,7 +2573,7 @@ function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket, myN
                       e.target.style.color = '#888';
                       e.target.style.borderColor = '#888';
                     }} 
-                    style={{ background: 'rgba(0,255,136,0.2)', border: '1px solid var(--accent-color)', color: 'var(--accent-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                    style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid var(--accent-color)', color: 'var(--accent-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
                   >
                     {t('加好友')}
                   </button>
@@ -2630,25 +2626,23 @@ function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket, myN
           animation: 'fadeIn 0.15s ease',
         }}>
           <div style={{
-            background: '#0a0e17', border: `1px solid ${toast.type === 'success' ? 'rgba(0,255,170,0.3)' : 'rgba(255,65,100,0.3)'}`,
+            background: 'var(--bg-light)', border: `1px solid ${toast.type === 'success' ? 'rgba(37,99,235,0.3)' : 'rgba(224,62,62,0.3)'}`,
             borderRadius: '16px', padding: '30px 40px',
             textAlign: 'center', maxWidth: '420px',
-            boxShadow: toast.type === 'success'
-              ? '0 0 60px rgba(0,255,170,0.12), 0 20px 60px rgba(0,0,0,0.5)'
-              : '0 0 60px rgba(255,65,100,0.12), 0 20px 60px rgba(0,0,0,0.5)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
             animation: 'popIn 0.25s ease',
           }}>
             <div style={{ fontSize: '3rem', marginBottom: '12px' }}>
               {toast.type === 'success' ? '✅' : '⚠️'}
             </div>
             <div style={{
-              color: toast.type === 'success' ? '#00ffaa' : '#ff416c',
+              color: toast.type === 'success' ? 'var(--accent-color)' : 'var(--danger-color)',
               fontWeight: 'bold', fontSize: '1.2rem',
               lineHeight: 1.5, marginBottom: '16px',
             }}>
               {toast.message}
             </div>
-            <div style={{ color: '#555', fontSize: '0.8rem', letterSpacing: '1px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500 }}>
               {t('視窗將自動關閉...')}
             </div>
           </div>

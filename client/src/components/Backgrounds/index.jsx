@@ -1,16 +1,10 @@
 import React from 'react';
 import EarthGlobe from '../../EarthGlobe';
 import ServerRoom from './ServerRoom';
-import Nebula from './Nebula';
-import RadarTerminal from './RadarTerminal';
-import CyberCity from './CyberCity';
 
 const STYLES = [
   { id: 'earth', name: '3D 地球', icon: '🌍' },
-  { id: 'server', name: '伺服器機房', icon: '🖥️' },
-  { id: 'nebula', name: '星雲宇宙', icon: '🌌' },
-  { id: 'radar', name: '雷達終端機', icon: '📡' },
-  { id: 'cyber', name: '賽博龐克城市', icon: '🏙️' },
+  { id: 'server', name: '數據海洋', icon: '🌊' },
 ];
 
 const STORAGE_KEY = 'eo_bg_style';
@@ -61,15 +55,6 @@ export default function BackgroundRouter(props) {
     case 'server':
       bg = <ServerRoom {...bgProps} />;
       break;
-    case 'nebula':
-      bg = <Nebula {...bgProps} />;
-      break;
-    case 'radar':
-      bg = <RadarTerminal {...bgProps} />;
-      break;
-    case 'cyber':
-      bg = <CyberCity {...bgProps} />;
-      break;
     default:
       bg = <EarthGlobe {...bgProps} />;
   }
@@ -79,24 +64,13 @@ export default function BackgroundRouter(props) {
       <div className="background-container">
         {bg}
       </div>
-      <div className="bg-switcher" style={{
-        position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999,
-        display: 'flex', gap: '6px',
-      }}>
+      <div className="bg-switcher">
         {STYLES.map(s => (
           <button
             key={s.id}
             onClick={() => setBackground(s.id)}
             title={s.name}
-            style={{
-              width: '36px', height: '36px', borderRadius: '50%',
-              border: style === s.id ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.2)',
-              background: style === s.id ? 'rgba(59,130,246,0.2)' : 'rgba(0,0,0,0.5)',
-              cursor: 'pointer', fontSize: '16px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.2s',
-              backdropFilter: 'blur(4px)',
-            }}
+            className={`bg-switcher-btn ${style === s.id ? 'active' : ''}`}
           >
             {s.icon}
           </button>

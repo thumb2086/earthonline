@@ -11,17 +11,6 @@
   justify-content: center;
 }
 
-.dc-bg-grid {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-image: 
-    linear-gradient(var(--border-color) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
-  background-size: 50px 50px;
-  pointer-events: none;
-  opacity: 0.3;
-}
-
 .dc-layout {
   display: flex;
   width: 100%;
@@ -76,7 +65,7 @@
   font-size: 1.8rem;
   font-weight: 700;
   color: var(--text-dim);
-  font-family: monospace;
+  font-family: var(--font-sans);
 }
 
 .level-info h3 {
@@ -116,7 +105,7 @@
 .data-value {
   color: var(--text-color) !important;
   font-size: 1rem;
-  font-family: monospace;
+  font-family: var(--font-sans);
 }
 
 .dc-progress-section {
@@ -218,13 +207,13 @@
   }
 }
 
-/* Earth Globe Styles */
+/* Earth Globe Styles — Notion light style */
 .earth-globe-wrapper {
   width: 100%;
   height: 100%;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(ellipse at 50% 50%, #0d1b2a, #050810);
+  background: var(--bg-color);
   cursor: grab;
   user-select: none;
   isolation: isolate;
@@ -232,21 +221,6 @@
 
 .earth-globe-wrapper:active {
   cursor: grabbing;
-}
-
-/* CRT scanline overlay */
-.globe-scanlines {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.08) 2px,
-    rgba(0, 0, 0, 0.08) 4px
-  );
 }
 
 .earth-globe-canvas {
@@ -272,52 +246,49 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   padding: 6px 12px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
 }
 
 .globe-stat-label {
   font-size: 0.6rem;
-  color: rgba(255, 255, 255, 0.3);
-  font-family: monospace;
-  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 .globe-stat-value {
   font-size: 1.1rem;
-  font-weight: bold;
-  color: #00ffaa;
-  font-family: monospace;
-  letter-spacing: 1px;
+  font-weight: 600;
+  color: var(--accent-color);
+  font-family: var(--font-sans);
 }
 
 .globe-event-badge {
-  background: rgba(255, 215, 0, 0.1);
-  border: 1px dashed rgba(255, 215, 0, 0.35);
+  background: rgba(223, 171, 1, 0.08);
+  border: 1px solid rgba(223, 171, 1, 0.25);
+  border-radius: 6px;
   padding: 5px 10px;
   font-size: 0.75rem;
-  color: #ffd700;
-  font-family: monospace;
-  letter-spacing: 1px;
-  animation: globeEventPulse 2s ease-in-out infinite;
+  color: var(--warning-color);
+  font-family: var(--font-sans);
+  font-weight: 600;
 }
 
 .globe-mode-badge {
-  background: rgba(0, 255, 170, 0.08);
-  border: 1px dashed rgba(0, 255, 170, 0.3);
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  border-radius: 6px;
   padding: 5px 10px;
   font-size: 0.7rem;
-  color: #00ffaa;
-  font-family: monospace;
-  letter-spacing: 1px;
+  color: var(--accent-color);
+  font-family: var(--font-sans);
+  font-weight: 600;
   margin-top: 6px;
-}
-
-@keyframes globeEventPulse {
-  0%, 100% { box-shadow: 0 0 4px rgba(255, 215, 0, 0.1); }
-  50% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.25); }
 }
 
 /* Control panel (right side) */
@@ -331,8 +302,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   padding: 8px;
   gap: 6px;
 }
@@ -347,28 +319,29 @@
 .globe-controls-divider {
   width: 20px;
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-color);
 }
 
 .globe-ctrl-btn {
   width: 30px;
   height: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.7);
-  color: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--border-color);
+  background: var(--bg-light);
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.1s;
-  font-family: monospace;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
   padding: 0;
+  border-radius: 6px;
 }
 
 .globe-ctrl-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--surface-color);
+  color: var(--text-color);
+  border-color: var(--accent-color);
 }
 
 .globe-ctrl-btn:disabled {
@@ -388,7 +361,8 @@
 .globe-zoom-indicator {
   width: 4px;
   height: 40px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-color);
+  border-radius: 2px;
   position: relative;
   margin: 2px 0;
 }
@@ -406,7 +380,9 @@
   bottom: 0;
   left: 0;
   width: 100%;
-  background: rgba(0, 255, 170, 0.25);
+  background: var(--accent-color);
+  opacity: 0.3;
+  border-radius: 2px;
   transition: height 0.1s;
 }
 
@@ -416,8 +392,8 @@
   bottom: 60px;
   z-index: 15;
   font-size: 0.55rem;
-  font-family: monospace;
-  color: rgba(255, 255, 255, 0.2);
+  font-family: var(--font-sans);
+  color: var(--text-dim);
   pointer-events: none;
   text-align: center;
   width: 46px;
@@ -436,17 +412,19 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   padding: 6px 10px;
-  color: rgba(255, 255, 255, 0.35);
-  font-family: monospace;
-  backdrop-filter: blur(4px);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  backdrop-filter: blur(8px);
 }
 
 .globe-nasa-label {
   font-size: 0.5rem;
-  letter-spacing: 2px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 .globe-nasa-date {
@@ -462,10 +440,11 @@
   flex-direction: column;
   gap: 4px;
   z-index: 10;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   padding: 8px 12px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
   pointer-events: none;
 }
 
@@ -474,30 +453,31 @@
   align-items: center;
   gap: 6px;
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.5);
-  font-family: monospace;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
 }
 
 .globe-legend-item.active {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-color);
+  font-weight: 600;
 }
 
 .globe-region-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border: 2px solid;
-  border-radius: 0;
+  border-radius: 50%;
   flex-shrink: 0;
   background: transparent;
 }
 
 .globe-region-name {
-  letter-spacing: 0.5px;
+  font-weight: 500;
 }
 
 .globe-region-count {
   margin-left: auto;
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--text-dim);
   font-size: 0.65rem;
 }
 
@@ -508,13 +488,13 @@
   left: 16px;
   min-width: 210px;
   max-width: 270px;
-  background: rgba(8, 10, 18, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
   padding: 14px;
-  backdrop-filter: blur(12px);
   z-index: 20;
   pointer-events: auto;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   animation: infoCardIn 0.15s ease-out;
 }
 
@@ -527,24 +507,25 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 18px;
-  height: 18px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: transparent;
-  color: rgba(255,255,255,0.25);
-  font-size: 0.6rem;
-  font-family: monospace;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-light);
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  font-family: var(--font-sans);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.1s;
   line-height: 1;
+  border-radius: 4px;
 }
 
 .globe-info-close:hover {
-  color: rgba(255,255,255,0.7);
-  border-color: rgba(255,255,255,0.2);
+  color: var(--text-color);
+  border-color: var(--text-secondary);
 }
 
 .globe-info-header {
@@ -553,30 +534,30 @@
   gap: 8px;
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .globe-info-username {
   font-size: 0.85rem;
-  font-weight: bold;
-  color: #fff;
-  font-family: monospace;
-  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: var(--text-color);
+  font-family: var(--font-sans);
 }
 
 .globe-info-level {
   font-size: 0.65rem;
-  font-weight: bold;
-  font-family: monospace;
-  padding: 1px 6px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  padding: 2px 8px;
   border: 1px solid currentColor;
+  border-radius: 4px;
 }
 
-.level-1 { color: #8e9eab; }
-.level-2 { color: #3b82f6; }
+.level-1 { color: var(--text-secondary); }
+.level-2 { color: var(--accent-color); }
 .level-3 { color: #a855f7; }
-.level-4 { color: #ffd700; }
-.level-5 { color: #ff416c; }
+.level-4 { color: var(--warning-color); }
+.level-5 { color: var(--danger-color); }
 
 .globe-info-body {
   display: flex;
@@ -592,39 +573,40 @@
 }
 
 .globe-info-label {
-  color: rgba(255,255,255,0.2);
-  font-family: monospace;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
   font-size: 0.6rem;
   min-width: 60px;
   flex-shrink: 0;
-  letter-spacing: 1px;
+  font-weight: 600;
 }
 
 .globe-info-val {
-  color: rgba(255,255,255,0.7);
-  font-family: monospace;
+  color: var(--text-color);
+  font-family: var(--font-sans);
   font-size: 0.72rem;
 }
 
 .pt-value {
-  color: #ffd700;
+  color: var(--warning-color);
+  font-weight: 600;
 }
 
 .globe-info-val.health-ok {
-  color: #00ffaa;
+  color: var(--success-color);
 }
 
 .globe-info-val.health-warn {
-  color: #ff416c;
+  color: var(--danger-color);
 }
 
 .globe-info-self {
   margin-top: 6px;
   font-size: 0.6rem;
-  color: rgba(59, 130, 246, 0.5);
-  font-family: monospace;
-  letter-spacing: 2px;
+  color: var(--accent-color);
+  font-family: var(--font-sans);
+  font-weight: 600;
   text-align: center;
-  border-top: 1px solid rgba(59, 130, 246, 0.1);
+  border-top: 1px solid var(--border-color);
   padding-top: 6px;
 }

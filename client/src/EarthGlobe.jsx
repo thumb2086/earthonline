@@ -622,7 +622,6 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', activeEve
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
     >
-      <div className="globe-scanlines"></div>
       <canvas ref={canvasRef} className="earth-globe-canvas" />
 
       <div className="globe-top-left">
@@ -632,7 +631,7 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', activeEve
         </div>
         <div className="globe-stat">
           <span className="globe-stat-label">MULTIPLIER</span>
-          <span className="globe-stat-value" style={{ color: multiplier > 1 ? '#ffd700' : '#00ffaa' }}>
+            <span className="globe-stat-value" style={{ color: multiplier > 1 ? 'var(--warning-color)' : 'var(--accent-color)' }}>
             {multiplier?.toFixed(1) || '1.0'}x
           </span>
         </div>

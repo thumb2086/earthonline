@@ -49,7 +49,6 @@ export default function DataCenterVisualizer({ lifespan, bonusPoints, ping, onli
 
   return (
     <div className="dc-modern-container">
-      <div className="dc-bg-grid"></div>
       
       <div className="dc-layout">
         

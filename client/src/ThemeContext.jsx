@@ -184,9 +184,9 @@ const ThemeContext = createContext(null);
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(() => {
     try {
-      return localStorage.getItem('eo_theme') || 'cyberpunk';
+      return localStorage.getItem('eo_theme') || 'light';
     } catch {
-      return 'cyberpunk';
+      return 'light';
     }
   });
 

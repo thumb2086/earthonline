@@ -16,64 +16,120 @@ export default function ServerRoom({ onlineCount, region, activeEvent, multiplie
     resize();
     window.addEventListener('resize', resize);
 
-    const serverCount = Math.max(4, Math.min(24, Math.floor((onlineCount || 0) / 5) + 4));
-    const servers = [];
-    for (let i = 0; i < serverCount; i++) {
-      servers.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height * 0.6 + canvas.height * 0.2,
-        w: 30 + Math.random() * 20,
-        h: 8 + Math.random() * 4,
-        blink: Math.random() * 2000,
-        color: `hsl(${120 + Math.random() * 60}, 80%, ${40 + Math.random() * 40}%)`,
-        label: `NODE-${String.fromCharCode(65 + i)}`
-      });
-    }
+    const streams = Array.from({ length: 40 }, (_, i) => ({
+      x: (i / 40) * canvas.width + (Math.random() - 0.5) * 20,
+      y: Math.random() * canvas.height,
+      speed: 1 + Math.random() * 2,
+      length: 30 + Math.random() * 80,
+      width: 1 + Math.random() * 2,
+      hue: 120 + Math.random() * 60,
+      alpha: 0.1 + Math.random() * 0.3,
+    }));
 
-    const leds = [];
-    for (let i = 0; i < 20; i++) {
-      leds.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * 20,
-        speed: 0.5 + Math.random(),
-        text: ['SYSTEM OK', 'NODES: ' + (onlineCount || 0), 'TEMP: ' + (20 + Math.random() * 10).toFixed(1) + '°C', 'HUM: ' + (40 + Math.random() * 20).toFixed(0) + '%'][Math.floor(Math.random() * 4)]
-      });
-    }
+    const glows = Array.from({ length: 15 }, (_, i) => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      radius: 30 + Math.random() * 80,
+      hue: 140 + Math.random() * 80,
+      pulse: Math.random() * 3000,
+    }));
+
+    const pulseBubbles = Array.from({ length: 12 }, (_, i) => ({
+      x: Math.random() * canvas.width,
+      y: canvas.height + 20 + Math.random() * 50,
+      radius: 4 + Math.random() * 12,
+      speed: 0.2 + Math.random() * 0.4,
+      hue: 150 + Math.random() * 60,
+      wobble: Math.random() * 1000,
+    }));
 
     const draw = (t) => {
-      ctx.fillStyle = '#0a0e17';
+      const grad = ctx.createRadialGradient(
+        canvas.width * 0.5, canvas.height * 0.5, 0,
+        canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.8
+      );
+      grad.addColorStop(0, '#0a1a0e');
+      grad.addColorStop(0.5, '#06120a');
+      grad.addColorStop(1, '#020804');
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      for (const rack of [[0, 0.3], [0.5, 0.5], [0.2, 0.7], [0.7, 0.8]]) {
-        const rx = canvas.width * rack[0];
-        const ry = canvas.height * rack[1];
-        ctx.strokeStyle = '#1a2a3a';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(rx, ry, 80, canvas.height * 0.25);
+      for (const g of glows) {
+        const pulse = 0.6 + 0.4 * Math.sin((t + g.pulse) / 2000);
+        const radGrad = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.radius * pulse);
+        radGrad.addColorStop(0, `hsla(${g.hue}, 60%, 50%, 0.04)`);
+        radGrad.addColorStop(1, `hsla(${g.hue}, 60%, 50%, 0)`);
+        ctx.fillStyle = radGrad;
+        ctx.beginPath();
+        ctx.arc(g.x, g.y, g.radius * pulse, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      for (const s of servers) {
-        const active = Math.sin((t + s.blink) / 500) > 0;
-        ctx.fillStyle = active ? s.color : '#1a2a2a';
-        ctx.fillRect(s.x, s.y, s.w, s.h);
-        if (active) {
-          ctx.fillStyle = 'rgba(0,255,170,0.05)';
-          ctx.fillRect(s.x - 2, s.y - 2, s.w + 4, s.h + 4);
+      for (const s of streams) {
+        s.y += s.speed;
+        if (s.y - s.length > canvas.height) {
+          s.y = -s.length;
+          s.x = (Math.random() * canvas.width);
         }
-        ctx.fillStyle = '#4a6a5a';
-        ctx.font = '6px monospace';
-        ctx.fillText(s.label, s.x, s.y - 2);
+        const gradStream = ctx.createLinearGradient(0, s.y - s.length, 0, s.y);
+        gradStream.addColorStop(0, `hsla(${s.hue}, 70%, 60%, 0)`);
+        gradStream.addColorStop(0.5, `hsla(${s.hue}, 70%, 60%, ${s.alpha})`);
+        gradStream.addColorStop(1, `hsla(${s.hue}, 70%, 60%, 0)`);
+        ctx.fillStyle = gradStream;
+        ctx.fillRect(s.x - s.width / 2, s.y - s.length, s.width, s.length);
       }
 
-      const temp = (20 + Math.sin(t / 10000) * 5).toFixed(1);
-      ctx.fillStyle = '#2a4a3a';
-      ctx.font = '10px monospace';
-      ctx.fillText(`⚡ 機房環境  |  溫度 ${temp}°C  |  濕度 ${(45 + Math.sin(t / 8000) * 10).toFixed(0)}%  |  能耗 ${(300 + Math.sin(t / 5000) * 50).toFixed(0)} kW`, 10, canvas.height - 10);
+      for (const b of pulseBubbles) {
+        b.y -= b.speed;
+        if (b.y + b.radius < 0) {
+          b.y = canvas.height + 20 + Math.random() * 30;
+          b.x = Math.random() * canvas.width;
+        }
+        const wobbleX = Math.sin((t + b.wobble) / 1500) * 8;
+        const alpha = Math.max(0, Math.min(1, (b.y / canvas.height) * 1.5));
+        if (alpha <= 0) continue;
 
-      if (activeEvent) {
-        ctx.fillStyle = '#ff4444';
-        ctx.font = 'bold 14px monospace';
-        ctx.fillText(`⚠ ${activeEvent}`, canvas.width / 2 - 50, 30);
+        ctx.shadowColor = `hsla(${b.hue}, 60%, 70%, 0.3)`;
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(b.x + wobbleX, b.y, b.radius * alpha, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${b.hue}, 60%, 70%, ${0.08 * alpha})`;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = `hsla(${b.hue}, 60%, 70%, ${0.15 * alpha})`;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.arc(b.x + wobbleX, b.y, b.radius * alpha, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const dataDots = (nodes || []).slice(0, 40);
+      for (let i = 0; i < dataDots.length; i++) {
+        const n = dataDots[i];
+        const nx = ((n.lon + 180) / 360) * canvas.width;
+        const ny = ((90 - n.lat) / 180) * canvas.height;
+        const glow = 0.3 + 0.7 * Math.sin((t + i * 300) / 1500);
+
+        ctx.shadowColor = `hsla(${(i * 37 + 140) % 360}, 60%, 60%, 0.4)`;
+        ctx.shadowBlur = 12 * glow;
+        ctx.beginPath();
+        ctx.arc(nx, ny, 2 + glow, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${(i * 37 + 140) % 360}, 70%, 70%, ${0.4 + 0.4 * glow})`;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        if (i % 3 === 0 && i + 1 < dataDots.length) {
+          const n2 = dataDots[i + 1];
+          const nx2 = ((n2.lon + 180) / 360) * canvas.width;
+          const ny2 = ((90 - n2.lat) / 180) * canvas.height;
+          ctx.strokeStyle = `hsla(${(i * 37 + 140) % 360}, 50%, 60%, ${0.05 + 0.05 * glow})`;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(nx, ny);
+          ctx.lineTo(nx2, ny2);
+          ctx.stroke();
+        }
       }
 
       animId = requestAnimationFrame(draw);

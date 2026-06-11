@@ -65,7 +65,7 @@ export default function Console({ logs, chatInput, setChatInput, socket, pmData,
           <div style={{
             position: 'absolute', bottom: '130px', right: '20px', width: '320px', height: '350px',
             background: 'var(--panel-bg)', border: '1px solid var(--accent-color)', borderRadius: '8px',
-            display: 'flex', flexDirection: 'column', zIndex: 1000, boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
+            display: 'flex', flexDirection: 'column', zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
           }}>
             <div className="pm-header" style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px',
@@ -81,7 +81,7 @@ export default function Console({ logs, chatInput, setChatInput, socket, pmData,
               {(pmLog?.[pmTarget] || []).map((msg, i) => (
                 <div key={i} style={{
                   alignSelf: msg.incoming ? 'flex-start' : 'flex-end',
-                  background: msg.incoming ? 'rgba(255,255,255,0.08)' : 'rgba(0,255,65,0.12)',
+                  background: msg.incoming ? 'rgba(255,255,255,0.08)' : 'rgba(37,99,235,0.08)',
                   color: msg.incoming ? 'var(--text-color)' : 'var(--accent-color)',
                   padding: '6px 12px', borderRadius: '8px', maxWidth: '80%', fontSize: '0.85rem',
                   wordBreak: 'break-word'

@@ -9,13 +9,13 @@ export default function LeaderboardModal({ show, onClose, leaderboard, sortMode,
   return (
     <div className="modal-overlay" onClick={onClose} style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+      background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
     }}>
       <div className="modal-content" style={{
         maxWidth: '900px', width: '90%', maxHeight: '85vh', overflowY: 'auto',
         background: 'var(--surface-color)', borderRadius: '12px', padding: '30px',
-        border: '1px solid var(--border-color)', boxShadow: '0 0 40px rgba(0,255,204,0.1)'
+        border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
       }} onClick={e => e.stopPropagation()}>
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '25px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px', flexWrap: 'wrap', gap: '15px'}}>
           <h2 style={{margin: 0, color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem'}}>
@@ -51,7 +51,7 @@ export default function LeaderboardModal({ show, onClose, leaderboard, sortMode,
               <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>{t('頭像')}</th>
               <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>{t('使用者 ID')}</th>
               <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>{t('國家/地區')}</th>
-              <th style={{padding: '12px 8px', color: sortMode === 'time' ? '#00ffcc' : 'var(--text-primary)'}}>{t('累積在線時間')} {sortMode === 'time' && '▼'}</th>
+               <th style={{padding: '12px 8px', color: sortMode === 'time' ? 'var(--accent-color)' : 'var(--text-primary)'}}>{t('累積在線時間')} {sortMode === 'time' && '▼'}</th>
               <th style={{padding: '12px 8px', color: sortMode === 'points' ? 'var(--accent-color)' : 'var(--text-primary)'}}>{t('累積點數')} {sortMode === 'points' && '▼'}</th>
               <th style={{padding: '12px 8px', color: 'var(--text-primary)'}}>{t('Discord 身分組')}</th>
             </tr>
