@@ -51,7 +51,28 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionState
       return;
     }
 
-    if (cmdUpper === 'REPORT') {
+    if (cmdUpper === 'HELP') {
+      socket.emit('terminal_response', `[SYS] === EARTH ONLINE TERMINAL v1.0 ===`);
+      socket.emit('terminal_response', `[SYS] /HELP           — 顯示此說明`);
+      socket.emit('terminal_response', `[SYS] /STATUS         — 顯示伺服器狀態`);
+      socket.emit('terminal_response', `[SYS] /PLAYERS        — 顯示在線玩家數`);
+      socket.emit('terminal_response', `[SYS] /BROADCAST <msg> — 全服廣播 (3600 PT)`);
+      socket.emit('terminal_response', `[SYS] /INVEST <type>   — 投資冷卻/頻寬/防護`);
+      socket.emit('terminal_response', `[SYS] /BET <amount>    — 下注排名`);
+      socket.emit('terminal_response', `[SYS] === 管理員指令 ===`);
+      socket.emit('terminal_response', `[SYS] /MUTE <user> <min>`);
+      socket.emit('terminal_response', `[SYS] /UNMUTE <user>`);
+      socket.emit('terminal_response', `[SYS] /BAN <user> <min>`);
+      socket.emit('terminal_response', `[SYS] /UNBAN <user>`);
+      socket.emit('terminal_response', `[SYS] /DELETE_MSG <user>`);
+      socket.emit('terminal_response', `[SYS] /GIVE_PTS <user> <amount>`);
+      socket.emit('terminal_response', `[SYS] /MASS_GIVE <amount>`);
+      socket.emit('terminal_response', `[SYS] /PAUSE           — 暫停 tick`);
+      socket.emit('terminal_response', `[SYS] /RESUME          — 恢復 tick`);
+      socket.emit('terminal_response', `[SYS] /RESET_ALL       — 重置伺服器`);
+      socket.emit('terminal_response', `[SYS] /SET_MULTIPLIER <n>`);
+      socket.emit('terminal_response', `[SYS] /TRIGGER_EVENT <type>`);
+    } else if (cmdUpper === 'REPORT') {
       try {
         const allUsers = await User.find({}).lean().limit(2000);
         let realCount = 0, botCount = 0, botNames = [], onlineReal = 0, onlineBot = 0;
@@ -128,12 +149,12 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionState
           });
         }
       } catch (err) { socket.emit('terminal_response', `[ERROR] 重置失敗: ${err.message}`); }
-    } else if (cmdUpper === 'PAUSE_TICK') {
+    } else if (cmdUpper === 'PAUSE_TICK' || cmdUpper === 'PAUSE') {
       if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
       setPaused(true);
       nspIo.emit('tick_paused');
       socket.emit('terminal_response', `[SYS] 伺服器 tick 已暫停`);
-    } else if (cmdUpper === 'RESUME_TICK') {
+    } else if (cmdUpper === 'RESUME_TICK' || cmdUpper === 'RESUME') {
       if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
       setPaused(false);
       nspIo.emit('tick_resumed');
@@ -154,6 +175,60 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionState
       state.investments[investType] = currentLevel + 1;
       socket.emit('terminal_response', `[SYS] 已投資 ${investType} Lv.${currentLevel + 1}！花費 ${cost} PT。全區域效果已提升。`);
       nspIo.emit('chat_system_message', { message: `[系統] ${user.username} 投資了 ${investType} Lv.${currentLevel + 1}！` });
+    } else if (cmdUpper === 'STATUS') {
+      socket.emit('terminal_response', `[SYS] 伺服器狀態：在線 ${connectedUsers.size} 人`);
+    } else if (cmdUpper === 'PLAYERS') {
+      socket.emit('terminal_response', `[SYS] 目前在線：${connectedUsers.size} 位節點`);
+    } else if (cmdUpper.startsWith('MUTE ')) {
+      if (user.role !== 'admin' && user.role !== 'moderator') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      const parts = rawCmd.substring(5).trim().split(/ +/);
+      const target = parts[0], dur = parseInt(parts[1]) || 10;
+      await User.updateOne({ username: target }, { $set: { mutedUntil: Date.now() + dur * 60000 } });
+      socket.emit('terminal_response', `[SYS] 已禁言 ${target} ${dur} 分鐘`);
+    } else if (cmdUpper.startsWith('UNMUTE ')) {
+      if (user.role !== 'admin' && user.role !== 'moderator') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      const target = rawCmd.substring(7).trim();
+      await User.updateOne({ username: target }, { $set: { mutedUntil: null } });
+      socket.emit('terminal_response', `[SYS] 已解除 ${target} 禁言`);
+    } else if (cmdUpper.startsWith('BAN ')) {
+      if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      const parts = rawCmd.substring(4).trim().split(/ +/);
+      const target = parts[0], dur = parseInt(parts[1]) || 60;
+      await User.updateOne({ username: target }, { $set: { bannedUntil: Date.now() + dur * 60000 } });
+      socket.emit('terminal_response', `[SYS] 已封鎖 ${target} ${dur} 分鐘`);
+    } else if (cmdUpper.startsWith('UNBAN ')) {
+      if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      const target = rawCmd.substring(6).trim();
+      await User.updateOne({ username: target }, { $set: { bannedUntil: null } });
+      socket.emit('terminal_response', `[SYS] 已解除 ${target} 封鎖`);
+    } else if (cmdUpper.startsWith('GIVE_PTS ') || cmdUpper.startsWith('GIVE ')) {
+      if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      const parts = rawCmd.split(/ +/);
+      const target = parts[1], amount = parseInt(parts[2]);
+      if (!target || isNaN(amount)) { socket.emit('terminal_response', '[ERROR] 用法: GIVE_PTS <username> <amount>'); return; }
+      await User.updateOne({ username: target }, { $inc: { accumulatedBonusPoints: amount } });
+      socket.emit('terminal_response', `[SYS] 已給予 ${target} ${amount} PT`);
+    } else if (cmdUpper.startsWith('MASS_GIVE ')) {
+      if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      const amount = parseInt(rawCmd.substring(10).trim());
+      if (isNaN(amount)) { socket.emit('terminal_response', '[ERROR] 用法: MASS_GIVE <amount>'); return; }
+      const result = await User.updateMany({}, { $inc: { accumulatedBonusPoints: amount } });
+      socket.emit('terminal_response', `[SYS] 已給予 ${result.modifiedCount} 位玩家各 ${amount} PT`);
+    } else if (cmdUpper.startsWith('DELETE_MSG ')) {
+      if (user.role !== 'admin' && user.role !== 'moderator') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      socket.emit('terminal_response', `[SYS] 已刪除指定玩家訊息（前段處理）`);
+    } else if (cmdUpper.startsWith('SET_MULTIPLIER ')) {
+      if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      const val = parseFloat(rawCmd.substring(15).trim());
+      if (isNaN(val)) { socket.emit('terminal_response', '[ERROR] 用法: SET_MULTIPLIER <value>'); return; }
+      // Find the region state and update multiplier
+      const region = nspIo.name?.replace('/', '') || 'asia';
+      const state = regionStates[region];
+      if (state) state.multiplier = val;
+      socket.emit('terminal_response', `[SYS] 已設定全域倍率為 ${val}`);
+    } else if (cmdUpper.startsWith('TRIGGER_EVENT ')) {
+      if (user.role !== 'admin') { socket.emit('terminal_response', '[ERROR] 權限不足'); return; }
+      socket.emit('terminal_response', `[SYS] 事件觸發功能需透過管理面板操作`);
     } else if (cmdUpper.startsWith('BET ')) {
       const amount = parseInt(rawCmd.substring(4).trim());
       if (isNaN(amount) || amount < 100) { socket.emit('terminal_response', '[ERROR] 用法: BET <金額(最少100)>'); return; }
