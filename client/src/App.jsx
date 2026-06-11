@@ -1448,11 +1448,11 @@ function Dashboard({ token, onLogout, region }) {
       <div className="main-content">
         {/* Left Metrics Terminal */}
         <aside className="metrics-terminal floating-panel">
-          <div className="brand-banner" style={{ textAlign: 'center', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '12px' }}>
+          <div className="brand-banner" style={{ textAlign: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-color)', marginBottom: '12px' }}>
             <div style={{display: 'flex', justifyContent: 'center', marginBottom: '6px'}}>
-              <Globe2 size={40} color="var(--accent-color)" className="icon-glow icon-spin" />
+              <Globe2 size={40} color="var(--accent-color)" />
             </div>
-            <h3 style={{margin: '0', color: 'var(--text-primary)', letterSpacing: '2px', fontSize: '1.1rem'}}>EARTH ONLINE</h3>
+            <h3 style={{margin: '0', color: 'var(--text-color)', fontWeight: 700, fontSize: '1.1rem'}}>EARTH ONLINE</h3>
           </div>
 
           <div className="metric-group" style={{padding: '10px 12px', marginBottom: '8px'}}>
@@ -1465,7 +1465,7 @@ function Dashboard({ token, onLogout, region }) {
                   style={{width: '40px', height: '40px', borderRadius: '50%', border: '2px solid var(--accent-color)', objectFit: 'cover'}} 
                 />
               ) : (
-                <div style={{width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)'}}>
+                <div style={{width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--border-color)'}}>
                   <User size={20} color="var(--text-secondary)" />
                 </div>
               )}
@@ -1477,26 +1477,26 @@ function Dashboard({ token, onLogout, region }) {
                     {t('已連結 Discord')}
                   </div>
                 ) : (
-<a href="#" onClick={(e) => { e.preventDefault(); setShowDiscordModal(true); }} style={{fontSize: '0.8rem', color: 'var(--info-color)'}}>
+<a href="#" onClick={(e) => { e.preventDefault(); setShowDiscordModal(true); }} style={{fontSize: '0.8rem', color: 'var(--accent-color)', fontWeight: 500}}>
                      {t('連結 Discord')}
                    </a>
                 )}
               </div>
             </div>
             <div style={{display: 'flex', gap: '12px', marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)'}}>
-              <div><span style={{color: '#888'}}>ping </span><strong style={{color: 'var(--text-main)'}}>{ping}ms</strong></div>
+              <div><span style={{color: 'var(--text-secondary)'}}>ping </span><strong style={{color: 'var(--text-color)'}}>{ping}ms</strong></div>
                <div><span style={{color: 'var(--text-secondary)'}}>{t('session')} </span><strong style={{color: 'var(--accent-color)'}}>{formatTime(sessionTime)}</strong></div>
-              <div><span style={{color: '#888'}}>{t('status')} </span><strong style={{color: isConnected ? 'var(--success-color)' : 'var(--danger-color)'}}>{isConnected ? t('on') : t('off')}</strong></div>
+              <div><span style={{color: 'var(--text-secondary)'}}>{t('status')} </span><strong style={{color: isConnected ? 'var(--success-color)' : 'var(--danger-color)'}}>{isConnected ? t('on') : t('off')}</strong></div>
             </div>
           </div>
 
           <div style={{display: 'flex', gap: '10px', marginBottom: '8px'}}>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
-              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('上線人數')}</div>
-              <div style={{fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--success-color)'}}>{globalStats.activeUsers}</div>
+              <div className="metric-title">{t('上線人數')}</div>
+              <div className="metric-value" style={{fontSize: '1.3rem', color: 'var(--accent-color)'}}>{globalStats.activeUsers}</div>
             </div>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
-              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('倍率')}</div>
+              <div className="metric-title">{t('倍率')}</div>
               {(() => {
                 const isOverclock = myNode?.activeBuffs?.overclock > Date.now();
                 const baseMult = globalStats.multiplier || 1.0;
@@ -1511,57 +1511,57 @@ function Dashboard({ token, onLogout, region }) {
               })()}
             </div>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
-              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('生命')}</div>
-              <div style={{fontSize: '1.3rem', fontWeight: 'bold', color: calculateHealthPercentage(lifespan) > 30 ? 'var(--accent-color)' : 'var(--danger-color)'}}>{Math.floor(calculateHealthPercentage(lifespan))}%</div>
+              <div className="metric-title">{t('生命')}</div>
+              <div className="metric-value" style={{fontSize: '1.3rem', color: calculateHealthPercentage(lifespan) > 30 ? 'var(--accent-color)' : 'var(--danger-color)'}}>{Math.floor(calculateHealthPercentage(lifespan))}%</div>
             </div>
           </div>
 
           <div className="metric-group" style={{padding: '10px 12px', marginBottom: '8px'}}>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px'}}>
-              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('節點等級')}</span>
-              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-color)'}}>
+              <span className="metric-title">{t('節點等級')}</span>
+              <span style={{fontSize: '1rem', fontWeight: 600, color: 'var(--accent-color)'}}>
                 Lv.{myNode?.level || 1}
-                {myNode?.levelProgress?.nextSec && <span style={{fontSize:'0.75rem', color:'#888', marginLeft:'5px'}}>(+{(myNode.levelProgress.progress * 100).toFixed(0)}%)</span>}
+                {myNode?.levelProgress?.nextSec && <span style={{fontSize:'0.75rem', color:'var(--text-secondary)', marginLeft:'5px'}}>(+{(myNode.levelProgress.progress * 100).toFixed(0)}%)</span>}
               </span>
             </div>
             {myNode?.levelProgress?.nextSec > 0 && (
-              <div style={{width:'100%', height:'4px', background:'rgba(255,255,255,0.1)', borderRadius:'2px', marginTop:'4px', overflow:'hidden'}}>
+              <div style={{width:'100%', height:'4px', background:'var(--bg-color)', borderRadius:'2px', marginTop:'4px', overflow:'hidden'}}>
                 <div style={{width:`${(myNode.levelProgress.progress * 100).toFixed(1)}%`, height:'100%', background:'var(--accent-color)', borderRadius:'2px', transition:'width 0.3s'}} />
               </div>
             )}
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px'}}>
-              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('總生存時間')}</span>
-              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-color)'}}>{formatTime(lifespan)}</span>
+              <span className="metric-title">{t('總生存時間')}</span>
+              <span style={{fontSize: '1rem', fontWeight: 600, color: 'var(--accent-color)'}}>{formatTime(lifespan)}</span>
             </div>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('累積點數')}</span>
-              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)'}}>{(myNode?.accumulatedBonusPoints || 0).toLocaleString()}</span>
+              <span className="metric-title">{t('累積點數')}</span>
+              <span style={{fontSize: '1rem', fontWeight: 600, color: 'var(--text-color)'}}>{(myNode?.accumulatedBonusPoints || 0).toLocaleString()}</span>
             </div>
           </div>
 
           <div style={{display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px'}}>
-            <div style={{fontSize: '0.8rem', color: '#888', marginBottom: '4px'}}>{t('伺服器：')}{region === 'asia' ? t('亞洲') : region === 'us' ? t('美洲') : t('歐洲')} | node: {myNode?.userId} | {myNode?.country || '--'}</div>
+            <div style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px'}}>{t('伺服器：')}{region === 'asia' ? t('亞洲') : region === 'us' ? t('美洲') : t('歐洲')} | node: {myNode?.userId} | {myNode?.country || '--'}</div>
             {globalStats.multiplier > 1.0 && (
               <div style={{fontSize: '0.8rem', color: 'var(--accent-color)'}}>{t('超載中：')}{globalStats.activeUsers} / 5 {t('人')}</div>
             )}
           </div>
 
           <div style={{ marginTop: 'auto', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(255,215,0,0.1)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)'}} onClick={() => setShowLeaderboard(true)}>
+            <button className="terminal-btn" onClick={() => setShowLeaderboard(true)}>
               <Activity size={14} /> {t('排行榜')}
             </button>
-            <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(255,215,0,0.05)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.2)'}} onClick={() => setShowAchievements(true)}>
+            <button className="terminal-btn" onClick={() => setShowAchievements(true)}>
               <Trophy size={14} /> {t('成就')}
             </button>
             {(myNode?.level || 1) >= 10 && (
-              <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(147,51,234,0.1)', color: '#9333EA', border: '1px solid rgba(147,51,234,0.3)'}} onClick={() => { setShowTalentModal(true); if (socket?.connected) socket.emit('get_talent_data'); }}>
+              <button className="terminal-btn" onClick={() => { setShowTalentModal(true); if (socket?.connected) socket.emit('get_talent_data'); }}>
                 <Zap size={14} /> {t('天賦')}
               </button>
             )}
-            <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)'}} onClick={() => { setShowWarPanel(true); if (socket?.connected) socket.emit('get_war_stats'); }}>
+            <button className="terminal-btn" onClick={() => { setShowWarPanel(true); if (socket?.connected) socket.emit('get_war_stats'); }}>
               <Globe2 size={14} /> {t('區域對抗')}
             </button>
-            <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}} onClick={() => setShowAboutModal(true)}>
+            <button className="terminal-btn" onClick={() => setShowAboutModal(true)}>
               <Info size={14} /> {t('系統資訊')}
             </button>
           </div>
@@ -1681,7 +1681,7 @@ function Dashboard({ token, onLogout, region }) {
         return (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+            background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(2px)',
             display: 'flex', justifyContent: 'flex-end',
           }} onClick={() => setShowAdminPanel(false)}>
             <div onClick={e => e.stopPropagation()} style={{

@@ -1,10 +1,8 @@
 import React from 'react';
 import EarthGlobe from '../../EarthGlobe';
-import ServerRoom from './ServerRoom';
 
 const STYLES = [
   { id: 'earth', name: '3D 地球', icon: '🌍' },
-  { id: 'server', name: '數據海洋', icon: '🌊' },
 ];
 
 const STORAGE_KEY = 'eo_bg_style';
@@ -36,11 +34,6 @@ export default function BackgroundRouter(props) {
     return () => window.removeEventListener('storage', handler);
   }, []);
 
-  const setBackground = (id) => {
-    setStyle(id);
-    saveStyle(id);
-  };
-
   const bgProps = {
     onlineCount: props.onlineCount,
     region: props.region,
@@ -50,34 +43,9 @@ export default function BackgroundRouter(props) {
     myNodeId: props.myNodeId,
   };
 
-  let bg;
-  switch (style) {
-    case 'server':
-      bg = <ServerRoom {...bgProps} />;
-      break;
-    default:
-      bg = <EarthGlobe {...bgProps} />;
-  }
-
   return (
-    <>
-      <div className="background-container">
-        {bg}
-      </div>
-      <div className="bg-switcher">
-        {STYLES.map(s => (
-          <button
-            key={s.id}
-            onClick={() => setBackground(s.id)}
-            title={s.name}
-            className={`bg-switcher-btn ${style === s.id ? 'active' : ''}`}
-          >
-            {s.icon}
-          </button>
-        ))}
-      </div>
-    </>
+    <div className="background-container">
+      <EarthGlobe {...bgProps} />
+    </div>
   );
 }
-
-export { STYLES, STORAGE_KEY };
