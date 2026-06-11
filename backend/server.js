@@ -611,9 +611,12 @@ regions.forEach(regionName => {
       // Disconnect compensation: calculate missed time
       const lastHeartbeat = heartbeatTimestamps.get(decoded.username);
       let offlineEarnings = null;
-      if (lastHeartbeat) {
+      const lastComp = lastCompTime.get(decoded.username) || 0;
+      const canCompensate = Date.now() - lastComp >= 300000;
+      if (lastHeartbeat && canCompensate) {
         const offlineDuration = Date.now() - lastHeartbeat;
         if (offlineDuration > 30000 && offlineDuration < 86400000) {
+          lastCompTime.set(decoded.username, Date.now());
           // Time compensation (existing, max 4h)
           const compensatedTime = Math.min(offlineDuration, 4 * 60 * 60 * 1000);
           const incFields = { accumulatedTime: compensatedTime };
@@ -647,9 +650,6 @@ regions.forEach(regionName => {
           }
         }
       }
-      const lastComp = lastCompTime.get(decoded.username) || 0;
-      if (Date.now() - lastComp < 300000) return; // 5 min cooldown
-      lastCompTime.set(decoded.username, Date.now());
       heartbeatTimestamps.set(decoded.username, Date.now());
 
       socket.emit('init_data', {
