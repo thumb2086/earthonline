@@ -151,6 +151,37 @@ function registerTerminalHandlers(socket, nspIo, connectedUsers, io, regionState
       state.investments[investType] = currentLevel + 1;
       socket.emit('terminal_response', `[SYS] 已投資 ${investType} Lv.${currentLevel + 1}！花費 ${cost} PT。全區域效果已提升。`);
       nspIo.emit('chat_system_message', { message: `[系統] ${user.username} 投資了 ${investType} Lv.${currentLevel + 1}！` });
+    } else if (cmdUpper.startsWith('BET ')) {
+      const amount = parseInt(rawCmd.substring(4).trim());
+      if (isNaN(amount) || amount < 100) { socket.emit('terminal_response', '[ERROR] 用法: BET <金額(最少100)>'); return; }
+      const dbUser = await User.findOne({ username: user.username });
+      if (!dbUser || (dbUser.accumulatedBonusPoints || 0) < amount) { socket.emit('terminal_response', `[ERROR] PT 不足！需要 ${amount} PT`); return; }
+      await User.updateOne({ username: user.username }, { $inc: { accumulatedBonusPoints: -amount } });
+      // Store bet: username -> { amount, weekStart }
+      const weekStart = new Date();
+      weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
+      weekStart.setUTCHours(16, 0, 0, 0);
+      const betKey = `bet_${weekStart.getTime()}`;
+      await User.updateOne({ username: user.username }, { $inc: { [betKey]: amount } });
+      socket.emit('terminal_response', `[SYS] 已下注 ${amount} PT！週一結算時若你進入前 50% 可獲得 ${Math.floor(amount * 1.8)} PT`);
+
+      // Weekly settlement check
+      const now = Date.now();
+      const monday = weekStart.getTime() + 7 * 86400000;
+      if (now >= monday) {
+        const allBets = await User.find({ [betKey]: { $exists: true } }, 'username accumulatedTime ' + betKey).lean();
+        const sorted = allBets.sort((a, b) => (b.accumulatedTime || 0) - (a.accumulatedTime || 0));
+        const topHalf = Math.ceil(sorted.length / 2);
+        for (let i = 0; i < sorted.length; i++) {
+          const betAmount = sorted[i][betKey] || 0;
+          if (i < topHalf && betAmount > 0) {
+            const payout = Math.floor(betAmount * 1.8);
+            await User.updateOne({ username: sorted[i].username }, { $inc: { accumulatedBonusPoints: payout } });
+          }
+          await User.updateOne({ username: sorted[i].username }, { $unset: { [betKey]: '' } });
+        }
+        if (sorted.length > 0) nspIo.emit('chat_system_message', { message: `[系統] 本週賭注已結算！` });
+      }
     } else {
       socket.emit('terminal_response', `[ERROR] UNKNOWN OR INVALID COMMAND: ${data.command}`);
     }
