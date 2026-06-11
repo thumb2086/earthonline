@@ -518,9 +518,9 @@ function Dashboard({ token, onLogout, region }) {
     if (!socket) return;
     const s = socket;
 
-    addLog('驗證金鑰已發送，等待授權...');
+    addLog(t('驗證金鑰已發送，等待授權...'));
     s.on('auth_error', (data) => {
-      const msg = data?.message || '授權已過期，請重新登入';
+      const msg = data?.message || t('授權已過期，請重新登入');
       addLog(`[SYSTEM] ${msg}`);
       alert(msg);
       setIsConnected(false);

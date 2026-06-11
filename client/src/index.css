@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@400;600;700&display=swap');
 @font-face {
   font-family: 'MadouFMG';
-  src: url('/fonts/madoufmg.ttf') format('truetype');
+  src: url('./assets/madoufmg.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
 }
