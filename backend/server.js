@@ -276,29 +276,6 @@ const regionStates = { asia: makeRegionState(), us: makeRegionState(), eu: makeR
 
 
 
-regions.forEach(regionName => {
-  const nsp = io.of(`/${regionName}`);
-  const state = regionStates[regionName];
-  
-  function triggerEvent(type) {
-    if (state.currentGlobalEvent) return;
-    let duration = getEventDuration(type);
-    state.currentGlobalEvent = { type, endTime: Date.now() + duration };
-    nsp.emit('global_event_started', { type, endTime: state.currentGlobalEvent.endTime });
-    console.log(`[SYS] ${regionName.toUpperCase()} Global Event Triggered: ${type}`);
-  }
-
-  setInterval(() => {
-    if (state.currentGlobalEvent) return;
-    // Start vote if enough players online
-    if (state.connectedUsers.size >= 5 && !state.eventVote) {
-      createVoteSession(state, nsp);
-    } else if (state.connectedUsers.size < 5 && Math.random() < 0.5) {
-      // Direct trigger for low population
-      triggerEvent(getRandomEvent());
-    }
-  }, 2 * 60 * 60 * 1000);
-});
 
 let hardwareStats = { cpu: 0, uplink: 0, downlink: 0 };
 setInterval(() => {
@@ -328,6 +305,14 @@ setInterval(() => {
 regions.forEach(regionName => {
   const nsp = io.of(`/${regionName}`);
   const state = regionStates[regionName];
+
+  function triggerEvent(type) {
+    if (state.currentGlobalEvent) return;
+    let duration = getEventDuration(type);
+    state.currentGlobalEvent = { type, endTime: Date.now() + duration };
+    nsp.emit('global_event_started', { type, endTime: state.currentGlobalEvent.endTime });
+    console.log(`[SYS] ${regionName.toUpperCase()} Global Event Triggered: ${type}`);
+  }
 
   let lastPausedState = false;
 
@@ -783,7 +768,17 @@ regions.forEach(regionName => {
       nspIo.emit('node_disconnected', { id: disconnectedUser.id || socket.id });
     }
   });
-});
+  });
+
+  // Event timer — runs periodically to trigger random events for each region
+  setInterval(() => {
+    if (state.currentGlobalEvent) return;
+    if (state.connectedUsers.size >= 5 && !state.eventVote) {
+      createVoteSession(state, nsp);
+    } else if (state.connectedUsers.size < 5 && Math.random() < 0.5) {
+      triggerEvent(getRandomEvent());
+    }
+  }, 2 * 60 * 60 * 1000);
 });
 
 const PORT = process.env.PORT || 3001;
