@@ -3,6 +3,8 @@ node_modules
 dist
 dist-electron
 .env
+.env.production
+.env.*
 
 crash.log
 
