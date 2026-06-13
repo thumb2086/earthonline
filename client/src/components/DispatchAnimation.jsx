@@ -1,15 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 export default function DispatchAnimation({ country, onComplete }) {
   const [phase, setPhase] = useState(0);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
+    setPhase(0);
     const t1 = setTimeout(() => setPhase(1), 400);
     const t2 = setTimeout(() => setPhase(2), 1200);
     const t3 = setTimeout(() => setPhase(3), 2000);
-    const t4 = setTimeout(() => onComplete?.(), 2600);
+    const t4 = setTimeout(() => onCompleteRef.current?.(), 2600);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
-  }, [onComplete]);
+  }, []);
 
   const dirs = ['up', 'down', 'left', 'right', 'up-left', 'up-right', 'down-left', 'down-right'];
   const particles = Array.from({ length: 12 }, (_, i) => ({
