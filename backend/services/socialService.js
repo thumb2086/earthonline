@@ -23,6 +23,23 @@ async function sendFriendRequest(fromUsername, targetUsername) {
   if (!dbTarget) return { success: false, reason: 'NOT_FOUND' };
   if ((dbTarget.friends || []).includes(fromUsername)) return { success: false, reason: 'ALREADY_FRIENDS' };
   if ((dbTarget.friendRequests || []).includes(fromUsername)) return { success: false, reason: 'ALREADY_SENT' };
+
+  // Check friend limit for the sender
+  const dbSender = await db.findUserByUsername(fromUsername);
+  if (dbSender) {
+    const friendCount = (dbSender.friends || []).length;
+    const baseLimit = 20;
+    const talentBonus = (() => {
+      const talents = dbSender.talents ? Object.fromEntries(dbSender.talents) : {};
+      return (talents.network || 0) * 5;
+    })();
+    const cosmeticBonus = dbSender.cosmetics?.get('neon_strip') ? 5 : 0;
+    const maxFriends = baseLimit + talentBonus + cosmeticBonus;
+    if (friendCount >= maxFriends) {
+      return { success: false, reason: 'FRIEND_LIMIT' };
+    }
+  }
+
   await db.updateUser(targetUsername, { $push: { friendRequests: fromUsername } });
   return { success: true };
 }

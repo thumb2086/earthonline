@@ -28,6 +28,8 @@ function registerSocialHandlers(socket, nspIo, connectedUsers) {
       for (const [sid, u] of connectedUsers.entries()) {
         if (u.username === targetUsername) { nspIo.to(sid).emit('friend_request_received', { from: user.username }); break; }
       }
+    } else if (result.reason === 'FRIEND_LIMIT') {
+      socket.emit('chat_system_message', { message: '⚠️ 好友數量已達上限（基礎20 + 天賦加成 + 霓虹燈管+5）' });
     }
   });
 
