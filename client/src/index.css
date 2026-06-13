@@ -896,11 +896,12 @@ body {
    Mobile Responsive Layout (≤768px)
    ========================================= */
 @media (max-width: 768px) {
-  body { overflow-y: auto; }
+  body { overflow: hidden; position: fixed; width: 100%; height: 100%; }
   .app-container {
-    height: auto;
+    height: 100dvh;
     min-height: 100dvh;
-    overflow-x: hidden;
+    max-height: 100dvh;
+    overflow: hidden;
   }
 
   /* Hide header on mobile - MobileLayout has its own nav */
@@ -1147,26 +1148,27 @@ body {
 .mobile-layout {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  height: 100dvh;
   overflow: hidden;
   background: var(--bg-color);
+  position: relative;
 }
 
 .mobile-content {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .mobile-nav {
   display: flex;
   background: var(--surface-color);
-  border-top: 1px solid var(--border-color);
+  border-top: 2px solid var(--border-color);
   flex-shrink: 0;
   padding: 4px 0;
-  padding-bottom: max(4px, env(safe-area-inset-bottom, 4px));
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  position: relative;
+  z-index: 10;
 }
 
 .mobile-nav-btn {
@@ -1210,6 +1212,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .mobile-dash-cards {
@@ -1312,7 +1318,6 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: calc(100vh - 120px);
 }
 
 .mobile-globe > div:first-child {
@@ -1362,7 +1367,7 @@ body {
 .mobile-chat {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 110px);
+  height: 100%;
 }
 
 .mobile-chat-messages {
@@ -1444,7 +1449,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding-bottom: 80px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .mobile-profile-header {
