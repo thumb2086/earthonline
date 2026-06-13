@@ -54,7 +54,7 @@ CI/CD：    無（手動部署）
 ```
 v2.0.x ── 離線基礎 + 行動版 redesign
   │
-v2.1.x ── Electron 發布流水線 + Steamworks 整合
+v2.1.x ── Electron 發布流水線
   │
 v2.2.x ── Pixel Art 視覺重設計
   │
@@ -62,9 +62,7 @@ v2.3.x ── 滿版世界地圖 + 派遣掛機
   │
 v2.4.x ── 全服秘寶抽獎
   │
-v2.5.x ── 真實數據 + P2P 聊天
-  │
-v3.0.x ── Steam 正式發布 + 反作弊 + 備援節點
+v2.5.x ── 真實數據 + P2P 聊天 + 反作弊 + 備援節點
 ```
 
 ---
@@ -175,24 +173,7 @@ desktop/
   - 改哪個檔案： `client/electron/main.cjs`
   - 驗證：`npm run build && npm run preview` + Electron 載入本機 build，離線可用
 
-### v2.1.1 — Steamworks 整合
-
-- **v2.1.1a Steamworks SDK 初始化**
-  - 做什麼：安裝 `steamworks.js`，在 Electron main process 初始化 Steam API，封裝成 preload API
-  - 改哪個檔案： `client/electron/main.cjs`、`client/electron/preload.cjs`、`client/package.json`
-  - 驗證：Steam overlay 可喚起，steam 初始化 log 正常
-
-- **v2.1.1b Steam 成就同步**
-  - 做什麼：將遊戲內成就（achievementService）對應至 Steam 成就，在解鎖時呼叫 `SteamUserStats.SetAchievement`
-  - 改哪個檔案： `client/electron/steam.js`（新建）、`client/src/context/GameContext.jsx`（成就解鎖時呼叫 preload API）
-  - 驗證：遊戲內解成就 → Steam overlay 彈出成就通知
-
-- **v2.1.1c Steam 好友 + 邀請**
-  - 做什麼：好友列表可看到 Steam 好友狀態，發送遊戲邀請直接啟用 Steam 內建 overlay
-  - 改哪個檔案： `client/electron/steam.js`、`client/electron/preload.cjs`
-  - 驗證：Steam 好友上線通知 + 可邀請
-
-### v2.1.2 — Discord RPC 強化
+### v2.1.1 — Discord RPC 強化
 
 - **v2.1.2a Electron Discord Rich Presence 改善**
   - 做什麼：現有 RPC 只顯示靜態狀態，改為即時更新（區域、PT、生存時間），支援按鈕「Join Game」
@@ -294,30 +275,9 @@ desktop/
 
 ---
 
-## 十、v3.0.x — Steam 正式發布 + 反作弊 + 備援
+## 十、反作弊 + 備援（併入 v2.5.x）
 
-### v3.0.0 — Steam 發布準備
-
-| Task | 說明 | 檔案 |
-|------|------|------|
-| v3.0.0a Steam 商品頁設定 | Steamworks 後台設定 | （外部） |
-| v3.0.0b Steam DRM 整合 | appid.txt + 加密 | `electron/steam.js` |
-| v3.0.0c 自動更新管道 | electron-updater + 發布伺服器 | `electron/main.cjs` |
-
-### v3.0.1 — 反作弊與安全
-
-| Task | 說明 | 檔案 |
-|------|------|------|
-| v3.0.1a 後端資產驗證 | 升級/抽獎時重算理論產出 | `validationService.js` |
-| v3.0.1b 安全抽獎校驗 | crypto.randomBytes() | `lotteryService.js` |
-
-### v3.0.2 — 備援節點輕量版
-
-| Task | 說明 | 檔案 |
-|------|------|------|
-| v3.0.2a VolunteerNode.js | 100-150 行輕量 relay | `desktop/VolunteerNode.js`（復活） |
-| v3.0.2b Render 健康度監控 | 自動切換備援 | `useSocket.js` |
-| v3.0.2c 啟動檢查 | 環境變數完整性檢查 | `env.js` |
+反作弊與備援功能已合併至 v2.5.x 版本規劃中。
 
 ---
 
@@ -364,11 +324,10 @@ desktop/
 | v2.4.1a-b | 轉生+FOMO | 3 天 | v2.4.0 | Medium |
 | v2.5.0a-c | Redis+GDP+氣運 | 4 天 | v2.3.1 | Medium |
 | v2.5.1a-d | P2P 聊天 | 4 天 | v2.0.0 | Low |
-| v3.0.0a-c | Steam 發布 | 5 天 | v2.4.1 | High |
-| v3.0.1a-b | 反作弊 | 3 天 | v3.0.0 | Medium |
-| v3.0.2a-c | 備援節點 | 3 天 | v2.5.1 | Low |
+| v2.5.2a-b | 反作弊 (後端資產驗證 + 安全抽獎) | 3 天 | v2.4.1 | Medium |
+| v2.5.3a-c | 備援節點輕量版 | 3 天 | v2.5.1 | Low |
 
-**總計：16 個子版本，約 67 個工作日（~3.5 個月）**
+**總計：15 個子版本，約 59 個工作日（~3 個月）**
 
 ---
 
@@ -378,7 +337,7 @@ desktop/
 2. **雙平台同步** — Web 與 Electron 共用同一份前端程式碼
 3. **向後相容** — 每個版本不破壞現有玩家資料
 4. **增量發布** — 每個子版本可獨立部署
-5. **Steam 優先** — 需要外部設定的功能（Steam SDK）盡早開始
+5. **Electron 原生體驗** — 電腦版透過 Electron 提供安裝檔與 Discord RPC
 
 ---
 
@@ -388,3 +347,4 @@ desktop/
 ✅ = 已完成
 ⬜ = 待執行
 🔄 = 進行中
+
