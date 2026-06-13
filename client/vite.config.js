@@ -10,6 +10,7 @@ export default defineConfig({
       srcDir: '',
       filename: 'sw.js',
       registerType: 'autoUpdate',
+      manifestFilename: 'manifest.json',
       manifest: {
         name: 'Earth Online',
         short_name: 'EarthOnline',
