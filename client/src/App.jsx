@@ -26,6 +26,7 @@ import FactionSelect from './components/FactionSelect';
 import WorldMap from './components/WorldMap';
 import CountryInfoPanel from './components/CountryInfoPanel';
 import MinePanel from './components/MinePanel';
+import LotteryModal from './components/LotteryModal';
 import './index.css';
 
 const VITE_API = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
@@ -85,6 +86,9 @@ function Dashboard({ token, onLogout, region }) {
   const [showWorldMap, setShowWorldMap] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState(null);
   const [mine, setMine] = useState(null);
+  const [showLottery, setShowLottery] = useState(false);
+  const [lotteryInventory, setLotteryInventory] = useState([]);
+  const [lastLotteryResult, setLastLotteryResult] = useState(null);
   const [toast, setToast] = useState(null); // { message, type } for non-blocking notifications
   const toastTimerRef = useRef(null);
   const { theme, setTheme, themeData: currentThemeData, themes } = useTheme();
@@ -255,6 +259,31 @@ function Dashboard({ token, onLogout, region }) {
     return () => {
       socket.off('mine_state', hMineState);
       socket.off('mine_upgrade_result', hMineUpgrade);
+    };
+  }, [socket]);
+
+  // Lottery socket handlers
+  useEffect(() => {
+    if (!socket) return;
+    const hResult = (data) => {
+      setLastLotteryResult(data);
+      if (data.success && data.artifact) {
+        addLog(`[SYS] 抽中【${data.artifact.rarity}】遺物 (×${data.artifact.multiplier})`);
+      }
+    };
+    const hInv = (data) => setLotteryInventory(data || []);
+    const hSmelt = (data) => {
+      if (data.success) addLog(`[SYS] 熔煉遺物回收 ${data.refund} PT`);
+      else addLog(`[SYS] 熔煉失敗：${data.error}`);
+      if (socket) socket.emit('lottery_inventory');
+    };
+    socket.on('lottery_result', hResult);
+    socket.on('lottery_inventory', hInv);
+    socket.on('lottery_smelt_result', hSmelt);
+    return () => {
+      socket.off('lottery_result', hResult);
+      socket.off('lottery_inventory', hInv);
+      socket.off('lottery_smelt_result', hSmelt);
     };
   }, [socket]);
 
@@ -900,6 +929,9 @@ function Dashboard({ token, onLogout, region }) {
               </button>
               <button className="dropdown-item" onClick={() => { setShowThemeMenu(!showThemeMenu); setDropdownOpen(false); }}>
                 <Palette size={16} /> {t('主題配色 (Themes)')}
+              </button>
+              <button className="dropdown-item" style={{color: '#f59e0b'}} onClick={() => { setShowLottery(true); setDropdownOpen(false); if (socket?.connected) socket.emit('lottery_inventory'); }}>
+                🎲 {t('秘寶抽獎')}
               </button>
               <button className="dropdown-item" onClick={() => { setShowSettings(true); setDropdownOpen(false); }}>
                 <Settings size={16} /> {t('設定 (Settings)')}
@@ -1782,6 +1814,16 @@ function Dashboard({ token, onLogout, region }) {
           pt={myNode?.accumulatedBonusPoints || 0}
           onUpgrade={() => socket.emit('upgrade_mine')}
           onClose={() => setMine(null)}
+        />
+      )}
+
+      {showLottery && (
+        <LotteryModal
+          pt={myNode?.accumulatedBonusPoints || 0}
+          artifacts={lotteryInventory}
+          onDraw={() => { if (socket?.connected) socket.emit('lottery_draw'); }}
+          onSmelt={(id) => { if (socket?.connected) socket.emit('lottery_smelt', id); }}
+          onClose={() => setShowLottery(false)}
         />
       )}
     </div>

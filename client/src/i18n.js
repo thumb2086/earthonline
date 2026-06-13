@@ -773,7 +773,8 @@ const translations = {
     "請先同意服務條款": "Please agree to the Terms of Service first",
     "遊戲公約": "Game Covenant",
     "歡迎加入地球在線": "Welcome to Earth Online",
-    "世界地圖": "World Map"
+    "世界地圖": "World Map",
+    "秘寶抽獎": "Artifact Draw"
   }
 };
 

@@ -801,6 +801,27 @@ regions.forEach(regionName => {
     const mines = getCountryMines(country);
     socket.emit('country_mines', mines);
   });
+
+  // Lottery handlers
+  const { draw: lotteryDraw, getArtifacts, smelt } = require('./services/lotteryService');
+  socket.on('lottery_draw', async () => {
+    if (!socket.user) return;
+    const result = await lotteryDraw(socket.user.username);
+    socket.emit('lottery_result', result);
+    if (result.success && result.artifact.rarity === '神話') {
+      nspIo.emit('system_message', { text: `🎉 ${socket.user.username} 抽中了神話遺物！`, time: Date.now() });
+    }
+  });
+  socket.on('lottery_inventory', () => {
+    if (!socket.user) return;
+    const list = getArtifacts(socket.user.username);
+    socket.emit('lottery_inventory', list);
+  });
+  socket.on('lottery_smelt', async (artifactId) => {
+    if (!socket.user) return;
+    const result = await smelt(socket.user.username, artifactId);
+    socket.emit('lottery_smelt_result', result);
+  });
   socket.on('get_war_stats', () => {
     socket.emit('war_stats', getWarStats());
   });
@@ -813,6 +834,31 @@ regions.forEach(regionName => {
     } catch (err) {
       socket.emit('region_switched', { success: false, message: '切換失敗' });
     }
+  });
+
+  // Reincarnation
+  const { reincarnate } = require('./services/lotteryService');
+  socket.on('lottery_reincarnate', async () => {
+    if (!socket.user) return;
+    const result = await reincarnate(socket.user.username);
+    socket.emit('lottery_reincarnate_result', result);
+    if (result.success) {
+      nspIo.emit('system_message', { text: `🌟 ${socket.user.username} 進行了遺物轉生！`, time: Date.now() });
+    }
+  });
+
+  // Luck leaderboard
+  const { getLuckLeaderboard } = require('./services/luckService');
+  socket.on('get_luck_leaderboard', () => {
+    const lb = getLuckLeaderboard();
+    socket.emit('luck_leaderboard', lb);
+  });
+
+  // P2P signaling
+  socket.on('signal', (data) => {
+    if (!socket.user) return;
+    const signalData = { ...data, from: socket.user.username };
+    socket.to(data.target).emit('signal', signalData);
   });
 // Handle Disconnect
   socket.on('disconnect', async () => {
