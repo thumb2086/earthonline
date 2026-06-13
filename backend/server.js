@@ -540,6 +540,16 @@ regions.forEach(regionName => {
       } else {
         console.log(`[SYS] Role sync: ${decoded.username} has no Discord linked`);
       }
+
+      // Dev mode: promote usernames from DEV_ADMIN_USERNAMES
+      if (process.env.NODE_ENV === 'development') {
+        const devAdmins = (process.env.DEV_ADMIN_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (devAdmins.includes(decoded.username)) {
+          await User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } });
+          if (dbUser) dbUser.role = 'admin';
+          console.log(`[SYS] Dev admin promoted: ${decoded.username}`);
+        }
+      }
       
       // Ban check — reject banned users
       if (dbUser && dbUser.bannedUntil && dbUser.bannedUntil > Date.now()) {
@@ -816,6 +826,10 @@ async function syncAllOfflineRoles() {
         } else {
           const discordRole = await discordBot.getHighestRole(u.discord?.id);
           if (discordRole?.includes('地球管理團隊')) newRole = 'admin';
+        }
+        if (newRole !== 'admin' && process.env.NODE_ENV === 'development') {
+          const devAdmins = (process.env.DEV_ADMIN_USERNAMES || '').split(',').map(s => s.trim()).filter(Boolean);
+          if (devAdmins.includes(u.username)) newRole = 'admin';
         }
         if (newRole !== (u.role || 'user')) {
           await User.updateOne({ _id: u._id }, { $set: { role: newRole } });

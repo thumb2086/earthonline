@@ -184,6 +184,19 @@ router.post('/bind-discord-manual', async (req, res) => {
     const success = await db.updateUserDiscord(decoded.username, profile);
     if (success) res.json({ success: true, message: 'Discord ID bound successfully manually' });
     else res.status(404).json({ error: 'User not found' });
+    } catch (err) { res.status(401).json({ error: 'Invalid token' }); }
+});
+
+router.post('/accept-covenant', async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: 'Missing token' });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    await User.updateOne(
+      { username: decoded.username || decoded.id },
+      { $set: { covenantAccepted: true, covenantAcceptedAt: Date.now() } }
+    );
+    res.json({ success: true });
   } catch (err) { res.status(401).json({ error: 'Invalid token' }); }
 });
 

@@ -21,6 +21,8 @@ import FourPetalSpiral from './components/FourPetalSpiral';
 import DocumentationOverlay from './components/DocumentationOverlay';
 import GameBackground from './components/GameBackground';
 import PixelWordArt from './components/PixelWordArt';
+import OnboardingGuide from './components/OnboardingGuide';
+import FactionSelect from './components/FactionSelect';
 import './index.css';
 
 const VITE_API = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
@@ -73,6 +75,10 @@ function Dashboard({ token, onLogout, region }) {
   const [discordId, setDiscordId] = useState('');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return localStorage.getItem('eo_onboarding_done') !== 'true'; } catch { return true; }
+  });
+  const [showFactionSelect, setShowFactionSelect] = useState(false);
   const [toast, setToast] = useState(null); // { message, type } for non-blocking notifications
   const toastTimerRef = useRef(null);
   const { theme, setTheme, themeData: currentThemeData, themes } = useTheme();
@@ -1671,6 +1677,38 @@ function Dashboard({ token, onLogout, region }) {
                 <option value="eu">{t('歐洲')}</option>
               </select>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showOnboarding && myNode && (
+        <OnboardingGuide onClose={() => {
+          setShowOnboarding(false);
+          localStorage.setItem('eo_onboarding_done', 'true');
+          setShowFactionSelect(true);
+        }} />
+      )}
+
+      {showFactionSelect && myNode && (
+        <div className="modal-overlay" onClick={() => setShowFactionSelect(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9998,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#1a1a2e', border: '2px solid #00ff41', padding: '30px',
+            maxWidth: '420px', width: '90%', borderRadius: '0',
+            boxShadow: '0 0 40px rgba(0,255,65,0.15)',
+          }}>
+            <FactionSelect
+              existingFaction={null}
+              onSelect={(faction) => {
+                setShowFactionSelect(false);
+                if (window.electronAPI) {
+                  window.electronAPI.updatePresence({ details: `陣營: ${faction}`, state: '探索地球在線' });
+                }
+              }}
+              onSkip={() => setShowFactionSelect(false)}
+            />
           </div>
         </div>
       )}

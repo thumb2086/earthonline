@@ -172,14 +172,14 @@ v2.5.x ── 真實數據 + P2P 聊天 + 反作弊 + 備援節點
 | v2.2.0e PixelWordArt 元件 | 3D 立體像素藝術字（text-shadow 多層次） | `components/PixelWordArt.jsx` | ✅ |
 | v2.2.0f 全站標題套用 | 登入頁「地球在線」+ 導航欄標題 | `App.jsx`, `LoginGateway.jsx` | ✅ |
 
-### v2.2.1 — 登入公約與引導流程
+### v2.2.1 — 登入公約與引導流程 ✅ 已完成
 
-| Task | 說明 | 檔案 |
-|------|------|------|
-| v2.2.1a 強制公約勾選 | Discord 登入前須勾約 | `LoginGateway.jsx`, `i18n.js` |
-| v2.2.1b 公約後端記錄 | covenantAccepted 時間戳 | `User.js`, `auth.js` |
-| v2.2.1c 引導式文檔 | 登入後單頁引導 | `OnboardingGuide.jsx` |
-| v2.2.1d 三大陣營介紹 | 點陣化照片 + 選擇按鈕 | `FactionSelect.jsx` |
+| Task | 說明 | 檔案 | 狀態 |
+|------|------|------|------|
+| v2.2.1a 強制公約勾選 | Discord 登入前須勾選服務條款 | `LoginGateway.jsx`, `i18n.js` | ✅ |
+| v2.2.1b 公約後端記錄 | `covenantAccepted` 時間戳 + API | `User.js`, `auth.js` | ✅ |
+| v2.2.1c 引導式文檔 | 5 步驟入門引導，讀完後顯示陣營選擇 | `OnboardingGuide.jsx` | ✅ |
+| v2.2.1d 三大陣營介紹 | 矢量化矩陣/紅石共合體/幽靈協議，點陣化卡片 | `FactionSelect.jsx` | ✅ |
 
 ---
 

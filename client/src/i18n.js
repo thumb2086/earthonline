@@ -768,7 +768,11 @@ const translations = {
     "區域對抗": "Region War",
     "在線時間": "Online Time",
     "平均在線": "Avg Online",
-    "事件完成率": "Event Rate"
+    "事件完成率": "Event Rate",
+    "我已閱讀並同意《地球在線服務條款》": "I have read and agree to the Earth Online Terms of Service",
+    "請先同意服務條款": "Please agree to the Terms of Service first",
+    "遊戲公約": "Game Covenant",
+    "歡迎加入地球在線": "Welcome to Earth Online"
   }
 };
 
