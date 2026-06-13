@@ -150,7 +150,21 @@ async function migrateOfflineTime() {
   }
 }
 
+// Generic wrappers to centralize User operations
+async function updateUser(username, updates) {
+  return await User.updateOne({ username }, updates);
+}
+
+async function incrementUser(username, incFields) {
+  return await User.updateOne({ username }, { $inc: incFields });
+}
+
+async function findUsersWithDiscord() {
+  return await User.find({ 'discord.id': { $exists: true, $ne: null } }).lean();
+}
+
 module.exports = {
+  User,
   findUserByUsername,
   findUserByUsernameOrEmail,
   createUser,
@@ -159,5 +173,8 @@ module.exports = {
   updateUserDiscord,
   getGlobalProduction,
   getRegionProduction,
-  migrateOfflineTime
+  migrateOfflineTime,
+  updateUser,
+  incrementUser,
+  findUsersWithDiscord
 };

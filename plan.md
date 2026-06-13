@@ -295,7 +295,7 @@ desktop/
 - [x] 聊天 filter regex 未 escape，可能引發 ReDoS（已有 escape，確認安全）
 - [ ] MongoDB 更新 bypass `db.js` — 多處直接 `User.findOne()`（需要大規模重構）
 - [x] 部分 client 使用 `document.getElementById()` 操作 DOM（改用 useRef）
-- [ ] App.jsx 1878 行，需要持續拆分（v1.14.0 已拆分 -556 行，仍有改善空間）
+- [x] App.jsx ~1620 行，抽出 DocumentationOverlay（-255 行）
 
 ### Medium（已完成修正）
 
@@ -347,4 +347,5 @@ desktop/
 ✅ = 已完成
 ⬜ = 待執行
 🔄 = 進行中
+
 

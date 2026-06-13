@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const db = require('../db');
 const { updateQuestProgress } = require('./questService');
 const { updateWarStats } = require('../state/regionState');
 
@@ -20,7 +20,7 @@ async function processTick(state, connectedUsers, regionName) {
   // Collective load: +1% decay per user above threshold
   const loadMultiplier = onlineCount > COLLECTIVE_LOAD_THRESHOLD ? 1 + (onlineCount - COLLECTIVE_LOAD_THRESHOLD) * 0.01 : 1;
 
-  const users = await User.find({ username: { $in: usernames } });
+  const users = await db.User.find({ username: { $in: usernames } });
   const updates = [];
 
   for (let user of users) {
@@ -40,7 +40,7 @@ async function processTick(state, connectedUsers, regionName) {
       // Auto-revive with backup node
       const hasBackup = user.cosmetics?.get('backup_node');
       if (hasBackup) {
-        await User.updateOne(
+        await db.User.updateOne(
           { username: user.username },
           { $set: { health: 30 }, $unset: { 'cosmetics.backup_node': '' } }
         );
@@ -109,7 +109,7 @@ async function processTick(state, connectedUsers, regionName) {
   updateWarStats(regionName, onlineCount, totalPT, !!state.currentGlobalEvent);
 
   if (updates.length > 0) {
-    await User.bulkWrite(updates);
+    await db.User.bulkWrite(updates);
   }
 
   return { updates, usernamesProcessed: users.length };

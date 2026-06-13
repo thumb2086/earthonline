@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const db = require('../db');
 
 const TALENT_POINT_INTERVAL = 86400000; // 24h in ms
 const MAX_TALENT_POINTS = 20;
@@ -25,7 +25,7 @@ const TALENTS = {
 };
 
 async function getTalentData(username) {
-  const user = await User.findOne({ username });
+  const user = await db.User.findOne({ username });
   if (!user) return { points: 0, spent: 0, talents: {}, all: TALENTS };
   return {
     points: user.talentPoints || 0,
@@ -36,7 +36,7 @@ async function getTalentData(username) {
 }
 
 async function checkTalentPointEarn(username, accumulatedTime) {
-  const user = await User.findOne({ username });
+  const user = await db.User.findOne({ username });
   if (!user) return false;
   const lastTime = user.lastTalentPointTime || 0;
   const totalPoints = (user.talentPoints || 0) + (user.talentPointsSpent || 0);
@@ -47,7 +47,7 @@ async function checkTalentPointEarn(username, accumulatedTime) {
   const nextMilestone = lastTime > 0 ? lastTime + TALENT_POINT_INTERVAL : accumulatedTime;
   if (accumulatedTime >= nextMilestone) {
     const newLastTime = nextMilestone;
-    await User.updateOne(
+    await db.User.updateOne(
       { username },
       { $inc: { talentPoints: 1 }, $set: { lastTalentPointTime: newLastTime } }
     );
@@ -59,7 +59,7 @@ async function checkTalentPointEarn(username, accumulatedTime) {
 async function assignTalent(username, talentId) {
   if (!TALENTS[talentId]) return { success: false, message: '天賦不存在' };
 
-  const user = await User.findOne({ username });
+  const user = await db.User.findOne({ username });
   if (!user) return { success: false, message: '用戶不存在' };
   if ((user.level || 1) < 10) return { success: false, message: '需要 Lv.10 解鎖天賦系統' };
 
@@ -68,7 +68,7 @@ async function assignTalent(username, talentId) {
   if (currentLevel >= TALENTS[talentId].maxLevel) return { success: false, message: '已達最高等級' };
   if ((user.talentPoints || 0) < 1) return { success: false, message: '天賦點不足' };
 
-  await User.updateOne(
+  await db.User.updateOne(
     { username },
     { $inc: { [`talents.${talentId}`]: 1, talentPoints: -1, talentPointsSpent: 1 } }
   );
@@ -76,7 +76,7 @@ async function assignTalent(username, talentId) {
 }
 
 async function resetTalents(username) {
-  const user = await User.findOne({ username });
+  const user = await db.User.findOne({ username });
   if (!user) return { success: false, message: '用戶不存在' };
 
   const currentTalents = user.talents ? Object.fromEntries(user.talents) : {};
@@ -84,7 +84,7 @@ async function resetTalents(username) {
   if (spentPoints === 0) return { success: false, message: '沒有已分配的天賦' };
   if ((user.accumulatedBonusPoints || 0) < RESET_COST) return { success: false, message: `需要 ${RESET_COST} PT 重置` };
 
-  await User.updateOne(
+  await db.User.updateOne(
     { username },
     { $set: { talents: {} }, $inc: { talentPoints: spentPoints, talentPointsSpent: -spentPoints, accumulatedBonusPoints: -RESET_COST } }
   );

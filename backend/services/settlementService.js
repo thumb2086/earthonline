@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const db = require('../db');
 const discordBot = require('../discordBot');
 const { getWarStats, resetWarStats } = require('../state/regionState');
 
@@ -28,7 +28,7 @@ function getCurrentWeekStart() {
 }
 
 async function checkWeeklyReset(username) {
-  const user = await User.findOne({ username });
+  const user = await db.User.findOne({ username });
   if (!user) return false;
   const weekStart = getCurrentWeekStart();
   if (weekStart > (user.weeklyResetAt || 0)) {
@@ -36,17 +36,17 @@ async function checkWeeklyReset(username) {
     const weeklyPT = user.weeklyScore || 0;
     const honorEarned = Math.floor(weeklyPT / 100);
     if (honorEarned > 0) {
-      await User.updateOne({ username }, { $inc: { honor: honorEarned } });
+      await db.User.updateOne({ username }, { $inc: { honor: honorEarned } });
     }
     // Reset weekly score
-    await User.updateOne({ username }, { $set: { weeklyScore: 0, weeklyResetAt: weekStart } });
+    await db.User.updateOne({ username }, { $set: { weeklyScore: 0, weeklyResetAt: weekStart } });
     return { reset: true, honorEarned, weeklyPT };
   }
   return { reset: false };
 }
 
 async function getWeeklyRanking(limit = 20) {
-  const users = await User.find({ weeklyScore: { $gt: 0 } })
+  const users = await db.User.find({ weeklyScore: { $gt: 0 } })
     .sort({ weeklyScore: -1 })
     .limit(limit)
     .select('username weeklyScore honor level accumulatedTime');
@@ -61,7 +61,7 @@ async function getWeeklyRanking(limit = 20) {
 
 async function processWeeklySettlement() {
   const weekStart = getCurrentWeekStart();
-  const topUsers = await User.find({ weeklyScore: { $gt: 0 } })
+  const topUsers = await db.User.find({ weeklyScore: { $gt: 0 } })
     .sort({ weeklyScore: -1 })
     .limit(50)
     .select('username weeklyScore honor discord.id');
@@ -72,7 +72,7 @@ async function processWeeklySettlement() {
     const honorEarned = Math.floor(u.weeklyScore / 100);
     const bonus = i < 3 ? [500, 300, 200][i] : i < 10 ? 100 : i < 25 ? 50 : 20;
     const totalHonor = honorEarned + bonus;
-    await User.updateOne({ username: u.username }, {
+    await db.User.updateOne({ username: u.username }, {
       $inc: { honor: totalHonor, accumulatedBonusPoints: bonus },
       $set: { weeklyScore: 0, weeklyResetAt: weekStart }
     });
@@ -95,10 +95,10 @@ async function processWeeklySettlement() {
   for (let i = 0; i < sortedRegions.length; i++) {
     const [regionName, stats] = sortedRegions[i];
     const regionBonus = i === 0 ? 200 : i === 1 ? 100 : 50;
-    const regionUsers = await User.find({ homeRegion: regionName, weeklyScore: { $gt: 0 } })
+    const regionUsers = await db.User.find({ homeRegion: regionName, weeklyScore: { $gt: 0 } })
       .select('username accumulatedBonusPoints');
     for (const u of regionUsers) {
-      await User.updateOne({ username: u.username }, { $inc: { accumulatedBonusPoints: regionBonus } });
+      await db.User.updateOne({ username: u.username }, { $inc: { accumulatedBonusPoints: regionBonus } });
     }
     // Extra personal bonus for top 10 in winning region
     if (i === 0) {
@@ -106,7 +106,7 @@ async function processWeeklySettlement() {
         .sort((a, b) => (b.accumulatedBonusPoints || 0) - (a.accumulatedBonusPoints || 0))
         .slice(0, 10);
       for (const u of topInRegion) {
-        await User.updateOne({ username: u.username }, { $inc: { accumulatedBonusPoints: 500, honor: 100 } });
+        await db.User.updateOne({ username: u.username }, { $inc: { accumulatedBonusPoints: 500, honor: 100 } });
       }
     }
     regionResults.push({ region: regionName, rank: i + 1, bonus: regionBonus, totalOnlineTime: stats.totalOnlineTime });

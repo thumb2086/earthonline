@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const db = require('../db');
 
 const ACHIEVEMENTS = [
   // Survival milestones
@@ -26,7 +26,7 @@ const ACHIEVEMENTS = [
 ];
 
 async function checkAchievements(username, stats) {
-  const user = await User.findOne({ username });
+  const user = await db.User.findOne({ username });
   if (!user) return [];
   const unlocked = user.achievements?.unlocked || [];
   const newlyUnlocked = [];
@@ -57,22 +57,22 @@ async function checkAchievements(username, stats) {
     if (met) {
       newlyUnlocked.push(ach.id);
       if (ach.reward > 0) {
-        await User.updateOne({ username }, { $inc: { accumulatedBonusPoints: ach.reward } });
+        await db.User.updateOne({ username }, { $inc: { accumulatedBonusPoints: ach.reward } });
       }
     }
   }
 
   if (newlyUnlocked.length > 0) {
-    await User.updateOne({ username }, { $push: { 'achievements.unlocked': { $each: newlyUnlocked } } });
+    await db.User.updateOne({ username }, { $push: { 'achievements.unlocked': { $each: newlyUnlocked } } });
     // Track total achievement count for honor
-    await User.updateOne({ username }, { $inc: { 'achievements.total': newlyUnlocked.length } });
+    await db.User.updateOne({ username }, { $inc: { 'achievements.total': newlyUnlocked.length } });
   }
 
   return newlyUnlocked;
 }
 
 async function getAchievementData(username) {
-  const user = await User.findOne({ username });
+  const user = await db.User.findOne({ username });
   const unlocked = user?.achievements?.unlocked || [];
   const total = user?.achievements?.total || 0;
   return { unlocked, total, all: ACHIEVEMENTS };
