@@ -1853,7 +1853,7 @@ function Dashboard({ token, onLogout, region }) {
           lastResult={lastLotteryResult}
           onDraw={() => { if (socket?.connected) socket.emit('lottery_draw'); }}
           onSmelt={(id) => { if (socket?.connected) socket.emit('lottery_smelt', id); }}
-          onClose={() => setShowLottery(false)}
+          onClose={() => { setShowLottery(false); setLastLotteryResult(null); }}
         />
       )}
 

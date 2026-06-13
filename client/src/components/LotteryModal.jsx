@@ -40,25 +40,25 @@ export default function LotteryModal({ pt, artifacts = [], onDraw, onSmelt, onCl
           每次 2,000 PT · 有機會獲得永久加成遺物
         </p>
 
-        {lastResult && !rolling && (
-          <div style={{
-            textAlign: 'center', padding: '10px', marginBottom: '12px',
-            background: `${rarityColors[lastResult.rarity] || '#64748b'}15`,
-            border: `1px solid ${rarityColors[lastResult.rarity] || '#64748b'}44`,
-            borderRadius: '8px', fontSize: '1.2rem',
-          }}>
-            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '4px' }}>
-              {rarityIcons[lastResult.rarity] || '?'}
-            </span>
-            <div style={{ color: rarityColors[lastResult.rarity] || '#64748b', fontWeight: 'bold' }}>
-              {lastResult.name || '未知遺物'}
+        {lastResult?.artifact && !rolling && (() => {
+          const a = lastResult.artifact;
+          const rc = rarityColors[a.rarity] || '#64748b';
+          const ri = rarityIcons[a.rarity] || '?';
+          return (
+            <div style={{
+              textAlign: 'center', padding: '10px', marginBottom: '12px',
+              background: `${rc}15`, border: `1px solid ${rc}44`,
+              borderRadius: '8px', fontSize: '1.2rem',
+            }}>
+              <span style={{ fontSize: '2rem', display: 'block', marginBottom: '4px' }}>{ri}</span>
+              <div style={{ color: rc, fontWeight: 'bold' }}>{a.name || '未知遺物'}</div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                {a.rarity === '神話' ? '🌟 神話級！全服公告！' : `${a.rarity}遺物`}
+                {lastResult.isJackpot && ' 🎉 Jackpot！'}
+              </div>
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-              {lastResult.rarity === 'mythic' ? '🌟 神話級！全服公告！' : `${lastResult.rarityText || ''}`}
-              {streak > 0 && ` (連抽 ${streak} 次)`}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginBottom: '16px' }}>
           {RARITIES.map(r => (
