@@ -85,12 +85,18 @@ function Dashboard({ token, onLogout, region }) {
   const [showFactionSelect, setShowFactionSelect] = useState(false);
   const [showWorldMap, setShowWorldMap] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState(null);
+  const [dispatchedCountry, setDispatchedCountry] = useState(null);
   const [mine, setMine] = useState(null);
   const [showLottery, setShowLottery] = useState(false);
   const [lotteryInventory, setLotteryInventory] = useState([]);
   const [lastLotteryResult, setLastLotteryResult] = useState(null);
   const [toast, setToast] = useState(null); // { message, type } for non-blocking notifications
   const toastTimerRef = useRef(null);
+  const showToast = (msg, type) => {
+    setToast({ message: msg, type });
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 5000);
+  };
   const { theme, setTheme, themeData: currentThemeData, themes } = useTheme();
   
   const pingStartRef = useRef(0);
@@ -249,16 +255,32 @@ function Dashboard({ token, onLogout, region }) {
   // Mine socket handlers
   useEffect(() => {
     if (!socket) return;
-    const hMineState = (data) => { if (data) setMine(data); };
+    const hMineState = (data) => {
+      if (data) {
+        setMine(data);
+        showToast(`🚀 已在 ${data.country} 建立礦場！Lv.${data.level} 開始自動挖礦`, 'success');
+        addLog(`[SYS] ✅ 已在 ${data.country} 建立礦場（Lv.${data.level}）`);
+      }
+    };
     const hMineUpgrade = (data) => {
-      if (data.success) addLog(`[SYS] 礦場升級至 Lv.${data.level}（${data.name}）`);
-      else addLog(`[SYS] 礦場升級失敗：${data.error}`);
+      if (data.success) {
+        addLog(`[SYS] 礦場升級至 Lv.${data.level}（${data.name}）`);
+        showToast(`⛏️ 礦場升級成功！Lv.${data.level} ${data.name}`, 'success');
+      } else {
+        addLog(`[SYS] 礦場升級失敗：${data.error}`);
+        showToast(`❌ 礦場升級失敗：${data.error}`, 'error');
+      }
+    };
+    const hMineEstablished = (data) => {
+      addLog(`[SYS] ${data.username} 已在 ${data.country} 建立礦場！`);
     };
     socket.on('mine_state', hMineState);
     socket.on('mine_upgrade_result', hMineUpgrade);
+    socket.on('mine_established', hMineEstablished);
     return () => {
       socket.off('mine_state', hMineState);
       socket.off('mine_upgrade_result', hMineUpgrade);
+      socket.off('mine_established', hMineEstablished);
     };
   }, [socket]);
 
@@ -442,12 +464,6 @@ function Dashboard({ token, onLogout, region }) {
     s.on('all_players_list', (list) => {
       setAllPlayersList(list || []);
     });
-
-    const showToast = (msg, type) => {
-      setToast({ message: msg, type });
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), 5000);
-    };
 
     s.on('buy_result', (data) => {
       if (data.success) {
@@ -1791,14 +1807,20 @@ function Dashboard({ token, onLogout, region }) {
               <CountryInfoPanel
                 country={selectedCountry}
                 hasMine={!!mine}
-                onEstablish={() => {
+                dispatching={dispatchedCountry === selectedCountry.name}
+                onEstablish={(countryName) => {
                   if (!mine && socket?.connected) {
+                    setDispatchedCountry(countryName);
                     socket.emit('establish_mine');
+                    setTimeout(() => setDispatchedCountry(null), 3000);
                   }
                   setShowWorldMap(false);
                   setSelectedCountry(null);
-                  if (mine || getMine) setTimeout(() => {
-                    if (socket?.connected) socket.emit('get_mine');
+                  if (mine) setTimeout(() => {
+                    if (socket?.connected) {
+                      socket.emit('get_mine');
+                      showToast('⛏️ 前往礦場', 'success');
+                    }
                   }, 300);
                 }}
                 onClose={() => setSelectedCountry(null)}
@@ -1825,6 +1847,26 @@ function Dashboard({ token, onLogout, region }) {
           onSmelt={(id) => { if (socket?.connected) socket.emit('lottery_smelt', id); }}
           onClose={() => setShowLottery(false)}
         />
+      )}
+
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 20, right: 20, zIndex: 99999,
+          background: toast.type === 'success' ? 'rgba(0,255,65,0.12)' : 'rgba(255,65,100,0.12)',
+          border: `1px solid ${toast.type === 'success' ? 'rgba(0,255,65,0.4)' : 'rgba(255,65,100,0.4)'}`,
+          borderRadius: '8px', padding: '12px 20px',
+          color: toast.type === 'success' ? '#00ff41' : '#ff416c',
+          fontFamily: 'monospace', fontSize: '0.85rem',
+          backdropFilter: 'blur(8px)',
+          boxShadow: toast.type === 'success'
+            ? '0 0 20px rgba(0,255,65,0.2)'
+            : '0 0 20px rgba(255,65,100,0.2)',
+          animation: 'popIn 0.3s ease-out',
+          maxWidth: '360px',
+          pointerEvents: 'none',
+        }}>
+          {toast.message}
+        </div>
       )}
     </div>
       )}
