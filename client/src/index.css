@@ -110,7 +110,7 @@ body {
 .main-content {
   display: flex;
   flex: 1;
-  height: calc(100dvh - 50px);
+  min-height: 0;
 }
 
 /* Left Sidebar - Metrics Terminal */
@@ -125,7 +125,7 @@ body {
   flex-direction: column;
   padding: 15px;
   margin: 15px;
-  height: calc(100dvh - 100px);
+  min-height: 0;
   gap: 20px;
   overflow-y: auto;
 }
@@ -289,7 +289,7 @@ body {
   align-items: center;
   position: relative;
   overflow: hidden;
-  height: 100vh;
+  height: 100dvh;
   width: 100vw;
   background-color: var(--bg-color);
   background-image: radial-gradient(circle at center, var(--surface-color) 0%, var(--bg-color) 100%);
