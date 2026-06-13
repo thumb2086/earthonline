@@ -26,7 +26,7 @@ const nodemailer = require('nodemailer');
 const os = require('os');
 
 const { FILTERED_WORDS, SHOP_ITEMS, ITEM_NAMES, COUNTRY_REGION, REGIONS } = require('./config/constants');
-const { JWT_SECRET, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, BACKEND_URL, DISCORD_REDIRECT_URI, DISCORD_WEBHOOK_URL, FRONTEND_URL } = require('./config/env');
+const { JWT_SECRET, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, BACKEND_URL, DISCORD_REDIRECT_URI, DISCORD_WEBHOOK_URL, FRONTEND_URL, ALLOWED_ORIGINS } = require('./config/env');
 const { startCleanupInterval } = require('./jobs/cleanup');
 const { runStartupMigrations } = require('./jobs/migration');
 const { processTick } = require('./services/gameLoop');
