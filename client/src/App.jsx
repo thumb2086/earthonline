@@ -271,6 +271,7 @@ function Dashboard({ token, onLogout, region }) {
     const hMineState = (data) => {
       if (data) {
         setMine(data);
+        setDispatchedCountry(null);
         showToast(`🚀 已在 ${data.country} 建立礦場！Lv.${data.level} 開始自動挖礦`, 'success');
         addLog(`[SYS] ✅ 已在 ${data.country} 建立礦場（Lv.${data.level}）`);
       }
@@ -1820,6 +1821,7 @@ function Dashboard({ token, onLogout, region }) {
                     setDispatchedCountry(countryName);
                     setShowDispatchAnim(true);
                     socket.emit('establish_mine', { country: countryName });
+                    setTimeout(() => setDispatchedCountry(null), 5000);
                   }
                   setShowWorldMap(false);
                   setSelectedCountry(null);
