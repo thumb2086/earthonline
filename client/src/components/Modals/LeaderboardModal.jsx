@@ -73,7 +73,7 @@ export default function LeaderboardModal({ show, onClose, leaderboard, sortMode,
                 <td style={{padding: '12px 8px'}}><MapPin size={16} style={{marginRight: '4px', verticalAlign: 'middle'}} />{user.country || 'UNKNOWN'}</td>
                 <td style={{padding: '12px 8px'}}>{formatTime(user.idleTime)}</td>
                 <td style={{padding: '12px 8px', color: 'var(--accent-color)', fontWeight: 'bold'}}>{user.points.toLocaleString()}</td>
-                <td style={{padding: '12px 8px', color: user.role === 'admin' ? '#ef4444' : user.role === 'moderator' ? '#f59e0b' : '#888', fontSize: '0.8rem', fontWeight: user.role !== 'user' ? 'bold' : 'normal'}}>{user.role === 'admin' ? t('管理員') : user.role === 'moderator' ? t('管理') : t('市民')}</td>
+                <td style={{padding: '12px 8px', color: user.role === 'admin' ? '#ef4444' : user.role === 'moderator' ? '#f59e0b' : '#888', fontSize: '0.8rem', fontWeight: user.role !== 'user' ? 'bold' : 'normal'}}>{user.role === 'admin' ? t('地球管理團隊') : user.role === 'moderator' ? t('管理') : t('市民')}</td>
               </tr>
             ))}
           </tbody>
