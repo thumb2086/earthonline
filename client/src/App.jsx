@@ -1613,6 +1613,30 @@ function Dashboard({ token, onLogout, region }) {
                 style={{ accentColor: 'var(--accent-color)', width: '18px', height: '18px', cursor: 'pointer' }}
               />
             </div>
+            {window.electronAPI && (
+              <>
+                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('無邊框視窗')}</span>
+                  <button
+                    onClick={async () => {
+                      const frameless = await window.electronAPI.toggleFrameless();
+                      addLog(`[SYS] 無邊框模式: ${frameless ? '開啟' : '關閉'}（下次啟動生效）`);
+                    }}
+                    style={{
+                      background: 'var(--bg-light)', border: '1px solid var(--border-color)',
+                      color: 'var(--accent-color)', padding: '4px 12px', borderRadius: '6px',
+                      cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    {t('切換 (重啟生效)')}
+                  </button>
+                </div>
+                <div style={{ marginTop: '10px', color: 'var(--text-dim)', fontSize: '0.75rem' }}>
+                  {t('視窗位置與大小會自動記憶')}
+                </div>
+              </>
+            )}
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('背景風格')}</span>
               <select value={bgStyle} onChange={e => { setBgStyle(e.target.value); localStorage.setItem('eo_bg_style', e.target.value); }}

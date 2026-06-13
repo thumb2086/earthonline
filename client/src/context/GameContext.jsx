@@ -85,6 +85,30 @@ export function GameProvider({ children, token, onLogout, region, SOCKET_URL, AP
 
   const isOfflineMode = !isConnected && engineReady;
 
+  const survivalTime = myNode?.survivalTime || 0;
+  const health = myNode?.health ?? 100;
+  const pt = myNode?.pt ?? 0;
+
+  useEffect(() => {
+    if (!window.electronAPI || !myNode) return;
+    const sendPresence = () => {
+      const hrs = Math.floor(survivalTime / 3600);
+      const mins = Math.floor((survivalTime % 3600) / 60);
+      window.electronAPI.updatePresence({
+        details: `${myNode.nickname || 'Node'} | ${region.toUpperCase()} | ${pt.toLocaleString()} PT`,
+        state: `存活 ${hrs}h ${mins}m | 健康度 ${Math.round(health)}%`,
+        startTimestamp: Date.now(),
+        smallImageKey: 'user_icon',
+        smallImageText: myNode.nickname || 'Survivor',
+        buttons: [{ label: '加入遊戲', url: 'https://earthonline.qzz.io' }],
+      });
+      window.electronAPI.setProgress(health / 100);
+    };
+    sendPresence();
+    const interval = setInterval(sendPresence, 20000);
+    return () => clearInterval(interval);
+  }, [myNode, region, survivalTime, health, pt]);
+
   return (
     <GameContext.Provider value={{
       socket, isConnected, ping,

@@ -38,13 +38,13 @@
 ```
 前端：    React 19 + Vite 8 + TypeScript + vanilla CSS + Leaflet
 後端：    Express 5 + Socket.io + Mongoose (MongoDB) + CommonJS
-桌面：    Electron 42 (client/) + Electron 31 (desktop/) 
-          └─ desktop/ 使用 electron-builder 打包 Windows NSIS
+桌面：    Electron 42 (client/electron/)
 PWA：     vite-plugin-pwa (injectManifest) + Service Worker
 離線引擎： GameEngine.js + IndexedDB (StorageAdapter.js)
 即時通訊： Socket.io (WebSocket) + 未來 WebRTC P2P
 部署：     Cloudflare Pages (前端) + Render (後端)
-CI/CD：    無（手動部署）
+CI/CD：    GitHub Actions（.github/workflows/ci.yml）
+Steam：    ❌ 不採用（已決定捨棄）
 ```
 
 ---
@@ -127,63 +127,33 @@ v2.5.x ── 真實數據 + P2P 聊天 + 反作弊 + 備援節點
 
 ---
 
-## 五、v2.1.x — Electron 發布流水線 + Steamworks
+## 五、v2.1.x — Electron 發布流水線
 
-> 目標：一鍵 build 出 Windows/Mac/Linux 安裝檔，並整合 Steamworks SDK。
+> 目標：一鍵 build 出 Windows/Mac/Linux 安裝檔。
 
-### 現有 Electron 架構
+### v2.1.0 — Electron 發布管道 ✅ 已完成
 
-```
-desktop/
-├── main.js          ← Electron main process，載入 pages.dev
-├── preload.js       ← contextBridge 暴露 electronAPI
-├── package.json     ← electron-builder 已設定 Windows NSIS
-├── build/
-│   ├── icon.ico
-│   └── icon.png
-└── package-lock.json
-```
-
-### 需要改進的點
-
-1. **載入本機 build 而非遠端 pages.dev** — 目前 `mainWindow.loadURL('https://earthonline1.pages.dev')`，離線時無法使用。應改為：
-   - 開發模式：`loadURL('http://localhost:5173')`
-   - 生產模式：`loadFile('dist/index.html')`（使用 client 的 vite build 產出）
-
-2. **electron-builder 需統一** — 目前 desktop/ 有獨立設定，但 client/ 也有 electron 依賴。兩者需整併。
-
-3. **Steamworks SDK 整合** — 使用 `steamworks.js` 或 `greenworks`。
-
-4. **自動更新** — 整合 `electron-updater`。
-
-### v2.1.0 — Electron 發布管道
-
-- **v2.1.0a 整併 Electron 到 client/**
+- **v2.1.0a 整併 Electron 到 client/** ✅
   - 做什麼：將 desktop/ 的 main.js/preload.js 搬至 `client/electron/`，統一使用 client/ 的依賴版本（Electron 42）。移除 `desktop/` 目錄。
   - 改哪個檔案： 搬移 `desktop/main.js` → `client/electron/main.cjs`、`desktop/preload.js` → `client/electron/preload.cjs`、更新 `client/package.json`（scripts/build + build config）、刪除 `desktop/`
   - 驗證：`npm run dev:electron` 啟動後載入本機 Vite dev server
 
-- **v2.1.0b electron-builder 設定**
+- **v2.1.0b electron-builder 設定** ✅
   - 做什麼：在 client/package.json 加入 `build` 區塊（win/mac/linux targets），加入 `electron-updater` 支援自動更新
   - 改哪個檔案： `client/package.json`
   - 驗證：`npm run build:electron` 產出 `.exe` / `.dmg` / `.AppImage`
 
-- **v2.1.0c 生產模式載入本機 build**
+- **v2.1.0c 生產模式載入本機 build** ✅
   - 做什麼：electron/main.cjs 判斷 `process.env.NODE_ENV`，dev 載 localhost:5173，production 載 `dist/index.html`
   - 改哪個檔案： `client/electron/main.cjs`
   - 驗證：`npm run build && npm run preview` + Electron 載入本機 build，離線可用
 
-### v2.1.1 — Discord RPC 強化
+### v2.1.1 — Discord RPC 強化 + 視窗管理 ✅ 已完成
 
-- **v2.1.2a Electron Discord Rich Presence 改善**
-  - 做什麼：現有 RPC 只顯示靜態狀態，改為即時更新（區域、PT、生存時間），支援按鈕「Join Game」
-  - 改哪個檔案： `client/electron/main.cjs`、`client/src/context/GameContext.jsx`
-  - 驗證：Discord 個人檔案顯示遊戲進度
-
-- **v2.1.2b 視窗管理**
-  - 做什麼：支援無邊框視窗切換、記憶視窗位置/大小、工作列進度條顯示健康度
-  - 改哪個檔案： `client/electron/main.cjs`
-  - 驗證：關掉重開後視窗位置還原
+| Task | 說明 | 檔案 | 狀態 |
+|------|------|------|------|
+| v2.1.1a Discord Rich Presence 即時更新 | 顯示區域、PT、生存時間，支援 Join Game 按鈕 | `client/electron/main.cjs`, `client/src/context/GameContext.jsx` | ✅ |
+| v2.1.1b 視窗管理 | 無邊框切換、記憶位置/大小、工作列健康度進度條 | `client/electron/main.cjs`, `client/src/App.jsx` | ✅ |
 
 ---
 
@@ -314,8 +284,7 @@ desktop/
 | v1.14.0a-d | 問題修正 + App.jsx 拆分 -556 行 | 4 天 | — | High | ✅ |
 | v1.14.0e-f | 文件更新 (README/CHANGELOG/AGENTS) | 2 天 | — | Medium | ✅ |
 | v2.1.0a-c | Electron 發布管道 | 3 天 | v2.0.0 | High | ✅ |
-| v2.1.1a-c | Steamworks 整合 | 5 天 | v2.1.0 | Medium |
-| v2.1.2a-b | Discord RPC 強化 + 視窗管理 | 2 天 | v2.1.0 | Low |
+| v2.1.1a-b | Discord RPC 強化 + 視窗管理 | 2 天 | v2.1.0 | Low |
 | v2.2.0a-f | Pixel Art 登入+導航 | 5 天 | — | Medium |
 | v2.2.1a-d | 登入公約+引導流程 | 4 天 | v2.2.0 | Medium |
 | v2.3.0a-b | 像素世界地圖 | 4 天 | v2.2.1 | High |
