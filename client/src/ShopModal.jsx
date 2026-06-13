@@ -5,7 +5,7 @@ import { useLanguage } from './LanguageContext';
 const SHOP_ITEMS = [
   {
     id: 'liquid_nitrogen',
-    name: '液態氮冷卻瓶', cost: 150, type: 'buff',
+    name: '液態氮冷卻瓶', cost: 5000, type: 'buff',
     icon: 'liquid_nitrogen.png', tagLabel: 'COOLING',
     shortDesc: '40 分鐘內衰減 -50% + 免疫維護',
     effects: [
@@ -16,7 +16,7 @@ const SHOP_ITEMS = [
   },
   {
     id: 'quantum_cooler',
-    name: '量子散熱塔', cost: 400, type: 'health',
+    name: '量子散熱塔', cost: 15000, type: 'health',
     icon: 'quantum_cooler.png', tagLabel: 'HEALTH',
     shortDesc: '恢復 60% HP + 30 分鐘衰減 -30%',
     effects: [
@@ -27,7 +27,7 @@ const SHOP_ITEMS = [
   },
   {
     id: 'overclock_chip',
-    name: '超頻晶片', cost: 800, type: 'buff',
+    name: '超頻晶片', cost: 30000, type: 'buff',
     icon: 'overclock_chip.png', tagLabel: 'BUFF',
     shortDesc: '30 分鐘 PT 收益 ×3.0 倍',
     effects: [
@@ -38,7 +38,7 @@ const SHOP_ITEMS = [
   },
   {
     id: 'firewall',
-    name: '防火牆', cost: 600, type: 'buff',
+    name: '防火牆', cost: 20000, type: 'buff',
     icon: 'firewall.png', tagLabel: 'BUFF',
     shortDesc: '45 分鐘免疫衰減 + 太陽風暴',
     effects: [
@@ -49,7 +49,7 @@ const SHOP_ITEMS = [
   },
   {
     id: 'generator',
-    name: '備用發電機', cost: 600, type: 'revive',
+    name: '備用發電機', cost: 10000, type: 'revive',
     icon: 'generator.png', tagLabel: 'REVIVE',
     shortDesc: '復活至 35% HP + 30 分額外 PT',
     effects: [
@@ -60,7 +60,7 @@ const SHOP_ITEMS = [
   },
   {
     id: 'neon_strip',
-    name: '霓虹燈管', cost: 800, type: 'cosmetic',
+    name: '霓虹燈管', cost: 8000, type: 'cosmetic',
     icon: 'neon_strip.png', tagLabel: 'COSMETIC',
     shortDesc: '裝飾 + 好友上限 +5',
     effects: [
@@ -71,7 +71,7 @@ const SHOP_ITEMS = [
   },
   {
     id: 'flash_drive',
-    name: '神秘隨身碟', cost: 500, type: 'random',
+    name: '神秘隨身碟', cost: 5000, type: 'random',
     icon: 'flash_drive.png', tagLabel: 'LOCKED',
     shortDesc: '⚠️ 暫時封鎖中',
     locked: true,
@@ -83,7 +83,7 @@ const SHOP_ITEMS = [
   },
   {
     id: 'speed_drive',
-    name: '網路加速器', cost: 1200, type: 'buff',
+    name: '網路加速器', cost: 25000, type: 'buff',
     icon: 'flash_drive.png', tagLabel: 'SPEED',
     shortDesc: '60 分鐘 tick 間隔縮短至 3 秒',
     effects: [
@@ -94,7 +94,7 @@ const SHOP_ITEMS = [
   },
   {
     id: 'backup_node',
-    name: '備份節點', cost: 1500, type: 'passive',
+    name: '備份節點', cost: 50000, type: 'passive',
     icon: 'generator.png', tagLabel: 'PASSIVE',
     shortDesc: '死亡時自動消耗以 30% HP 復活',
     effects: [
