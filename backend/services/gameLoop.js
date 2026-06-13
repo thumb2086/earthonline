@@ -49,6 +49,13 @@ async function processTick(state, connectedUsers, regionName) {
       }
     }
 
+    // Passive health recovery when low (online, caps at 50)
+    let recovery = 0;
+    if (!isDead && user.health > 0 && user.health < 50) {
+      const room = 50 - user.health;
+      recovery = Math.min(room, user.health < 25 ? 0.2 : 0.1);
+    }
+
     let ptPerTick = 0;
     let timeEarned = 0;
 
@@ -71,6 +78,7 @@ async function processTick(state, connectedUsers, regionName) {
 
     const incFields = {};
     if (decay > 0) incFields.health = -decay;
+    if (recovery > 0) incFields.health = (incFields.health || 0) + recovery;
     if (ptPerTick > 0) { incFields.accumulatedBonusPoints = ptPerTick; incFields.weeklyScore = ptPerTick; }
     if (timeEarned > 0) incFields.accumulatedTime = timeEarned;
 
@@ -83,7 +91,8 @@ async function processTick(state, connectedUsers, regionName) {
       });
       for (const [sid, cu] of connectedUsers) {
         if (cu.username === user.username) {
-          if (decay > 0) cu.health = (cu.health || 0) - decay;
+          const healthChange = (recovery || 0) - (decay || 0);
+          if (healthChange !== 0) cu.health = Math.min(50, Math.max(0, (cu.health || 0) + healthChange));
           if (ptPerTick > 0) cu.accumulatedBonusPoints = (cu.accumulatedBonusPoints || 0) + ptPerTick;
           if (timeEarned > 0) cu.accumulatedTime = (cu.accumulatedTime || 0) + timeEarned;
           break;
