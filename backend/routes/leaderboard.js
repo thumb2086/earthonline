@@ -21,14 +21,12 @@ router.get('/leaderboard', async (req, res) => {
     return res.json(lbCache.data);
   }
   try {
-    const users = await User.find({}, 'username accumulatedTime accumulatedBonusPoints discord country')
+    const users = await User.find({}, 'username accumulatedTime accumulatedBonusPoints discord country role')
       .sort({ accumulatedTime: -1 }).limit(100).lean();
     const leaderboard = await Promise.all(users.map(async u => {
       const idleTimeSeconds = Math.floor((u.accumulatedTime || 0) / 1000);
       const points = u.accumulatedBonusPoints || 0;
-      const discordId = u.discord?.id || '無';
-      const realRole = discordId !== '無' ? await getCachedRole(discordId) : '';
-      return { username: u.username, discordId, discordName: u.discord?.username || '未綁定', avatar: u.discord?.avatar || null, country: u.country || 'UNKNOWN', idleTime: idleTimeSeconds, points, role: realRole || '' };
+      return { username: u.username, discordId: u.discord?.id || '無', discordName: u.discord?.username || '未綁定', avatar: u.discord?.avatar || null, country: u.country || 'UNKNOWN', idleTime: idleTimeSeconds, points, role: u.role || 'user' };
     }));
     leaderboard.sort((a, b) => b.points - a.points);
     lbCache = { data: leaderboard, ts: Date.now() };
