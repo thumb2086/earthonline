@@ -1,412 +1,389 @@
-﻿# Earth Online — 開發路線圖 (Current → v1.14.0 → v2.0.0+)
+﻿# Earth Online — 完整開發路線圖
 
-> 基於 v2.0.0-planning.md 與 2025-06-11 專案審計結果整合
-> 每個小版號為可獨立部署、不破壞現有遊戲的增量更新
-> 目標：v1.14.0 正式發布
+> 最後更新：2026-06-13 | 分支：dev
 
 ---
 
-## 目前進度
+## 一、現狀摘要
 
-已完成：v1.8.x(v1.8.1~v1.8.4 後端重構)、v1.9.x(v1.9.1~v1.9.4 前端重構)、v1.10.x(v1.10.1~v1.10.3 經濟重塑)、v1.11.x(v1.11.1~v1.11.4 事件&目標)、v1.12.x(v1.12.1~v1.12.3 離線收益+天賦)
-進行中：v1.12.4 區域對抗
+### 已完成的基礎建設
 
----
+| 領域 | 狀態 | 說明 |
+|------|------|------|
+| 後端重構 (v1.8.x) | ✅ | services / socket / routes / config 抽出，server.js 瘦身 |
+| 前端重構 (v1.9.x) | ✅ | hooks 提取、modals 獨立、GameContext |
+| 經濟重塑 (v1.10.x) | ✅ | 健康曲線 decay、道具平衡、死亡限制、區域投資 |
+| 事件與目標 (v1.11.x) | ✅ | 全域事件投票、每日任務、成就、週結算 |
+| 新功能 (v1.12.1~v1.12.3) | ✅ | 離線收益、天賦系統、區域對抗統計 |
+| Offline-First (v2.0.0) | ✅ | GameEngine + IndexedDB + PWA SW + Mobile CSS |
+| 手機 UI Redesign (v2.0.1) | ✅ | 底部 4 Tab 導航 (Dashboard/Globe/Chat/Profile) |
+| 管理員判定修復 | ✅ | 角色同步搬到 init_data 之前 |
 
-## 審計重點摘要（2025-06-11）
+### v1.14.0 已完成
 
-| 嚴重度 | 數量 | 關鍵項目 |
-|--------|------|---------|
-| Critical | 7 | Secrets 外洩、弱 JWT Secret、Wildcard CORS、重複函數、crash.log 未 gitignore、IP 日誌洩漏 |
-| High | 9 | Helmet 關閉、App.jsx 2719 行、server.js 761 行、重複程式碼、未使用 import、遺漏 rate limit、未定義變數、無 token 撤銷 |
-| Medium | 9 | 遺漏輸入驗證、FP 精度、重複結算邏輯、50 人限制、100 次 Discord 查詢、console.log |
-| Low | 10 | 無 lint、React keys、硬編碼字串、遺漏索引、靜默 catch |
-
----
-
-## v1.12.x — 深度新功能
-
-### v1.12.4 — 區域對抗系統
-
-- **v1.12.4a 區域指標收集 (backend)**
-  - **做什麼：** 在 regionState.js 新增 warStats（totalOnlineTime、avg/peak users、eventsCompleted、totalPTEarned），在 gameLoop 每 tick 更新
-  - **改哪個檔案：** `backend/state/regionState.js`、`backend/services/gameLoop.js`、`backend/server.js`
-  - **驗證：** 區域統計數據正確累積，socket 查詢返回即時三區對比
-  - **狀態：** ✅ 已完成
-
-- **v1.12.4b 區域結算 + 獎勵 (backend)**
-  - **做什麼：** 整合 warStats 到 settlementService，結算時發放區域排名獎勵（冠軍全區 +200 PT + 邊框，亞軍 +100 PT，個人前 10 +500 PT）
-  - **改哪個檔案：** `backend/services/settlementService.js`、`backend/state/regionState.js`
-  - **驗證：** 結算時區域排名正確、獎勵正確發放
-
-- **v1.12.4c 前端區域對抗面板 (frontend)**
-  - **做什麼：** 新增三欄即時對比面板 UI，顯示各區 stats、本週趨勢、個人貢獻
-  - **改哪個檔案：** `client/src/App.jsx`、`client/src/i18n.js`
-  - **驗證：** 三欄即時對比顯示、socket 實時更新
-
-### v1.12.5 — 多背景風格系統
-
-- **v1.12.5a 背景架構 + Style 1 保留**
-  - **做什麼：** 建立 `client/src/components/Backgrounds/` 目錄與 router，保留 EarthGlobe 為 Style 1
-  - **改哪個檔案：** `client/src/components/Backgrounds/index.jsx`（新建）
-  - **驗證：** 背景切換不影響 EarthGlobe 功能
-
-- **v1.12.5b Style 2: 伺服器機房 (ServerRoom)**
-  - **做什麼：** 新增伺服器機櫃動畫背景，刀片閃爍對應在線節點
-  - **改哪個檔案：** `client/src/components/Backgrounds/ServerRoom.jsx`（新建）
-  - **驗證：** 機房動畫正常渲染
-
-- **v1.12.5c Style 3~5 + 切換 UI**
-  - **做什麼：** 加入星雲(Nebula)、雷達(RadarTerminal)、賽博城市(CyberCity) + 設定面板切換
-  - **改哪個檔案：** 3 個新背景元件 + `client/src/App.jsx` + `client/src/i18n.js`
-  - **驗證：** 5 種背景可自由切換、儲存在 localStorage
+| Task | 狀態 |
+|------|------|
+| 修復 server.js catch(e) => {} 靜默失敗 | ✅ |
+| 修復 /api/global/stats 硬編碼 region=asia (改為所有 region 聚合) | ✅ |
+| 修復 heartbeatTimestamps 重啟消失 (fallback 到 DB lastHeartbeat) | ✅ |
+| App.jsx 元件拆分 (-556 行，抽出 5 個 Modal 到獨立檔案) | ✅ |
+| 更新 README + CHANGELOG | ⬜ |
+| 更新 AGENTS.md | ⬜ |
 
 ---
 
-## v1.13.x — 系統優化與安全
+## 二、現有技術棧
 
-### v1.13.1 — 安全修正 (Critical)
-
-- **v1.13.1a 修復外洩 secrets**
-  - **做什麼：** 將 `.env` 從 git 移除，輪換所有 exposed secrets（JWT_SECRET、DISCORD_CLIENT_SECRET），更新為 crypto.randomBytes(64) 強密碼
-  - **改哪個檔案：** `.gitignore`、`backend/.env`、`backend/config/env.js`
-  - **驗證：** `git status` 顯示 .env 不再被追蹤
-
-- **v1.13.1b 修復 CORS 與啟用 helmet**
-  - **做什麼：** 限制 Socket.io CORS 為白名單域名，重新啟用 helmet（設定 CSP 允許 Socket.io）
-  - **改哪個檔案：** `backend/server.js`
-  - **驗證：** 外部域名無法連接 WebSocket，安全 headers 正確發送
-
-- **v1.13.1c 修復 crash.log 與 IP 洩漏**
-  - **做什麼：** crash.log 加入 gitignore，移除 stdout IP 日誌
-  - **改哪個檔案：** `.gitignore`、`backend/server.js`
-  - **驗證：** crash.log 不再被 git 追蹤
-
-- **v1.13.1d 修復 terminalHandler 未定義變數**
-  - **做什麼：** 補上 INVEST_MAX_LEVEL 和 INVEST_COSTS 常數
-  - **改哪個檔案：** `backend/socket/terminalHandler.js`
-  - **驗證：** `/INVEST` 指令不再噴 ReferenceError
-
-- **v1.13.1e 移除重複程式碼**
-  - **做什麼：** 移除 obfuscateIp()、getEventDuration()、sendDiscordWebhook() 重複定義
-  - **改哪個檔案：** `backend/server.js`、`backend/routes/auth.js`、`backend/services/eventSystem.js`、`backend/socket/terminalHandler.js`
-  - **驗證：** 共用函數只定義一次，所有引用處正常工作
-
-- **v1.13.1f 清理未使用 import**
-  - **做什麼：** 移除 server.js 中未使用的 import（helmet、bcrypt、jwt、nodemailer 等）
-  - **改哪個檔案：** `backend/server.js`
-  - **驗證：** Node.js 啟動無警告
-
-### v1.13.2 — 效能優化 (Medium)
-
-- **v1.13.2a MongoDB Indexes**
-  - **做什麼：** 補上 homeRegion、accumulatedTime、weeklyScore 的查詢索引
-  - **改哪個檔案：** `backend/models/User.js`
-  - **驗證：** MongoDB 查詢使用正確索引
-
-- **v1.13.2b 快取層**
-  - **做什麼：** regionPopulation 快取 30s、leaderboard 快取 5s、roleCache TTL 維持 1min
-  - **改哪個檔案：** `backend/server.js`、`backend/routes/leaderboard.js`
-  - **驗證：** countDocuments 呼叫次數減少
-
-- **v1.13.2c App.jsx 組件拆分**
-  - **做什麼：** 將 LoginGateway、CountdownBanner、DonateBanner、FourPetalSpiral 抽出到獨立檔案
-  - **改哪個檔案：** `client/src/components/LoginGateway.jsx`、`CountdownBanner.jsx`、`DonateBanner.jsx`、`FourPetalSpiral.jsx`（新建） + `client/src/App.jsx`
-  - **驗證：** UI 行為與拆分前完全一致
-
-- **v1.13.2d 統一 Discord 角色分配**
-  - **做什麼：** 整合 assignExclusiveRole 和 assignWeeklyRoles 為單一函數
-  - **改哪個檔案：** `backend/discordBot.js`
-  - **驗證：** 週 cron 正常執行
-
-### v1.13.3 — 開發體驗
-
-- **v1.13.3a ESLint + Prettier**
-  - **做什麼：** 加入 linting 與格式化設定
-  - **改哪個檔案：** `.eslintrc.cjs`、`.prettierrc`（新建） + `package.json`（兩端）
-  - **驗證：** `npm run lint` 正常執行
-
-- **v1.13.3b Rate Limiting 補完**
-  - **做什麼：** 為 Discord OAuth 端點加入 rate limit
-  - **改哪個檔案：** `backend/server.js`
-  - **驗證：** 短時間大量請求被正確限制
-
-- **v1.13.3c 離線補償防重複**
-  - **做什麼：** 限制每 5min 最多一次離線補償
-  - **改哪個檔案：** `backend/server.js`
-  - **驗證：** 短時間重複連線只補償一次
-
-### v1.13.4 — 壓力測試
-
-- **v1.13.4a 大量連線模擬**
-  - **做什麼：** 測試 100/500 同時連線，確認 tick delay < 100ms
-  - **改哪個檔案：** `backend/scripts/stress-test.js`（新建）
-  - **驗證：** 高併發下 tick 正常
-
-- **v1.13.4b 邊界情況驗證**
-  - **做什麼：** 檢查健康度 <0/>100、背包負數、Buff 過期
-  - **改哪個檔案：** `backend/services/gameLoop.js`、`backend/services/shopService.js`
-  - **驗證：** 所有邊界情況正確處理
-
-- **v1.13.4c 完整回歸測試**
-  - **做什麼：** 跑一遍所有功能（登入、掛機、商城、背包、事件、任務、成就、天賦、區域對抗）
-  - **驗證：** 所有功能正常
+```
+前端：    React 19 + Vite 8 + TypeScript + vanilla CSS + Leaflet
+後端：    Express 5 + Socket.io + Mongoose (MongoDB) + CommonJS
+桌面：    Electron 42 (client/) + Electron 31 (desktop/) 
+          └─ desktop/ 使用 electron-builder 打包 Windows NSIS
+PWA：     vite-plugin-pwa (injectManifest) + Service Worker
+離線引擎： GameEngine.js + IndexedDB (StorageAdapter.js)
+即時通訊： Socket.io (WebSocket) + 未來 WebRTC P2P
+部署：     Cloudflare Pages (前端) + Render (後端)
+CI/CD：    無（手動部署）
+```
 
 ---
 
-## v1.14.0 — 正式發布
+## 三、版本路線總圖
 
-- **v1.14.0a 更新 README.md**
-  - **做什麼：** 完整遊戲規則說明、新功能使用指南
-  - **改哪個檔案：** `README.md`
-  - **驗證：** 文件涵蓋所有功能
-
-- **v1.14.0b 更新 AGENTS.md**
-  - **做什麼：** 開發指引更新為新架構
-  - **改哪個檔案：** `AGENTS.md`
-  - **驗證：** 開發指引準確反映當前架構
-
-- **v1.14.0c 更新 CHANGELOG**
-  - **做什麼：** 所有 v1.8.x ~ v1.13.x 版本摘要
-  - **改哪個檔案：** `CHANGELOG.md`（新建）
-  - **驗證：** 版本歷史完整
-
-- **v1.14.0d dev → main merge + CF Pages 部署**
-  - **做什麼：** 合併 dev 到 main，確認部署成功
-  - **驗證：** earthonline1.pages.dev 正常訪問
+```
+v2.0.x ── 離線基礎 + 行動版 redesign
+  │
+v2.1.x ── Electron 發布流水線 + Steamworks 整合
+  │
+v2.2.x ── Pixel Art 視覺重設計
+  │
+v2.3.x ── 滿版世界地圖 + 派遣掛機
+  │
+v2.4.x ── 全服秘寶抽獎
+  │
+v2.5.x ── 真實數據 + P2P 聊天
+  │
+v3.0.x ── Steam 正式發布 + 反作弊 + 備援節點
+```
 
 ---
 
-## v2.0.x — Pixel Art 視覺重設計
+## 四、v2.0.x — 離線基礎 + 行動版
 
-> 去 AI 化、純粹回歸復古美式點陣美學。全面採用美式重工業復古點陣（Pixel Art）與極具厚重感的像素配色。
+### v2.0.0 — Offline-First 核心 ✅ 已完成
 
-### v2.0.1 — 登入與條約頁點陣化
+| Task | 檔案 | 狀態 |
+|------|------|------|
+| Service Worker + vite-plugin-pwa | `sw.js`, `vite.config.js`, `main.jsx` | ✅ |
+| GameEngine.js (mirror gameLoop) | `client/src/engine/GameEngine.js` | ✅ |
+| StorageAdapter.js (IndexedDB) | `client/src/engine/StorageAdapter.js` | ✅ |
+| GameContext 整合引擎+離線模式 | `client/src/context/GameContext.jsx` | ✅ |
+| 離線模式 UI (⚡ 標籤 + 側欄數值) | `client/src/App.jsx` | ✅ |
+| Mobile CSS 重構 (768px + 480px) | `client/src/index.css` | ✅ |
+| 管理員判定修復（同步搬至 init_data 前） | `backend/server.js` | ✅ |
 
-- **v2.0.1a 登入頁背景點陣紋理**
-  - **做什麼：** 將登入頁背景改為深褐色粗糙礦岩點陣紋理（CSS pixel-art 重複背景），中央登入框為深灰色半透明面板，四周亮綠色發光邊框
-  - **改哪個檔案：** `client/src/index.css`、`client/src/components/LoginGateway.jsx`
-  - **驗證：** 登入頁呈現礦岩紋理 + 亮綠邊框登入框
+### v2.0.1 — 行動版 UI Redesign ✅ 已完成
 
-- **v2.0.1b 底部條約點陣條**
-  - **做什麼：** 底部《市民公約條約》改為深邃草地綠點陣條背景，文字改為粗白點陣體加黑色陰影（CSS text-shadow + pixel font）
-  - **改哪個檔案：** `client/src/index.css`、`client/src/components/LoginGateway.jsx`
-  - **驗證：** 條約區呈現草地綠點陣條 + 白字黑陰影
+> 手機上開 earthonline.qzz.io 改為原生 App 體驗的底部 Tab 導航。
 
-### v2.0.2 — 導航欄與選單點陣化
+**設計結果：**
 
-- **v2.0.2a 頂部導航欄點陣化**
-  - **做什麼：** 導航欄改為深石磚灰色點陣紋理背景，上方壓一條草地綠細線；左側 LOGO 改為黃色立體爆裂紋藝術字（CSS pixel text effect）
-  - **改哪個檔案：** `client/src/App.jsx`、`client/src/index.css`
-  - **驗證：** 導航欄呈現石磚灰點陣 + 黃色爆裂紋 LOGO
+```
+┌─────────────────┐
+│  Header (精簡)    │
+│  ⚡ 離線標籤      │
+│                   │
+│   主要內容區       │
+│   (每個 Tab 全螢幕) │
+│                   │
+├─────────────────┤
+│ 📊 🌍 💬 👤     │  ← 底部固定導航列
+└─────────────────┘
+```
 
-- **v2.0.2b 分類拉頁選單點陣化**
-  - **做什麼：** 下拉選單改為深灰色格子物品欄視覺；懸停時亮青色像素外框 + 機械按鍵音效（CSS outline + Howler.js）
-  - **改哪個檔案：** `client/src/App.jsx`、`client/src/index.css`
-  - **驗證：** 選單懸停出現青色像素框 + 音效
+- **v2.0.1a 底部 Tab 導航架構 ✅**
+  - 做什麼：建立 `client/src/components/Mobile/MobileNav.jsx` + `MobileLayout.jsx`，四頁輪換，僅手機 (<768px) 顯示
+  - 改哪個檔案： `client/src/components/Mobile/MobileNav.jsx`（新建）、`client/src/components/Mobile/MobileLayout.jsx`（新建）、`client/src/App.jsx`、`client/src/index.css`
+  - 驗證：手機上四頁可自由切換，桌面不受影響
 
-### v2.0.3 — 3D 像素藝術字元件
+- **v2.0.1b 手機儀表板 ✅**
+  - 做什麼：卡片式佈局顯示健康度% + PT + 等級 + 生存時間，快捷按鈕列（商城、背包、成就、天賦、排行、區域、關於）
+  - 改哪個檔案： `client/src/components/Mobile/MobileDashboard.jsx`（新建）
+  - 驗證：所有數據正確顯示，按鈕可操作
 
-- **v2.0.3a Pixel WordArt 元件**
-  - **做什麼：** 建立 `<PixelWordArt>` 元件，渲染帶黑色粗邊框 + 飽和漸層色的 3D 立體街機藝術字（多重 text-shadow + linear-gradient）
-  - **改哪個檔案：** `client/src/components/PixelWordArt.jsx`（新建）
-  - **驗證：** 所有標題套用後呈現 3D 立體像素字效果
+- **v2.0.1c 手機地圖 ✅**
+  - 做什麼：全螢幕 DataCenterVisualizer（3D 地球）+ 浮動聊天按鈕
+  - 改哪個檔案： `client/src/components/Mobile/MobileGlobe.jsx`（新建）
+  - 驗證：地圖操作流暢，聊天面板可開關
 
-- **v2.0.3b 全站標題套用 PixelWordArt**
-  - **做什麼：** 將陣營名稱、核心標題等全部改用 `<PixelWordArt>`
-  - **改哪個檔案：** `client/src/App.jsx`
-  - **驗證：** 全站標題統一 3D 像素風格
+- **v2.0.1d 手機聊天 ✅**
+  - 做什麼：全螢幕聊天室，輸入框固定在底部，僅顯示聊天/DC 訊息
+  - 改哪個檔案： `client/src/components/Mobile/MobileChat.jsx`（新建）
+  - 驗證：聊天發送/接收正常
 
----
-
-## v2.1.x — 登入公約與引導流程
-
-### v2.1.1 — Discord 登入 + 市民公約
-
-- **v2.1.1a 強制公約勾選流程**
-  - **做什麼：** 登入前強制閱讀並勾選《市民公約條約》，勾選後立體灰色按鈕亮起可點擊；Discord 一鍵登入整合
-  - **改哪個檔案：** `client/src/components/LoginGateway.jsx`、`client/src/i18n.js`
-  - **驗證：** 未勾約時按鈕禁用，勾約後亮起可登入
-
-- **v2.1.1b 公約後端記錄**
-  - **做什麼：** 使用者在勾選同意後，後端儲存 covenantAccepted 時間戳
-  - **改哪個檔案：** `backend/models/User.js`、`backend/routes/auth.js`
-  - **驗證：** 資料庫記錄 covenantAccepted 欄位
-
-### v2.1.2 — 引導式文檔與陣營介紹
-
-- **v2.1.2a 全球開採指南頁**
-  - **做什麼：** 登入後進入單頁向下滾動引導頁，以深色硬質合金面板呈現獨立世界觀文檔
-  - **改哪個檔案：** `client/src/components/OnboardingGuide.jsx`（新建）、`client/src/App.jsx`、`client/src/i18n.js`
-  - **驗證：** 登入後先看到引導頁，可向下滾動閱讀
-
-- **v2.1.2b 三大陣營介紹 + 點陣化照片**
-  - **做什麼：** 展示三張真實建築照片經點陣化濾鏡處理（台北101、自由女神、巴黎鐵塔），對應亞洲/美洲/歐洲陣營，附帶簡介與選擇按鈕
-  - **改哪個檔案：** `client/src/components/FactionSelect.jsx`（新建）、`client/public/assets/factions/`（新增點陣圖）、`client/src/i18n.js`
-  - **驗證：** 三陣營卡片正確顯示，點擊選擇後記錄陣營
+- **v2.0.1e 手機個人頁 ✅**
+  - 做什麼：頭像 + Discord 狀態 + 統計摘要 + 設定開關（主題、語言、BGM、通知、背景）+ 登出
+  - 改哪個檔案： `client/src/components/Mobile/MobileProfile.jsx`（新建）
+  - 驗證：設定可切換，登出正常
 
 ---
 
-## v2.2.x — 滿版世界地圖與派遣掛機
+## 五、v2.1.x — Electron 發布流水線 + Steamworks
 
-### v2.2.1 — 2D 像素世界地圖
+> 目標：一鍵 build 出 Windows/Mac/Linux 安裝檔，並整合 Steamworks SDK。
 
-- **v2.2.1a 像素世界地圖核心**
-  - **做什麼：** 滿畫面 2D 像素世界地圖（含各國國旗），支援自由拖曳與滾輪縮放（react-leaflet 或自訂 canvas）
-  - **改哪個檔案：** `client/src/components/WorldMap.jsx`（新建）、`client/src/App.jsx`
-  - **驗證：** 地圖可拖曳縮放，各國位置正確
+### 現有 Electron 架構
 
-- **v2.2.1b 地圖點陣紋理疊加**
-  - **做什麼：** 地圖表面疊加 pixel-art 紋理濾鏡，各國輪廓以粗像素邊框繪製
-  - **改哪個檔案：** `client/src/components/WorldMap.jsx`
-  - **驗證：** 地圖呈現點陣風格而非平滑向量
+```
+desktop/
+├── main.js          ← Electron main process，載入 pages.dev
+├── preload.js       ← contextBridge 暴露 electronAPI
+├── package.json     ← electron-builder 已設定 Windows NSIS
+├── build/
+│   ├── icon.ico
+│   └── icon.png
+└── package-lock.json
+```
 
-### v2.2.2 — 跨國派遣掛機 + 情報窗
+### 需要改進的點
 
-- **v2.2.2a 國家情報窗**
-  - **做什麼：** 點擊國家彈出情報窗（真實數據：在線人數、GDP/秒、已進駐玩家數）
-  - **改哪個檔案：** `client/src/components/CountryInfoPanel.jsx`（新建）、`client/src/i18n.js`
-  - **驗證：** 點擊國家顯示正確情報數據
+1. **載入本機 build 而非遠端 pages.dev** — 目前 `mainWindow.loadURL('https://earthonline1.pages.dev')`，離線時無法使用。應改為：
+   - 開發模式：`loadURL('http://localhost:5173')`
+   - 生產模式：`loadFile('dist/index.html')`（使用 client 的 vite build 產出）
 
-- **v2.2.2b 派遣建立礦場**
-  - **做什麼：** 情報窗點擊「在此建立我的礦場」，右側掛機面板開始自動跳錢，後端記錄玩家派遣國家
-  - **改哪個檔案：** `client/src/components/CountryInfoPanel.jsx`、`client/src/App.jsx`、`backend/socket/gameHandler.js`
-  - **驗證：** 派遣後右側面板金幣跳動，資料庫更新派駐國家
+2. **electron-builder 需統一** — 目前 desktop/ 有獨立設定，但 client/ 也有 electron 依賴。兩者需整併。
 
-### v2.2.3 — 五大礦層升級
+3. **Steamworks SDK 整合** — 使用 `steamworks.js` 或 `greenworks`。
 
-- **v2.2.3a 礦層升級邏輯 (backend)**
-  - **做什麼：** 實作 Lv.1 碎石地層 → Lv.5 地球星核共五層指數級產出公式，每層花費遞增
-  - **改哪個檔案：** `backend/config/constants.js`、`backend/services/mineService.js`（新建）
-  - **驗證：** 升級花費與產出符合指數曲線
+4. **自動更新** — 整合 `electron-updater`。
 
-- **v2.2.3b 礦層升級 UI (frontend)**
-  - **做什麼：** 掛機面板顯示當前礦層、升級按鈕與下一層預覽；升級時播放點陣爆炸動畫
-  - **改哪個檔案：** `client/src/components/MinePanel.jsx`（新建）、`client/src/App.jsx`
-  - **驗證：** 點擊升級按鈕後礦層提升、產出增加、動畫播放
+### v2.1.0 — Electron 發布管道
 
-### v2.2.4 — 萬人開採反饋動畫
+- **v2.1.0a 整併 Electron 到 client/**
+  - 做什麼：將 desktop/ 的 main.js/preload.js 搬至 `client/electron/`，統一使用 client/ 的依賴版本（Electron 42）。移除 `desktop/` 目錄。
+  - 改哪個檔案： 搬移 `desktop/main.js` → `client/electron/main.cjs`、`desktop/preload.js` → `client/electron/preload.cjs`、更新 `client/package.json`（scripts/build + build config）、刪除 `desktop/`
+  - 驗證：`npm run dev:electron` 啟動後載入本機 Vite dev server
 
-- **v2.2.4a 十字鎬敲擊動畫**
-  - **做什麼：** 玩家派遣礦場至某國後，該國地圖上方實時冒出十字鎬像素敲擊動畫（多個小 sprite 隨機跳動）
-  - **改哪個檔案：** `client/src/components/PickaxeAnimation.jsx`（新建）、`client/src/components/WorldMap.jsx`
-  - **驗證：** 有玩家進駐的國家上方出現十字鎬動畫
+- **v2.1.0b electron-builder 設定**
+  - 做什麼：在 client/package.json 加入 `build` 區塊（win/mac/linux targets），加入 `electron-updater` 支援自動更新
+  - 改哪個檔案： `client/package.json`
+  - 驗證：`npm run build:electron` 產出 `.exe` / `.dmg` / `.AppImage`
 
-- **v2.2.4b 動畫人數連動**
-  - **做什麼：** 十字鎬數量與進駐玩家數成正比，socket 實時增減
-  - **改哪個檔案：** `client/src/components/WorldMap.jsx`、`backend/socket/gameHandler.js`
-  - **驗證：** 玩家人數增減時動畫數量同步變化
+- **v2.1.0c 生產模式載入本機 build**
+  - 做什麼：electron/main.cjs 判斷 `process.env.NODE_ENV`，dev 載 localhost:5173，production 載 `dist/index.html`
+  - 改哪個檔案： `client/electron/main.cjs`
+  - 驗證：`npm run build && npm run preview` + Electron 載入本機 build，離線可用
 
----
+### v2.1.1 — Steamworks 整合
 
-## v2.3.x — 全服限量秘寶抽獎
+- **v2.1.1a Steamworks SDK 初始化**
+  - 做什麼：安裝 `steamworks.js`，在 Electron main process 初始化 Steam API，封裝成 preload API
+  - 改哪個檔案： `client/electron/main.cjs`、`client/electron/preload.cjs`、`client/package.json`
+  - 驗證：Steam overlay 可喚起，steam 初始化 log 正常
 
-### v2.3.1 — 抽獎系統核心
+- **v2.1.1b Steam 成就同步**
+  - 做什麼：將遊戲內成就（achievementService）對應至 Steam 成就，在解鎖時呼叫 `SteamUserStats.SetAchievement`
+  - 改哪個檔案： `client/electron/steam.js`（新建）、`client/src/context/GameContext.jsx`（成就解鎖時呼叫 preload API）
+  - 驗證：遊戲內解成就 → Steam overlay 彈出成就通知
 
-- **v2.3.1a 抽獎後端邏輯**
-  - **做什麼：** 實作抽獎 API，四種稀有度（Common 89.99% / Epic 9.9% / Mythic 0.1% / Unique 0.001%），後端安全隨機數生成，消耗百億資金
-  - **改哪個檔案：** `backend/services/lotteryService.js`（新建）、`backend/server.js`、`backend/config/constants.js`
-  - **驗證：** 抽獎機率分布符合設定，資金正確扣除
+- **v2.1.1c Steam 好友 + 邀請**
+  - 做什麼：好友列表可看到 Steam 好友狀態，發送遊戲邀請直接啟用 Steam 內建 overlay
+  - 改哪個檔案： `client/electron/steam.js`、`client/electron/preload.cjs`
+  - 驗證：Steam 好友上線通知 + 可邀請
 
-- **v2.3.1b 抽獎前端 UI + 動畫**
-  - **做什麼：** 【探尋地球秘寶】按鈕、方塊加載動畫與金光閃爍開獎動畫，顯示抽中物品
-  - **改哪個檔案：** `client/src/components/LotteryModal.jsx`（新建）、`client/src/App.jsx`、`client/src/i18n.js`
-  - **驗證：** 點擊按鈕後播放動畫，正確顯示抽獎結果
+### v2.1.2 — Discord RPC 強化
 
-### v2.3.2 — 神物庫存與絕版
+- **v2.1.2a Electron Discord Rich Presence 改善**
+  - 做什麼：現有 RPC 只顯示靜態狀態，改為即時更新（區域、PT、生存時間），支援按鈕「Join Game」
+  - 改哪個檔案： `client/electron/main.cjs`、`client/src/context/GameContext.jsx`
+  - 驗證：Discord 個人檔案顯示遊戲進度
 
-- **v2.3.2a 資料庫行級鎖定**
-  - **做什麼：** 神物庫存採用 MongoDB 行級鎖（findOneAndUpdate 原子操作），庫存歸零即拒發
-  - **改哪個檔案：** `backend/services/lotteryService.js`、`backend/models/User.js`
-  - **驗證：** 高併發抽獎不會超發，庫存 0 時回傳錯誤
-
-- **v2.3.2b 神物庫存管理後台**
-  - **做什麼：** 管理介面設定每國家神話限量 1 個、全服獨特僅 1 個；被抽走後全服庫存歸零
-  - **改哪個檔案：** `backend/services/lotteryService.js`、`backend/config/constants.js`
-  - **驗證：** 庫存正確扣減，絕版後不可再抽得
-
-### v2.3.3 — 神物效果與轉生
-
-- **v2.3.3a 神物 Buff 系統**
-  - **做什麼：** 史詩 +5%、神話 +20% 掛機速度；獨特全服唯一地圖懸浮特效 + Discord 閃爍身分組
-  - **改哪個檔案：** `backend/services/gameLoop.js`、`backend/discordBot.js`、`client/src/components/WorldMap.jsx`
-  - **驗證：** 持有神物後產出正確提升，地圖顯示專屬特效
-
-- **v2.3.3b 熔煉轉生系統**
-  - **做什麼：** 普通級化石可熔煉為「幸運晶石」，消耗晶石進行礦場轉生，永久提升下一輪開採速度
-  - **改哪個檔案：** `backend/services/lotteryService.js`、`client/src/components/LotteryModal.jsx`、`client/src/i18n.js`
-  - **驗證：** 熔煉後晶石數量正確，轉生後產出加成生效
-
-- **v2.3.3c FOMO 全服通知**
-  - **做什麼：** 獨特/神話被抽走時，全服廣播 + Discord Webhook 通知，地圖特效即時更新
-  - **改哪個檔案：** `backend/services/lotteryService.js`、`backend/discordBot.js`、`client/src/components/WorldMap.jsx`
-  - **驗證：** 全服玩家收到抽中通知，絕版物品不再顯示
+- **v2.1.2b 視窗管理**
+  - 做什麼：支援無邊框視窗切換、記憶視窗位置/大小、工作列進度條顯示健康度
+  - 改哪個檔案： `client/electron/main.cjs`
+  - 驗證：關掉重開後視窗位置還原
 
 ---
 
-## v2.4.x — 真實數據底層架構
+## 六、v2.2.x — Pixel Art 視覺重設計
 
-### v2.4.1 — 真實在線人數統計
+> 去 AI 化、純粹回歸復古美式點陣美學。
 
-- **v2.4.1a Redis 國家在線 Set**
-  - **做什麼：** 利用 Redis Set 統計每個國家的當前在線玩家，玩家離線或切換國時實時增減
-  - **改哪個檔案：** `backend/services/redisService.js`（新建）、`backend/server.js`、`backend/socket/gameHandler.js`
-  - **驗證：** 切換國家後 Redis Set 正確 +1/-1，地圖顯示正確在線數
+### v2.2.0 — 登入與導航點陣化
 
-### v2.4.2 — 真實國家 GDP 連動
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v2.2.0a 登入頁點陣紋理 + 亮綠邊框 | 登入框改為深灰半透明面板 | `index.css`, `LoginGateway.jsx` |
+| v2.2.0b 底部條約點陣條 | 深邃草地綠點陣條背景 | `index.css`, `LoginGateway.jsx` |
+| v2.2.0c 導航欄點陣化 | 深石磚灰紋理，黃色爆裂紋 LOGO | `App.jsx`, `index.css` |
+| v2.2.0d 分類拉頁選單點陣化 | 深灰格子物品欄，懸停青框+音效 | `App.jsx`, `index.css` |
+| v2.2.0e PixelWordArt 元件 | 3D 立體像素藝術字 | `components/PixelWordArt.jsx` |
+| v2.2.0f 全站標題套用 | 陣營名稱、核心標題統一風格 | `App.jsx` |
 
-- **v2.4.2a 國家 GDP 即時加總**
-  - **做什麼：** 點擊國家顯示的「總資源產出/秒」由該國所有在線玩家的真實開採時薪加總，每秒更新
-  - **改哪個檔案：** `backend/services/gdpService.js`（新建）、`client/src/components/CountryInfoPanel.jsx`
-  - **驗證：** 高階玩家進駐後該國 GDP 暴漲，離開後下跌
+### v2.2.1 — 登入公約與引導流程
 
-### v2.4.3 — 全服氣運值排行
-
-- **v2.4.3a 氣運值計算 cron**
-  - **做什麼：** 每 5 分鐘 SUM 三大陣營神物權重 + 轉生次數，第一名陣營地圖板塊渲染金色粒子特效
-  - **改哪個檔案：** `backend/services/luckService.js`（新建）、`backend/jobs/`、`client/src/components/WorldMap.jsx`
-  - **驗證：** 氣運排行第一的陣營區域顯示金色粒子特效
-
----
-
-## v2.5.x — 反作弊與安全性
-
-### v2.5.1 — 後端資產驗證
-
-- **v2.5.1a 伺服器端產出重算**
-  - **做什麼：** 升級/抽獎時後端根據「上次存檔時間 × 理論每秒產出」重新計算玩家資產，拒絕前端偽造數據
-  - **改哪個檔案：** `backend/services/validationService.js`（新建）、`backend/services/gameLoop.js`、`backend/services/lotteryService.js`
-  - **驗證：** 修改前端請求數值被後端拒絕
-
-### v2.5.2 — 安全抽獎校驗
-
-- **v2.5.2a 後端安全隨機數**
-  - **做什麼：** 抽獎亂數由 crypto.randomBytes() 生成，前端僅播放動畫不參與邏輯
-  - **改哪個檔案：** `backend/services/lotteryService.js`
-  - **驗證：** 前後端抽獎結果一致，無法偽造
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v2.2.1a 強制公約勾選 | Discord 登入前須勾約 | `LoginGateway.jsx`, `i18n.js` |
+| v2.2.1b 公約後端記錄 | covenantAccepted 時間戳 | `User.js`, `auth.js` |
+| v2.2.1c 引導式文檔 | 登入後單頁引導 | `OnboardingGuide.jsx` |
+| v2.2.1d 三大陣營介紹 | 點陣化照片 + 選擇按鈕 | `FactionSelect.jsx` |
 
 ---
 
-## 總版本時程表
+## 七、v2.3.x — 滿版世界地圖 + 派遣掛機
 
-| 版本 | 主題 | 相依性 | 優先級 |
-|------|------|--------|--------|
-| v1.12.4 | 區域對抗系統 | v1.11.4 | High |
-| v1.12.5 | 多背景風格系統 | — | Medium |
-| v1.13.1 | 安全修正 | — | Critical |
-| v1.13.2 | 效能優化 | v1.13.1 | Medium |
-| v1.13.3 | 開發體驗 | — | Low |
-| v1.13.4 | 壓力測試 | v1.13.2 | Low |
-| v1.14.0 | 正式發布 | 全部 | High |
+### v2.3.0 — 像素世界地圖
+
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v2.3.0a 2D 像素世界地圖 | 滿畫面地圖，支援拖曳縮放 | `WorldMap.jsx`（新建） |
+| v2.3.0b 地圖點陣紋理疊加 | pixel-art 濾鏡 + 粗邊框 | `WorldMap.jsx` |
+
+### v2.3.1 — 跨國派遣 + 礦層
+
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v2.3.1a 國家情報窗 | 在線人數/GDP/進駐玩家 | `CountryInfoPanel.jsx` |
+| v2.3.1b 派遣建立礦場 | 點擊國家建立礦場，自動跳錢 | `App.jsx`, `gameHandler.js` |
+| v2.3.1c 五大礦層升級邏輯 | Lv.1 碎石→Lv.5 星核，指數產出 | `constants.js`, `mineService.js` |
+| v2.3.1d 礦層升級 UI | 升級按鈕 + 點陣爆炸動畫 | `MinePanel.jsx` |
+| v2.3.1e 十字鎬敲擊動畫 | 進駐國家上方實時動畫 | `PickaxeAnimation.jsx` |
 
 ---
 
-## 版本標記規則
+## 八、v2.4.x — 全服限量秘寶抽獎
+
+### v2.4.0 — 抽獎系統
+
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v2.4.0a 抽獎後端邏輯 | 四稀有度 + 安全隨機數 | `lotteryService.js` |
+| v2.4.0b 抽獎前端動畫 | 方塊加載 + 金光開獎 | `LotteryModal.jsx` |
+| v2.4.0c 神物庫存行級鎖 | MongoDB findOneAndUpdate | `lotteryService.js` |
+| v2.4.0d 神物效果 | +5%/+20% 掛機速度 | `gameLoop.js` |
+
+### v2.4.1 — 轉生與 FOMO
+
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v2.4.1a 熔煉轉生系統 | 化石→晶石→轉生 | `lotteryService.js` |
+| v2.4.1b 全服廣播通知 | 獨特/神話被抽時 Discord + 地圖特效 | `lotteryService.js`, `discordBot.js` |
+
+---
+
+## 九、v2.5.x — 真實數據 + P2P 聊天
+
+### v2.5.0 — 真實數據底層
+
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v2.5.0a Redis 國家在線 Set | 即時在線人數統計 | `redisService.js` |
+| v2.5.0b 國家 GDP 連動 | 該國玩家開採時薪加總 | `gdpService.js` |
+| v2.5.0c 全服氣運排行 | 神物權重 + 轉生次數 SUM | `luckService.js` |
+
+### v2.5.1 — P2P 聊天 (選擇性啟用)
+
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v2.5.1a WebRTC 信號交換 | Cloudflare Worker 或 Render 端點 | `_worker.js` or `server.js` |
+| v2.5.1b GossipProtocol | 去重廣播 + Peer 管理 | `engine/GossipProtocol.js` |
+| v2.5.1c P2PNetwork | RTCPeerConnection 管理 | `engine/P2PNetwork.js` |
+| v2.5.1d 聊天 fallback | P2P 失敗降級至 socket.io | `useSocket.js` |
+
+---
+
+## 十、v3.0.x — Steam 正式發布 + 反作弊 + 備援
+
+### v3.0.0 — Steam 發布準備
+
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v3.0.0a Steam 商品頁設定 | Steamworks 後台設定 | （外部） |
+| v3.0.0b Steam DRM 整合 | appid.txt + 加密 | `electron/steam.js` |
+| v3.0.0c 自動更新管道 | electron-updater + 發布伺服器 | `electron/main.cjs` |
+
+### v3.0.1 — 反作弊與安全
+
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v3.0.1a 後端資產驗證 | 升級/抽獎時重算理論產出 | `validationService.js` |
+| v3.0.1b 安全抽獎校驗 | crypto.randomBytes() | `lotteryService.js` |
+
+### v3.0.2 — 備援節點輕量版
+
+| Task | 說明 | 檔案 |
+|------|------|------|
+| v3.0.2a VolunteerNode.js | 100-150 行輕量 relay | `desktop/VolunteerNode.js`（復活） |
+| v3.0.2b Render 健康度監控 | 自動切換備援 | `useSocket.js` |
+| v3.0.2c 啟動檢查 | 環境變數完整性檢查 | `env.js` |
+
+---
+
+## 十一、現有問題清單
+
+### Critical（v1.14.0 前修正）
+
+- [ ] `backend/server.js` 多處 `catch(e) => {}` 靜默失敗
+- [ ] `/api/global/stats` 硬編碼 `region = 'asia'`
+- [ ] `heartbeatTimestamps` 為 in-memory Map，重啟後消失
+
+### High（重構過程中處理）
+
+- [ ] `discordBot.js` 直接 import User model + 持有 io 實例
+- [ ] 聊天 filter regex 未 escape，可能引發 ReDoS
+- [ ] MongoDB 更新 bypass `db.js` — 多處直接 `User.findOne()`
+- [ ] 部分 client 使用 `document.getElementById()` 操作 DOM
+- [ ] App.jsx 2357 行，需要持續拆分
+
+### Medium（功能開發中處理）
+
+- [ ] CSS `text-transform: lowercase` 影響非英文語系
+- [ ] Docker compose 部分環境變數未用引號包裹
+- [ ] 無 `npm start` script（README 說有但實際沒有）
+- [ ] `desktop/` 與 `client/` 有重複的 Electron 依賴
+
+---
+
+## 十二、版本時程總表
+
+| 版本 | 主題 | 預計天數 | 相依性 | 優先級 |
+|------|------|---------|--------|--------|
+| v2.0.1a-e | 行動版 UI Redesign (底部 Tab) | 5 天 | v2.0.0 | High | ✅ |
+| v1.14.0a-d | 問題修正 + App.jsx 拆分 -556 行 | 4 天 | — | High | ✅ |
+| v1.14.0e-f | 文件更新 (README/CHANGELOG/AGENTS) | 2 天 | — | Medium |
+| v2.1.0a-c | Electron 發布管道 | 3 天 | v2.0.0 | High |
+| v2.1.1a-c | Steamworks 整合 | 5 天 | v2.1.0 | Medium |
+| v2.1.2a-b | Discord RPC 強化 + 視窗管理 | 2 天 | v2.1.0 | Low |
+| v2.2.0a-f | Pixel Art 登入+導航 | 5 天 | — | Medium |
+| v2.2.1a-d | 登入公約+引導流程 | 4 天 | v2.2.0 | Medium |
+| v2.3.0a-b | 像素世界地圖 | 4 天 | v2.2.1 | High |
+| v2.3.1a-e | 跨國派遣+礦層 | 6 天 | v2.3.0 | High |
+| v2.4.0a-d | 抽獎系統核心 | 4 天 | v2.3.1 | High |
+| v2.4.1a-b | 轉生+FOMO | 3 天 | v2.4.0 | Medium |
+| v2.5.0a-c | Redis+GDP+氣運 | 4 天 | v2.3.1 | Medium |
+| v2.5.1a-d | P2P 聊天 | 4 天 | v2.0.0 | Low |
+| v3.0.0a-c | Steam 發布 | 5 天 | v2.4.1 | High |
+| v3.0.1a-b | 反作弊 | 3 天 | v3.0.0 | Medium |
+| v3.0.2a-c | 備援節點 | 3 天 | v2.5.1 | Low |
+
+**總計：16 個子版本，約 67 個工作日（~3.5 個月）**
+
+---
+
+## 十三、開發原則
+
+1. **Offline-First** — 每個功能在實作時都確保離線可用
+2. **雙平台同步** — Web 與 Electron 共用同一份前端程式碼
+3. **向後相容** — 每個版本不破壞現有玩家資料
+4. **增量發布** — 每個子版本可獨立部署
+5. **Steam 優先** — 需要外部設定的功能（Steam SDK）盡早開始
+
+---
+
+## 版本標記
 
 ```
 ✅ = 已完成
 ⬜ = 待執行
-🔴 = 阻塞
-```
-
-> 最後更新：2025-06-11
+🔄 = 進行中

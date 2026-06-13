@@ -7,6 +7,11 @@ import DataCenterVisualizer from './DataCenterVisualizer';
 import ShopModal from './ShopModal';
 import BackpackModal from './BackpackModal';
 import LeaderboardModal from './components/Modals/LeaderboardModal';
+import WarPanelModal from './components/Modals/WarPanelModal';
+import TalentModal from './components/Modals/TalentModal';
+import AchievementModal from './components/Modals/AchievementModal';
+import SocialModal from './components/Modals/SocialModal';
+import AccountInfoModal from './components/Modals/AccountInfoModal';
 import Console from './components/Dashboard/Console';
 import { GameProvider, useGame } from './context/GameContext';
 import CountdownBanner from './components/CountdownBanner';
@@ -379,6 +384,14 @@ function Dashboard({ token, onLogout, region }) {
       osc.stop(ctx.currentTime + duration / 1000);
     } catch(e) {}
   };
+
+  const [mobileTab, setMobileTab] = useState('dashboard');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const [offlineState, setOfflineState] = useState(null);
   useEffect(() => {
@@ -1137,6 +1150,55 @@ function Dashboard({ token, onLogout, region }) {
         </div>
       </header>
 
+      {isMobile ? (
+        <MobileLayout
+          mobileTab={mobileTab}
+          setMobileTab={setMobileTab}
+          t={t}
+          myNode={myNode}
+          lifespan={lifespan}
+          isOfflineMode={isOfflineMode}
+          offlineState={offlineState}
+          globalStats={globalStats}
+          socket={socket}
+          logs={logs}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          addLog={addLog}
+          ping={ping}
+          nodes={nodes}
+          currentEvent={currentEvent}
+          bgStyle={bgStyle}
+          setBgStyle={setBgStyle}
+          theme={theme}
+          themes={themes}
+          setTheme={setTheme}
+          bgmEnabled={bgmEnabled}
+          toggleBgm={toggleBgm}
+          notificationEnabled={notificationEnabled}
+          setNotificationEnabled={setNotificationEnabled}
+          boundDiscord={boundDiscord}
+          myRole={myRole}
+          honor={myNode?.honor || 0}
+          weeklyScore={myNode?.weeklyScore || 0}
+          region={region}
+          onLogout={onLogout}
+          onOpenShop={() => setShowShopModal(true)}
+          onOpenBackpack={() => setShowBackpack(true)}
+          onOpenAchievements={() => setShowAchievements(true)}
+          onOpenTalent={() => { setShowTalentModal(true); if (socket?.connected) socket.emit('get_talent_data'); }}
+          onOpenLeaderboard={() => setShowLeaderboard(true)}
+          onOpenWar={() => { setShowWarPanel(true); if (socket?.connected) socket.emit('get_war_stats'); }}
+          onOpenAbout={() => setShowAboutModal(true)}
+          onOpenAccountInfo={() => setShowAccountInfo(true)}
+          onOpenDiscordBind={() => setShowDiscordModal(true)}
+          onOpenSocial={() => setShowSocialModal(true)}
+          pmData={{ showPm, pmTarget, pmInput, setPmInput, pmLog }}
+          onClosePm={() => setShowPm(false)}
+          language={language}
+          setLanguage={setLanguage}
+        />
+      ) : (
       <div className="main-content">
         {/* Left Metrics Terminal */}
         <aside className="metrics-terminal floating-panel">
@@ -1296,6 +1358,7 @@ function Dashboard({ token, onLogout, region }) {
                       <Console logs={logs} chatInput={chatInput} setChatInput={setChatInput} socket={socket} pmData={{showPm,pmTarget,pmInput,setPmInput,pmLog}} onClosePm={()=>setShowPm(false)} />
 </main>
       </div>
+      )}
 
             {/* Leaderboard Modal */}
       <LeaderboardModal show={showLeaderboard} onClose={()=>setShowLeaderboard(false)} leaderboard={leaderboard} sortMode={sortMode} setSortMode={setSortMode} formatTime={formatTime} />
@@ -1844,232 +1907,6 @@ function Dashboard({ token, onLogout, region }) {
   );
 }
 
-function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
-  const { t, language, setLanguage } = useLanguage();
-  const [info, setInfo] = useState(null);
-  const [error, setError] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [emailInput, setEmailInput] = useState('');
-  const [isSendingVerify, setIsSendingVerify] = useState(false);
-
-  useEffect(() => {
-    fetch(`${apiUrl}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.error) setError(data.error);
-        else setInfo(data);
-      })
-      .catch(() => setError('伺服器連線失敗'));
-  }, [token]);
-
-  const handleGenerateKey = async () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-    try {
-      const res = await fetch(`${apiUrl}/auth/generate-recovery-key`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setInfo(prev => ({ ...prev, recoveryKey: data.recoveryKey }));
-        setShowKey(true);
-      } else {
-        alert(data.error || '生成失敗');
-      }
-    } catch (err) {
-      alert('連線失敗');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    const confirmText = prompt('警告：刪除帳號將會永久清除您的所有生存時間與榮譽點數，無法恢復！\n請輸入大寫的 DELETE 來確認刪除：');
-    if (confirmText !== 'DELETE') return;
-
-    try {
-      const res = await fetch(`${apiUrl}/auth/delete-account`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert('您的帳號已經被永久刪除。');
-        onClose();
-        if (onLogout) onLogout();
-      } else {
-        alert(data.error || '刪除失敗');
-      }
-    } catch (err) {
-      alert('連線失敗');
-    } finally {
-      setIsSendingVerify(false);
-    }
-  };
-
-  const handleSendVerify = async () => {
-    if (!info) return;
-    const targetEmail = info.email || emailInput;
-    if (!targetEmail) return alert('請輸入電子郵件');
-    
-    setIsSendingVerify(true);
-    try {
-      const res = await fetch(`${apiUrl}/auth/send-verification`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ token, email: targetEmail })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert('驗證信已送出，請檢查您的信箱（包含垃圾信件匣）。');
-        // Update local info state to reflect the email
-        setInfo(prev => ({ ...prev, email: targetEmail, isEmailVerified: false }));
-      } else {
-        alert(data.error || '發送失敗');
-      }
-    } catch (err) {
-      alert('連線失敗');
-    }
-    setIsSendingVerify(false);
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose} style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
-    }}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{
-        width: '480px', background: 'rgba(18, 20, 25, 0.95)', borderRadius: '16px', padding: '35px',
-        border: '1px solid rgba(255, 255, 255, 0.08)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
-        backdropFilter: 'blur(16px)',
-        fontFamily: 'var(--font-sans)', color: 'var(--text-main)', position: 'relative'
-      }}>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', paddingBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.06)'}}>
-          <h2 style={{margin: 0, display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-color)', fontSize: '1.4rem', fontWeight: '700'}}>
-            <User size={22} color="#3b82f6" /> {t('帳號設定與安全')}
-          </h2>
-          <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-            {!window.electronAPI && (
-              <a href="https://earthonline.onrender.com/downloads/EarthOnlineSetup.exe" style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--success-color)', textDecoration: 'none', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', fontWeight: '600'}}>
-                {t('📥 下載專屬電腦版')}
-              </a>
-            )}
-            <X size={20} style={{cursor: 'pointer', color: 'var(--text-dim)', transition: 'color 0.2s'}} onClick={onClose} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-dim)'} />
-          </div>
-        </div>
-        
-        {error ? <div style={{color: 'var(--danger-color)', padding: '15px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px'}}>{error}</div> : !info ? <div style={{color: 'var(--text-dim)', textAlign: 'center', padding: '30px 0'}}>{t('讀取帳戶資訊中...')}</div> : (
-          <div style={{display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.95rem'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)'}}>
-              <span style={{color: 'var(--text-dim)'}}>{t('代號 (Subject ID)')}</span>
-              <strong style={{color: 'var(--text-color)'}}>{info.username}</strong>
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)'}}>
-              <span style={{color: 'var(--text-dim)'}}>{t('連線建立日 (Joined)')}</span>
-              <strong style={{color: 'var(--text-color)'}}>{new Date(info.createdAt).toLocaleDateString()}</strong>
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)'}}>
-              <span style={{color: 'var(--text-dim)'}}>{t('累積生存時間')}</span>
-              <strong style={{color: 'var(--text-color)'}}>{(info.accumulatedTime / 3600).toFixed(1)} 小時</strong>
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)'}}>
-              <span style={{color: 'var(--text-dim)'}}>{t('榮譽點數 (PT)')}</span>
-              <strong style={{color: 'var(--info-color)'}}>{Number(info.accumulatedBonusPoints || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}</strong>
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between', padding: '8px 0'}}>
-              <span style={{color: 'var(--text-dim)'}}>{t('Discord 通訊協定')}</span>
-              <strong style={{color: info.discord && info.discord.username ? 'var(--info-color)' : 'var(--text-dim)'}}>
-                {info.discord && info.discord.username ? info.discord.username : t('未綁定')}
-              </strong>
-            </div>
-            <div style={{marginTop: '25px', padding: '20px', background: 'rgba(239, 68, 68, 0.05)', borderLeft: '4px solid #ef4444', borderRadius: '0 8px 8px 0'}}>
-              <div style={{color: 'var(--danger-color)', fontWeight: '600', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                <ShieldCheck size={18} /> {t('專屬恢復金鑰 (Recovery Key)')}
-              </div>
-              <p style={{fontSize: '0.85rem', color: 'var(--text-dim)', marginBottom: '15px', lineHeight: '1.5'}}>
-                {t('如果您遺失密碼，這是【唯一】能找回帳號的憑證，請妥善保管並勿洩漏給他人。')}
-              </p>
-              <div style={{display: 'flex', gap: '10px'}}>
-                {info.recoveryKey === t('未產生') ? (
-                  <button disabled={isGenerating} style={{flex: 1, padding: '10px', background: isGenerating ? 'var(--text-dim)' : 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: isGenerating ? 'not-allowed' : 'pointer', transition: 'background 0.2s'}} onClick={handleGenerateKey} onMouseOver={e => { if(!isGenerating) e.currentTarget.style.background = 'var(--danger-color)'; }} onMouseOut={e => { if(!isGenerating) e.currentTarget.style.background = 'var(--danger-color)'; }}>
-                    {isGenerating ? t('生成中...') : t('生成專屬金鑰')}
-                  </button>
-                ) : (
-                  <>
-                    <input 
-                      type={showKey ? "text" : "password"} 
-                      value={info.recoveryKey} 
-                      readOnly 
-                      style={{flex: 1, letterSpacing: showKey ? '1px' : '3px', background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '10px', borderRadius: '6px', outline: 'none'}}
-                    />
-                    <button style={{padding: '0 15px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger-color)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'}} onClick={() => setShowKey(!showKey)} onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'} onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}>
-                      {showKey ? t('隱藏') : t('顯示')}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Email Binding Section */}
-            <div style={{marginTop: '15px', padding: '20px', background: 'rgba(16, 185, 129, 0.05)', borderLeft: '4px solid #10b981', borderRadius: '0 8px 8px 0'}}>
-              <div style={{color: 'var(--success-color)', fontWeight: '600', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                <ShieldCheck size={18} /> {t('安全信箱綁定')}
-              </div>
-              <p style={{fontSize: '0.85rem', color: 'var(--text-dim)', marginBottom: '15px', lineHeight: '1.5'}}>
-                {t('綁定信箱可獲得額外的帳號保護，若遺失密碼可透過信箱快速找回。')}
-              </p>
-              {info.isEmailVerified ? (
-                <div style={{display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success-color)', background: 'rgba(16,185,129,0.1)', padding: '10px 15px', borderRadius: '6px'}}>
-                  <CheckCircle size={16} /> <span style={{fontWeight: '500'}}>{t('已綁定：')}{info.email}</span>
-                </div>
-              ) : info.email ? (
-                <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
-                  <span style={{color: 'var(--warning-color)', flex: 1, background: 'rgba(245,158,11,0.1)', padding: '10px', borderRadius: '6px'}}>{t('⏳ 等待驗證：')}{info.email}</span>
-                  <button style={{padding: '10px 15px', background: 'var(--success-color)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer'}} onClick={handleSendVerify} disabled={isSendingVerify}>
-                    {isSendingVerify ? t('發送中...') : t('重發驗證信')}
-                  </button>
-                </div>
-              ) : (
-                <div style={{display: 'flex', gap: '10px'}}>
-                  <input 
-                    type="email" 
-                    placeholder={t('輸入電子郵件...')} 
-                    value={emailInput} 
-                    onChange={e => setEmailInput(e.target.value)} 
-                    style={{flex: 1, background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '10px 15px', borderRadius: '6px', outline: 'none'}}
-                  />
-                  <button style={{padding: '0 20px', background: 'var(--success-color)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s'}} onClick={handleSendVerify} disabled={isSendingVerify} onMouseOver={e => e.currentTarget.style.background = 'var(--success-color)'} onMouseOut={e => e.currentTarget.style.background = 'var(--success-color)'}>
-                    {isSendingVerify ? t('發送中...') : t('綁定')}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div style={{marginTop: '25px', textAlign: 'center'}}>
-              <button 
-                style={{background: 'transparent', color: 'var(--text-dim)', border: 'none', padding: '8px 16px', fontSize: '0.85rem', cursor: 'pointer', transition: 'color 0.2s'}} 
-                onClick={handleDeleteAccount}
-                onMouseOver={e => e.currentTarget.style.color = 'var(--danger-color)'}
-                onMouseOut={e => e.currentTarget.style.color = 'var(--text-dim)'}
-              >
-                {t('刪除帳號 (無法恢復)')}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function App() {
   const { t, language, setLanguage } = useLanguage();
   const [token, setToken] = useState(localStorage.getItem('eo_token'));
@@ -2101,276 +1938,5 @@ function App() {
     </GameProvider>
   );
 }
-
-function WarPanelModal({ data, onClose, region }) {
-  const { t } = useLanguage();
-  if (!data) return null;
-  const regions = Object.entries(data).sort(([, a], [, b]) => b.totalOnlineTime - a.totalOnlineTime);
-  return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', maxWidth: '700px', width: '95%' }}>
-        <h2 style={{ margin: '0 0 20px', color: 'var(--text-color)', fontSize: '1.3rem' }}>{t('區域對抗')}</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-          {regions.map(([r, s], i) => (
-            <div key={r} style={{ padding: '15px', borderRadius: '8px', background: i === 0 ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.03)', border: i === 0 ? '1px solid rgba(255,215,0,0.4)' : '1px solid var(--border-color)', position: 'relative' }}>
-              {i === 0 && <div style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#FFD700', color: '#000', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>🏆 1st</div>}
-              <h3 style={{ color: r === region ? 'var(--accent-color)' : 'var(--text-color)', margin: '0 0 10px', fontSize: '0.95rem' }}>{r === 'asia' ? t('亞洲') : r === 'us' ? t('美洲') : t('歐洲')}</h3>
-              <div style={{ fontSize: '0.8rem', color: '#888', lineHeight: '1.8' }}>
-                <div>{t('在線時間')}: {Math.round((s.totalOnlineTime || 0) / 3600000)}h</div>
-                <div>{t('平均在線')}: {s.avgOnlineUsers || 0}</div>
-                <div>Peak: {s.peakOnlineUsers || 0}</div>
-                <div>{t('事件完成率')}: {s.eventRate || 0}%</div>
-                <div>PT: {(s.totalPTEarned || 0).toFixed(0)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button onClick={onClose} style={{ marginTop: '20px', width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-light)', color: 'var(--text-color)', cursor: 'pointer', fontWeight: 'bold' }}>{t('關閉')}</button>
-      </div>
-    </div>
-  );
-}
-
-function TalentModal({ data, onClose, socket }) {
-  const { t } = useLanguage();
-  const { points, spent, talents, all } = data;
-  const [result, setResult] = useState(null);
-  const trees = [
-    { id: 'survival', name: '🛡️ 生存系', en: 'Survival', talents: ['iron_wall', 'regeneration', 'gecko', 'immortal'] },
-    { id: 'production', name: '⚡ 產能系', en: 'Production', talents: ['overclock', 'calculus', 'burst', 'plunder'] },
-    { id: 'social', name: '🤝 社交系', en: 'Social', talents: ['rally', 'network', 'resonance', 'leader'] },
-  ];
-  const handleAssign = (talentId) => {
-    if (socket?.connected) {
-      socket.emit('assign_talent', { talentId });
-      socket.once('talent_result', (res) => setResult(res));
-    }
-  };
-  return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', maxWidth: '800px', width: '95%', maxHeight: '85vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, color: 'var(--text-color)', fontSize: '1.3rem' }}>{t('天賦樹')}</h2>
-          <span style={{ marginLeft: 'auto', fontSize: '0.9rem', color: '#9333EA' }}>{t('可用點數')}: {points || 0}</span>
-        </div>
-        {result && (
-          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '6px', background: result.success ? 'rgba(0,255,170,0.1)' : 'rgba(255,65,108,0.1)', border: `1px solid ${result.success ? '#00ffaa' : '#ff416c'}`, color: result.success ? '#00ffaa' : '#ff416c', fontSize: '0.9rem' }}>
-            {result.message}
-          </div>
-        )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
-          {trees.map(tree => (
-            <div key={tree.id}>
-              <h3 style={{ color: 'var(--text-color)', margin: '0 0 12px', fontSize: '1rem' }}>{tree.talents.map(id => all[id]).filter(Boolean).length > 0 ? tree.name : tree.en}</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {tree.talents.map(id => {
-                  const def = all[id];
-                  if (!def) return null;
-                  const lvl = talents[id] || 0;
-                  const maxed = lvl >= def.maxLevel;
-                  const hasPoint = (points || 0) > 0;
-                  return (
-                    <div key={id} style={{ padding: '10px', borderRadius: '8px', background: lvl > 0 ? 'rgba(147,51,234,0.1)' : 'rgba(255,255,255,0.03)', border: lvl > 0 ? '1px solid rgba(147,51,234,0.3)' : '1px solid transparent' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                        <span style={{ color: 'var(--text-color)', fontWeight: 'bold', fontSize: '0.9rem' }}>{def.name || id}</span>
-                        <span style={{ color: maxed ? '#FFD700' : '#888', fontSize: '0.8rem' }}>Lv.{lvl}/{def.maxLevel}</span>
-                      </div>
-                      <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '6px' }}>{def.desc}</div>
-                      {!maxed && (
-                        <button onClick={() => handleAssign(id)} disabled={!hasPoint} style={{ width: '100%', padding: '4px', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: hasPoint ? 'rgba(147,51,234,0.2)' : 'rgba(255,255,255,0.05)', color: hasPoint ? '#9333EA' : '#555', cursor: hasPoint ? 'pointer' : 'default' }}>
-                          {hasPoint ? `+1 (${(points || 0)} ${t('剩餘')})` : t('點數不足')}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-          {spent > 0 && (
-            <button onClick={() => { if (socket?.connected) { socket.emit('reset_talents'); socket.once('talent_result', (res) => setResult(res)); } }} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--danger-color)', background: 'rgba(255,65,108,0.1)', color: 'var(--danger-color)', cursor: 'pointer', fontWeight: 'bold' }}>
-              {t('重置天賦 (500 PT)')}
-            </button>
-          )}
-          <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-light)', color: 'var(--text-color)', cursor: 'pointer', fontWeight: 'bold' }}>{t('關閉')}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AchievementModal({ data, onClose }) {
-  const { t } = useLanguage();
-  const { unlocked, all } = data;
-  return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', maxWidth: '500px', width: '95%', maxHeight: '80vh', overflowY: 'auto' }}>
-        <h2 style={{ margin: '0 0 20px', color: 'var(--text-color)', fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Trophy size={22} color="#FFD700" /> {t('成就')}
-          <span style={{ marginLeft: 'auto', fontSize: '0.85rem', color: '#888' }}>{unlocked?.length || 0}/{all?.length || 0}</span>
-        </h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {(all || []).map(ach => {
-            const done = (unlocked || []).includes(ach.id);
-            return (
-              <div key={ach.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '8px', background: done ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: done ? '1px solid rgba(255,215,0,0.3)' : '1px solid transparent', opacity: done ? 1 : 0.4 }}>
-                <div style={{ fontSize: '1.5rem' }}>{done ? '🏆' : '🔒'}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: 'var(--text-color)', fontWeight: 'bold', fontSize: '0.95rem' }}>{t(ach.name)}</div>
-                  <div style={{ color: '#888', fontSize: '0.8rem' }}>{t(ach.en)}</div>
-                </div>
-                {ach.reward > 0 && <div style={{ fontSize: '0.8rem', color: '#FFD700' }}>+{ach.reward} PT</div>}
-              </div>
-            );
-          })}
-        </div>
-        <button onClick={onClose} style={{ marginTop: '20px', width: '100%', padding: '10px', background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--text-color)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>{t('關閉')}</button>
-      </div>
-    </div>
-  );
-}
-
-function SocialModal({ onClose, socialTab, setSocialTab, socialData, socket, myNode, onPmUser, toast }) {
-  const { t, language, setLanguage } = useLanguage();
-  const sortedPlayers = [...(socialData.allPlayers || [])].sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
-  return (
-    <div className="modal-overlay" onClick={onClose} style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
-    }}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{
-        background: 'rgba(10, 15, 30, 0.95)',
-        border: '1px solid var(--accent-color)',
-        borderRadius: '10px', padding: '20px', width: '90%', maxWidth: '500px',
-        boxShadow: '0 0 20px rgba(0, 255, 136, 0.2)', color: '#fff', position: 'relative',
-        maxHeight: '80vh', display: 'flex', flexDirection: 'column'
-      }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>
-          <X size={24} />
-        </button>
-        <h2 style={{ color: 'var(--accent-color)', marginTop: 0, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Users size={24} /> {t('社交網路 (Social Matrix)')}
-        </h2>
-
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>
-          <button onClick={() => setSocialTab('all')} style={{ flex: 1, padding: '8px', background: socialTab === 'all' ? 'var(--accent-color)' : 'transparent', color: socialTab === 'all' ? '#000' : '#fff', border: '1px solid var(--accent-color)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{t('全服玩家')}</button>
-          <button onClick={() => setSocialTab('friends')} style={{ flex: 1, padding: '8px', background: socialTab === 'friends' ? 'var(--accent-color)' : 'transparent', color: socialTab === 'friends' ? '#000' : '#fff', border: '1px solid var(--accent-color)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{t('好友列表')}</button>
-          <button onClick={() => setSocialTab('requests')} style={{ flex: 1, padding: '8px', background: socialTab === 'requests' ? 'var(--accent-color)' : 'transparent', color: socialTab === 'requests' ? '#000' : '#fff', border: '1px solid var(--accent-color)', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-            {t('交友邀請')} {socialData.friendRequests?.length > 0 && <span style={{ background: 'var(--danger-color)', color: '#fff', padding: '2px 6px', borderRadius: '10px', fontSize: '0.8rem', marginLeft: '5px' }}>{socialData.friendRequests.length}</span>}
-          </button>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {socialTab === 'all' && (
-            sortedPlayers.length === 0 ? <div style={{textAlign: 'center', color: '#888'}}>{t('查無資料')}</div> :
-            sortedPlayers.map(p => (
-              <div key={p.username} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '5px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ color: p.online ? '#0f0' : '#888', fontWeight: 'bold' }}>●</span>
-                  <span>{p.username} [{p.country}]</span>
-                </div>
-                {p.username !== myNode?.username && !socialData.friends?.find(f => f.username === p.username) && (
-                  <button 
-                    onClick={(e) => {
-                      socket.emit('send_friend_request', { targetUsername: p.username });
-                      e.target.disabled = true;
-                      e.target.innerText = '✓';
-                      e.target.style.background = 'rgba(255,255,255,0.1)';
-                      e.target.style.color = '#888';
-                      e.target.style.borderColor = '#888';
-                    }} 
-                    style={{ background: 'rgba(0,255,136,0.2)', border: '1px solid var(--accent-color)', color: 'var(--accent-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-                  >
-                    {t('加好友')}
-                  </button>
-                )}
-              </div>
-            ))
-          )}
-
-          {socialTab === 'friends' && (
-            socialData.friends?.length === 0 ? <div style={{textAlign: 'center', color: '#888'}}>{t('目前沒有好友')}</div> :
-            socialData.friends?.map(f => (
-              <div key={f.username} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '5px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ color: f.online ? '#0f0' : '#888', fontWeight: 'bold' }}>●</span>
-                  <span>{f.username}</span>
-                </div>
-                <div>
-                <button onClick={() => onPmUser && onPmUser(f.username)} style={{ background: 'rgba(0,255,136,0.2)', border: '1px solid var(--accent-color)', color: 'var(--accent-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', marginRight: '5px' }}>{t('私訊')}</button>
-                <button onClick={() => {
-                  if (window.confirm(`${t('刪除')} ${f.username}?`)) {
-                    socket.emit('remove_friend', { targetUsername: f.username });
-                  }
-                }} style={{ background: 'rgba(255,65,108,0.2)', border: '1px solid var(--danger-color)', color: 'var(--danger-color)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>{t('刪除')}</button>
-                </div>
-              </div>
-            ))
-          )}
-
-          {socialTab === 'requests' && (
-            socialData.friendRequests?.length === 0 ? <div style={{textAlign: 'center', color: '#888'}}>{t('目前沒有邀請')}</div> :
-            socialData.friendRequests?.map(req => (
-              <div key={req} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '5px' }}>
-                <span>{req}{t('想要加您為好友')}</span>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  <button onClick={() => socket.emit('accept_friend_request', { targetUsername: req })} style={{ background: 'var(--accent-color)', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>{t('接受')}</button>
-                  <button onClick={() => socket.emit('reject_friend_request', { targetUsername: req })} style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>{t('拒絕')}</button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-      
-      {/* Toast Notification — full center overlay */}
-      {toast && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 99999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
-          animation: 'fadeIn 0.15s ease',
-        }}>
-          <div style={{
-            background: '#0a0e17', border: `1px solid ${toast.type === 'success' ? 'rgba(0,255,170,0.3)' : 'rgba(255,65,100,0.3)'}`,
-            borderRadius: '16px', padding: '30px 40px',
-            textAlign: 'center', maxWidth: '420px',
-            boxShadow: toast.type === 'success'
-              ? '0 0 60px rgba(0,255,170,0.12), 0 20px 60px rgba(0,0,0,0.5)'
-              : '0 0 60px rgba(255,65,100,0.12), 0 20px 60px rgba(0,0,0,0.5)',
-            animation: 'popIn 0.25s ease',
-          }}>
-            <div style={{ fontSize: '3rem', marginBottom: '12px' }}>
-              {toast.type === 'success' ? '✅' : '⚠️'}
-            </div>
-            <div style={{
-              color: toast.type === 'success' ? '#00ffaa' : '#ff416c',
-              fontWeight: 'bold', fontSize: '1.2rem',
-              lineHeight: 1.5, marginBottom: '16px',
-            }}>
-              {toast.message}
-            </div>
-            <div style={{ color: '#555', fontSize: '0.8rem', letterSpacing: '1px' }}>
-              {t('視窗將自動關閉...')}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Footer / Open Source Badge */}
-      <div style={{ position: 'fixed', bottom: '15px', left: '0', width: '100%', textAlign: 'center', pointerEvents: 'none', zIndex: 9999 }}>
-        <a href="https://github.com/huchialun9-ctrl/earthonline" target="_blank" rel="noreferrer" style={{ pointerEvents: 'auto', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--panel-bg)', padding: '6px 14px', borderRadius: '20px', textDecoration: 'none', color: 'var(--text-dim)', fontSize: '0.8rem', backdropFilter: 'blur(4px)', border: '1px solid var(--border-color)', transition: 'all 0.2s' }} onMouseEnter={e => {e.currentTarget.style.background='var(--bg-light)'; e.currentTarget.style.color='var(--text-color)'}} onMouseLeave={e => {e.currentTarget.style.background='var(--panel-bg)'; e.currentTarget.style.color='var(--text-dim)'}}>
-          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
-          Open Source on GitHub
-          <img src="https://img.shields.io/github/license/huchialun9-ctrl/earthonline?style=flat-square&color=blue" alt="MIT License" style={{ height: '14px', marginLeft: '4px' }} />
-        </a>
-      </div>
-    </div>
-  );
-}
-
 
 export default App;
