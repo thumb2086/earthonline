@@ -285,7 +285,7 @@ function Dashboard({ token, onLogout, region }) {
   const API_URL = `${BASE_URL}/api/${region}`;
   const SOCKET_URL = BASE_URL;
   const game = useGame();
-  const { socket, isConnected, ping, nodes, myNode, setMyNode, myRole, globalStats, hubStats, leaderboard, currentEvent, lifespan, sessionTime, logs, addLog } = game;
+  const { socket, isConnected, ping, nodes, myNode, setMyNode, myRole, globalStats, hubStats, leaderboard, currentEvent, lifespan, sessionTime, logs, addLog, isOfflineMode, engineReady, getEngineState } = game;
   const [eventVote, setEventVote] = useState(null); // { options, endTime }
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [adminTarget, setAdminTarget] = useState('');
@@ -379,6 +379,16 @@ function Dashboard({ token, onLogout, region }) {
       osc.stop(ctx.currentTime + duration / 1000);
     } catch(e) {}
   };
+
+  const [offlineState, setOfflineState] = useState(null);
+  useEffect(() => {
+    if (!isOfflineMode || !engineReady) { setOfflineState(null); return; }
+    const id = setInterval(() => {
+      const st = getEngineState?.();
+      if (st) setOfflineState(st);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isOfflineMode, engineReady, getEngineState]);
 
   const [pmTarget, setPmTarget] = useState(null);
   const [pmInput, setPmInput] = useState('');
@@ -1065,7 +1075,12 @@ function Dashboard({ token, onLogout, region }) {
             <div style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
               <span style={{color: 'var(--text-dim)'}}>{t('總人口')}:</span> <strong style={{color: 'var(--text-color)'}}>{globalStats.totalPopulation}</strong>
             </div>
-            {!isConnected && <span style={{color: 'var(--danger-color)', fontWeight: 'bold'}}>[{t('已斷線')}]</span>}
+            {!isConnected && isOfflineMode && (
+              <span style={{color: 'var(--warning-color)', fontWeight: 'bold', background: 'rgba(245,158,11,0.15)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem'}}>
+                ⚡ {t('離線模式')}
+              </span>
+            )}
+            {!isConnected && !engineReady && <span style={{color: 'var(--danger-color)', fontWeight: 'bold'}}>[{t('已斷線')}]</span>}
           </div>
 
           <div className={`header-dropdown${dropdownOpen ? ' open' : ''}`} ref={dropdownRef}>
@@ -1208,11 +1223,15 @@ function Dashboard({ token, onLogout, region }) {
             )}
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px'}}>
               <span style={{fontSize: '0.8rem', color: '#888'}}>{t('總生存時間')}</span>
-              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-color)'}}>{formatTime(lifespan)}</span>
+              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-color)'}}>
+                {isOfflineMode && offlineState ? formatTime(offlineState.accumulatedTime) : formatTime(lifespan)}
+              </span>
             </div>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
               <span style={{fontSize: '0.8rem', color: '#888'}}>{t('累積點數')}</span>
-              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)'}}>{(myNode?.accumulatedBonusPoints || 0).toLocaleString()}</span>
+              <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)'}}>
+                {isOfflineMode && offlineState ? Math.floor(offlineState.accumulatedBonusPoints).toLocaleString() : (myNode?.accumulatedBonusPoints || 0).toLocaleString()}
+              </span>
             </div>
           </div>
 

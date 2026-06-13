@@ -143,13 +143,16 @@ async function sendDiscordWebhook(message) {
 }
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: ALLOWED_ORIGINS }));
 app.use(express.json());
 app.use('/downloads', express.static(path.join(__dirname, 'public/downloads')));
 app.use(morgan('short'));
-// Helmet disabled — its default CSP blocks cross-origin Socket.io connections to Render
-// If re-enabling, must add explicit connectSrc for all backend URLs
-// app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: {
+  directives: {
+    defaultSrc: ["'self'"],
+    connectSrc: ["'self'", BACKEND_URL, FRONTEND_URL, 'wss://earthonline.qzz.io:443', 'ws://earthonline.qzz.io:3001', 'wss://earthonline.qzz.io:443', 'ws://earthonline.qzz.io:3001']
+  }
+}}));
 
 // Health check for Render
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() }));
@@ -506,6 +509,30 @@ regions.forEach(regionName => {
       let ip = socket.handshake.headers['x-forwarded-for'] || socket.request.connection.remoteAddress;
       if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
       const dbUser = await db.findUserByUsername(decoded.username);
+
+      // Sync Discord role to in-app role BEFORE constructing user object and init_data
+      if (dbUser?.discord?.id) {
+        const adminIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
+        if (adminIds.includes(dbUser.discord.id)) {
+          await User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } });
+          dbUser.role = 'admin';
+        } else {
+          try {
+            const discordRole = await discordBot.getHighestRole(dbUser.discord.id);
+            if (discordRole) {
+              if (discordRole.includes('地球管理團隊')) {
+                await User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } });
+                dbUser.role = 'admin';
+              } else if (dbUser.role === 'admin' && !discordRole.includes('地球管理團隊')) {
+                await User.updateOne({ username: decoded.username }, { $set: { role: 'user' } });
+                dbUser.role = 'user';
+              }
+            }
+          } catch (err) {
+            console.error('[SYS] Discord role sync error:', err);
+          }
+        }
+      }
       
       // Ban check — reject banned users
       if (dbUser && dbUser.bannedUntil && dbUser.bannedUntil > Date.now()) {
@@ -666,23 +693,6 @@ regions.forEach(regionName => {
       // Sync tick paused state to newly connected clients
       if (isPaused()) {
         socket.emit('tick_paused');
-      }
-
-      // Sync Discord role to in-app role — check admin list or Discord guild role
-      if (dbUser?.discord?.id) {
-        const adminIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
-        if (adminIds.includes(dbUser.discord.id)) {
-          User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } }).catch(console.error);
-        } else {
-          discordBot.getHighestRole(dbUser.discord.id).then(discordRole => {
-            if (!discordRole) return;
-            if (discordRole.includes('地球管理團隊')) {
-              User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } }).catch(console.error);
-            } else if (user.role === 'admin' && !discordRole.includes('地球管理團隊')) {
-              User.updateOne({ username: decoded.username }, { $set: { role: 'user' } }).catch(console.error);
-            }
-          }).catch(() => {});
-        }
       }
 
       if (connectedUsers.size % 10 === 0 && connectedUsers.size > 0) {
