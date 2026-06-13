@@ -4,12 +4,13 @@ async function getSocialData(username) {
   const dbUser = await User.findOne({ username });
   if (!dbUser) return null;
 
-  const allUsers = await User.find({}, { username: 1, country: 1 }).limit(50).lean();
+  const allUsers = await User.find({}, { username: 1, country: 1, role: 1 }).limit(50).lean();
 
   return {
     allPlayers: allUsers.map(u => ({
       username: u.username,
-      country: u.country
+      country: u.country,
+      role: u.role || 'user'
     })),
     friends: dbUser.friends || [],
     friendRequests: dbUser.friendRequests || []

@@ -510,22 +510,30 @@ regions.forEach(regionName => {
       if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
       const dbUser = await db.findUserByUsername(decoded.username);
 
-      // Sync Discord role to in-app role BEFORE constructing user object and init_data
-      if (dbUser?.discord?.id) {
+      // Sync role: check ADMIN_USERNAMES env var first (no Discord dependency)
+      const adminUsernames = (process.env.ADMIN_USERNAMES || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      if (adminUsernames.includes(decoded.username.toLowerCase())) {
+        if (dbUser?.role !== 'admin') {
+          await User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } });
+          if (dbUser) dbUser.role = 'admin';
+          console.log(`[SYS] Admin promoted via ADMIN_USERNAMES: ${decoded.username}`);
+        }
+      } else if (dbUser?.discord?.id) {
+        // Fallback: check Discord server role
         const adminIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
         if (adminIds.includes(dbUser.discord.id)) {
           await User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } });
-          dbUser.role = 'admin';
+          if (dbUser) dbUser.role = 'admin';
         } else {
           try {
             const discordRole = await discordBot.getHighestRole(dbUser.discord.id);
             if (discordRole) {
               if (discordRole.includes('地球管理團隊')) {
                 await User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } });
-                dbUser.role = 'admin';
-              } else if (dbUser.role === 'admin' && !discordRole.includes('地球管理團隊')) {
+                if (dbUser) dbUser.role = 'admin';
+              } else if (dbUser?.role === 'admin' && !discordRole.includes('地球管理團隊')) {
                 await User.updateOne({ username: decoded.username }, { $set: { role: 'user' } });
-                dbUser.role = 'user';
+                if (dbUser) dbUser.role = 'user';
               }
             }
           } catch (err) {
