@@ -380,6 +380,14 @@ function Dashboard({ token, onLogout, region }) {
     } catch(e) {}
   };
 
+  const [mobileTab, setMobileTab] = useState('dashboard');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const [offlineState, setOfflineState] = useState(null);
   useEffect(() => {
     if (!isOfflineMode || !engineReady) { setOfflineState(null); return; }
@@ -1137,6 +1145,55 @@ function Dashboard({ token, onLogout, region }) {
         </div>
       </header>
 
+      {isMobile ? (
+        <MobileLayout
+          mobileTab={mobileTab}
+          setMobileTab={setMobileTab}
+          t={t}
+          myNode={myNode}
+          lifespan={lifespan}
+          isOfflineMode={isOfflineMode}
+          offlineState={offlineState}
+          globalStats={globalStats}
+          socket={socket}
+          logs={logs}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          addLog={addLog}
+          ping={ping}
+          nodes={nodes}
+          currentEvent={currentEvent}
+          bgStyle={bgStyle}
+          setBgStyle={setBgStyle}
+          theme={theme}
+          themes={themes}
+          setTheme={setTheme}
+          bgmEnabled={bgmEnabled}
+          toggleBgm={toggleBgm}
+          notificationEnabled={notificationEnabled}
+          setNotificationEnabled={setNotificationEnabled}
+          boundDiscord={boundDiscord}
+          myRole={myRole}
+          honor={myNode?.honor || 0}
+          weeklyScore={myNode?.weeklyScore || 0}
+          region={region}
+          onLogout={onLogout}
+          onOpenShop={() => setShowShopModal(true)}
+          onOpenBackpack={() => setShowBackpack(true)}
+          onOpenAchievements={() => setShowAchievements(true)}
+          onOpenTalent={() => { setShowTalentModal(true); if (socket?.connected) socket.emit('get_talent_data'); }}
+          onOpenLeaderboard={() => setShowLeaderboard(true)}
+          onOpenWar={() => { setShowWarPanel(true); if (socket?.connected) socket.emit('get_war_stats'); }}
+          onOpenAbout={() => setShowAboutModal(true)}
+          onOpenAccountInfo={() => setShowAccountInfo(true)}
+          onOpenDiscordBind={() => setShowDiscordModal(true)}
+          onOpenSocial={() => setShowSocialModal(true)}
+          pmData={{ showPm, pmTarget, pmInput, setPmInput, pmLog }}
+          onClosePm={() => setShowPm(false)}
+          language={language}
+          setLanguage={setLanguage}
+        />
+      ) : (
       <div className="main-content">
         {/* Left Metrics Terminal */}
         <aside className="metrics-terminal floating-panel">
@@ -1296,6 +1353,7 @@ function Dashboard({ token, onLogout, region }) {
                       <Console logs={logs} chatInput={chatInput} setChatInput={setChatInput} socket={socket} pmData={{showPm,pmTarget,pmInput,setPmInput,pmLog}} onClosePm={()=>setShowPm(false)} />
 </main>
       </div>
+      )}
 
             {/* Leaderboard Modal */}
       <LeaderboardModal show={showLeaderboard} onClose={()=>setShowLeaderboard(false)} leaderboard={leaderboard} sortMode={sortMode} setSortMode={setSortMode} formatTime={formatTime} />

@@ -79,11 +79,11 @@ v3.0.x ── Steam 正式發布 + 反作弊 + 備援節點
 | Mobile CSS 重構 (768px + 480px) | `client/src/index.css` | ✅ |
 | 管理員判定修復（同步搬至 init_data 前） | `backend/server.js` | ✅ |
 
-### v2.0.1 — 行動版 UI Redesign
+### v2.0.1 — 行動版 UI Redesign ✅ 已完成
 
-> 手機上開 earthonline.qzz.io 目前是桌面三欄布局縮小，需要改為原生 App 體驗的底部 Tab 導航。
+> 手機上開 earthonline.qzz.io 改為原生 App 體驗的底部 Tab 導航。
 
-**設計目標：**
+**設計結果：**
 
 ```
 ┌─────────────────┐
@@ -98,29 +98,29 @@ v3.0.x ── Steam 正式發布 + 反作弊 + 備援節點
 └─────────────────┘
 ```
 
-- **v2.0.1a 底部 Tab 導航架構**
-  - 做什麼：建立 `client/src/components/MobileNav.jsx`，四頁輪換（Dashboard / Globe / Chat / Profile），僅手機 (<768px) 顯示，隱藏桌面左側邊欄
-  - 改哪個檔案： `client/src/components/MobileNav.jsx`（新建）、`client/src/App.jsx`、`client/src/index.css`
+- **v2.0.1a 底部 Tab 導航架構 ✅**
+  - 做什麼：建立 `client/src/components/Mobile/MobileNav.jsx` + `MobileLayout.jsx`，四頁輪換，僅手機 (<768px) 顯示
+  - 改哪個檔案： `client/src/components/Mobile/MobileNav.jsx`（新建）、`client/src/components/Mobile/MobileLayout.jsx`（新建）、`client/src/App.jsx`、`client/src/index.css`
   - 驗證：手機上四頁可自由切換，桌面不受影響
 
-- **v2.0.1b 手機儀表板 (Dashboard Tab)**
-  - 做什麼：卡片式佈局顯示健康度% + PT + 等級 + 生存時間，下方快捷按鈕列（商城、背包、成就、天賦）
-  - 改哪個檔案： `client/src/components/MobileDashboard.jsx`（新建）、`client/src/App.jsx`
+- **v2.0.1b 手機儀表板 ✅**
+  - 做什麼：卡片式佈局顯示健康度% + PT + 等級 + 生存時間，快捷按鈕列（商城、背包、成就、天賦、排行、區域、關於）
+  - 改哪個檔案： `client/src/components/Mobile/MobileDashboard.jsx`（新建）
   - 驗證：所有數據正確顯示，按鈕可操作
 
-- **v2.0.1c 手機地圖 (Globe Tab)**
-  - 做什麼：全螢幕 3D 地球，觸控縮放旋轉，點擊節點顯示資訊卡
-  - 改哪個檔案： `client/src/components/MobileGlobe.jsx`（新建）、`client/src/App.jsx`
-  - 驗證：地圖操作流暢
+- **v2.0.1c 手機地圖 ✅**
+  - 做什麼：全螢幕 DataCenterVisualizer（3D 地球）+ 浮動聊天按鈕
+  - 改哪個檔案： `client/src/components/Mobile/MobileGlobe.jsx`（新建）
+  - 驗證：地圖操作流暢，聊天面板可開關
 
-- **v2.0.1d 手機聊天 (Chat Tab)**
-  - 做什麼：全螢幕聊天室，輸入框固定在底部，訊息從上往下排列
-  - 改哪個檔案： `client/src/components/MobileChat.jsx`（新建）、`client/src/App.jsx`
-  - 驗證：聊天發送/接收正常，鍵盤彈出時輸入框不被遮擋
+- **v2.0.1d 手機聊天 ✅**
+  - 做什麼：全螢幕聊天室，輸入框固定在底部，僅顯示聊天/DC 訊息
+  - 改哪個檔案： `client/src/components/Mobile/MobileChat.jsx`（新建）
+  - 驗證：聊天發送/接收正常
 
-- **v2.0.1e 手機個人頁 (Profile Tab)**
-  - 做什麼：頭像 + Discord 狀態 + 統計摘要 + 設定開關（主題、語言、BGM）+ 登出
-  - 改哪個檔案： `client/src/components/MobileProfile.jsx`（新建）、`client/src/App.jsx`
+- **v2.0.1e 手機個人頁 ✅**
+  - 做什麼：頭像 + Discord 狀態 + 統計摘要 + 設定開關（主題、語言、BGM、通知、背景）+ 登出
+  - 改哪個檔案： `client/src/components/Mobile/MobileProfile.jsx`（新建）
   - 驗證：設定可切換，登出正常
 
 ---
@@ -346,7 +346,7 @@ desktop/
 
 | 版本 | 主題 | 預計天數 | 相依性 | 優先級 |
 |------|------|---------|--------|--------|
-| v2.0.1a-e | 行動版 UI Redesign (底部 Tab) | 5 天 | v2.0.0 | High |
+| v2.0.1a-e | 行動版 UI Redesign (底部 Tab) | 5 天 | v2.0.0 | High | ✅ |
 | v1.14.0 | 正式發布 + 問題修正 | 7 天 | — | High |
 | v2.1.0a-c | Electron 發布管道 | 3 天 | v2.0.0 | High |
 | v2.1.1a-c | Steamworks 整合 | 5 天 | v2.1.0 | Medium |
