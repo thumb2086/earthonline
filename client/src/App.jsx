@@ -99,7 +99,7 @@ function Dashboard({ token, onLogout, region }) {
   const [selectedCountry, setSelectedCountry] = useState(null);
   const [showDispatchAnim, setShowDispatchAnim] = useState(false);
   const [dispatchedCountry, setDispatchedCountry] = useState(null);
-  const [mine, setMine] = useState(null);
+  const [mines, setMines] = useState([]);
   const [showLottery, setShowLottery] = useState(false);
   const [lotteryInventory, setLotteryInventory] = useState([]);
   const [lastLotteryResult, setLastLotteryResult] = useState(null);
@@ -268,10 +268,17 @@ function Dashboard({ token, onLogout, region }) {
   // Mine socket handlers
   useEffect(() => {
     if (!socket) return;
-    const hMineState = (data) => {
-      if (data) {
-        setMine(data);
-        setDispatchedCountry(null);
+    const hMinesState = (data) => {
+      setDispatchedCountry(null);
+      if (Array.isArray(data)) {
+        setMines(data);
+        const newest = data.reduce((a, b) => a.startedAt > b.startedAt ? a : b, data[0]);
+        if (newest) {
+          showToast(`🚀 已在 ${newest.country} 建立礦場！Lv.${newest.level} 開始自動挖礦`, 'success');
+          addLog(`[SYS] ✅ 已在 ${newest.country} 建立礦場（Lv.${newest.level}）`);
+        }
+      } else if (data) {
+        setMines([data]);
         showToast(`🚀 已在 ${data.country} 建立礦場！Lv.${data.level} 開始自動挖礦`, 'success');
         addLog(`[SYS] ✅ 已在 ${data.country} 建立礦場（Lv.${data.level}）`);
       }
@@ -288,11 +295,13 @@ function Dashboard({ token, onLogout, region }) {
     const hMineEstablished = (data) => {
       addLog(`[SYS] ${data.username} 已在 ${data.country} 建立礦場！`);
     };
-    socket.on('mine_state', hMineState);
+    socket.on('mines_state', hMinesState);
+    socket.on('mine_state', hMinesState);
     socket.on('mine_upgrade_result', hMineUpgrade);
     socket.on('mine_established', hMineEstablished);
     return () => {
-      socket.off('mine_state', hMineState);
+      socket.off('mines_state', hMinesState);
+      socket.off('mine_state', hMinesState);
       socket.off('mine_upgrade_result', hMineUpgrade);
       socket.off('mine_established', hMineEstablished);
     };
@@ -1814,10 +1823,11 @@ function Dashboard({ token, onLogout, region }) {
             {selectedCountry && (
               <CountryInfoPanel
                 country={selectedCountry}
-                hasMine={!!mine}
+                hasMine={mines.some(m => m.country === selectedCountry.name)}
                 dispatching={dispatchedCountry === selectedCountry.name}
                 onEstablish={(countryName) => {
-                  if (!mine && socket?.connected) {
+                  const hasMineInCountry = mines.some(m => m.country === countryName);
+                  if (!hasMineInCountry && socket?.connected) {
                     setDispatchedCountry(countryName);
                     setShowDispatchAnim(true);
                     socket.emit('establish_mine', { country: countryName });
@@ -1825,9 +1835,9 @@ function Dashboard({ token, onLogout, region }) {
                   }
                   setShowWorldMap(false);
                   setSelectedCountry(null);
-                  if (mine) setTimeout(() => {
+                  if (hasMineInCountry) setTimeout(() => {
                     if (socket?.connected) {
-                      socket.emit('get_mine');
+                      socket.emit('get_mine', { country: countryName });
                       showToast('⛏️ 前往礦場', 'success');
                     }
                   }, 300);
@@ -1839,12 +1849,12 @@ function Dashboard({ token, onLogout, region }) {
         </div>
       )}
 
-      {mine && socket?.connected && (
+      {mines.length > 0 && socket?.connected && (
         <MinePanel
-          mine={mine}
+          mines={mines}
           pt={myNode?.accumulatedBonusPoints || 0}
-          onUpgrade={() => socket.emit('upgrade_mine')}
-          onClose={() => setMine(null)}
+          onUpgrade={(mineId) => socket.emit('upgrade_mine', { mineId })}
+          onClose={() => setMines([])}
         />
       )}
 
