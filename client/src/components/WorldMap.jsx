@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 
 const PIXEL = 6;
 const MAP_W = 160;
@@ -13,6 +13,15 @@ const CONTINENTS = [
   { name: '大洋洲', color: '#38bdf8', blocks: [[100,45],[101,45],[102,45],[100,46],[102,46],[100,47],[101,47],[102,47],[100,48],[101,48],[100,49],[101,49]] },
 ];
 
+const LABEL_POSITIONS = [
+  { name: '北美', x: 15, y: 10 },
+  { name: '南美', x: 23, y: 36 },
+  { name: '歐洲', x: 66, y: 14 },
+  { name: '非洲', x: 68, y: 32 },
+  { name: '亞洲', x: 90, y: 15 },
+  { name: '大洋洲', x: 96, y: 48 },
+];
+
 const WATER_COLOR = '#0a1628';
 
 export default function WorldMap({ players = [], onCountryClick, style }) {
@@ -21,8 +30,11 @@ export default function WorldMap({ players = [], onCountryClick, style }) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef(null);
 
-  const continentMap = {};
-  CONTINENTS.forEach(c => c.blocks.forEach(([bx, by]) => { continentMap[`${bx},${by}`] = c; }));
+  const continentMap = useMemo(() => {
+    const map = {};
+    CONTINENTS.forEach(c => c.blocks.forEach(([bx, by]) => { map[`${bx},${by}`] = c; }));
+    return map;
+  }, []);
 
   const handleMouseDown = useCallback((e) => {
     setDragging(true);
@@ -36,13 +48,15 @@ export default function WorldMap({ players = [], onCountryClick, style }) {
 
   const handleMouseUp = useCallback(() => setDragging(false), []);
 
-  const handleClick = useCallback((e) => {
+  const handlePixelClick = useCallback((e) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const mx = Math.floor((e.clientX - rect.left - offset.x) / PIXEL);
     const my = Math.floor((e.clientY - rect.top - offset.y) / PIXEL);
     const key = `${mx},${my}`;
-    if (continentMap[key]) onCountryClick?.(continentMap[key]);
+    if (continentMap[key]) {
+      onCountryClick?.(continentMap[key]);
+    }
   }, [offset, continentMap, onCountryClick]);
 
   const playerCoords = {};
@@ -63,7 +77,7 @@ export default function WorldMap({ players = [], onCountryClick, style }) {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onClick={handleClick}
+      onClick={handlePixelClick}
     >
       <div style={{
         position: 'absolute', left: offset.x, top: offset.y,
@@ -94,6 +108,36 @@ export default function WorldMap({ players = [], onCountryClick, style }) {
           );
         })}
       </div>
+
+      {/* Clickable continent labels */}
+      {LABEL_POSITIONS.map(lp => {
+        const cont = CONTINENTS.find(c => c.name === lp.name);
+        if (!cont) return null;
+        return (
+          <div key={lp.name} onClick={() => onCountryClick?.(cont)} style={{
+            position: 'absolute',
+            left: lp.x * PIXEL + offset.x - 4,
+            top: lp.y * PIXEL + offset.y,
+            padding: '2px 8px',
+            fontSize: '0.75rem',
+            color: '#fff',
+            background: `${cont.color}33`,
+            border: `1px solid ${cont.color}`,
+            cursor: 'pointer',
+            fontFamily: 'monospace',
+            letterSpacing: '1px',
+            textShadow: '0 0 4px rgba(0,0,0,0.8)',
+            whiteSpace: 'nowrap',
+            zIndex: 5,
+            transition: 'background 0.15s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = `${cont.color}66`}
+            onMouseLeave={e => e.currentTarget.style.background = `${cont.color}33`}
+          >
+            {lp.name}
+          </div>
+        );
+      })}
     </div>
   );
 }

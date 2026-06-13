@@ -784,7 +784,7 @@ regions.forEach(regionName => {
   registerTalentHandlers(socket, connectedUsers);
 
   // Mine handlers
-  const { initMine, getMine, upgradeMine, getCountryMines } = require('./services/mineService');
+  const { initMine, getMines, getMine, findMineById, upgradeMine, getCountryMines } = require('./services/mineService');
   socket.on('establish_mine', (data = {}) => {
     if (!socket.user) return;
     const username = socket.user.username;
@@ -792,21 +792,28 @@ regions.forEach(regionName => {
     if (!dbUser) return;
     const country = data.country || dbUser.country || 'UNKNOWN';
     const mine = initMine(username, country);
-    socket.emit('mine_state', mine);
+    socket.emit('mines_state', getMines(username));
     nspIo.emit('mine_established', { username, country: dbUser.country });
   });
-  socket.on('get_mine', () => {
+  socket.on('get_mine', (data) => {
     if (!socket.user) return;
-    const mine = getMine(socket.user.username);
-    socket.emit('mine_state', mine || null);
+    const username = socket.user.username;
+    const country = data?.country;
+    if (country) {
+      const mine = getMine(username, country);
+      socket.emit('mine_state', mine || null);
+    } else {
+      socket.emit('mines_state', getMines(username));
+    }
   });
-  socket.on('upgrade_mine', async () => {
+  socket.on('upgrade_mine', async (data) => {
     if (!socket.user) return;
-    const result = await upgradeMine(socket.user.username);
+    const mineId = data?.mineId;
+    const username = socket.user.username;
+    const result = await upgradeMine(username, mineId);
     socket.emit('mine_upgrade_result', result);
     if (result.success) {
-      const updated = getMine(socket.user.username);
-      socket.emit('mine_state', updated);
+      socket.emit('mines_state', getMines(username));
     }
   });
   socket.on('get_country_mines', (country) => {

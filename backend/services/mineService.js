@@ -8,25 +8,41 @@ const MINE_LEVELS = [
   { level: 5, name: '星核層',    cost: 30000,output: 80,  icon: '⭐' },
 ];
 
-const mines = new Map();
+const mines = new Map(); // Map<username, mine[]>
 
 function initMine(username, country) {
-  if (mines.has(username)) return mines.get(username);
-  const mine = { username, country, level: 1, startedAt: Date.now(), totalMined: 0 };
-  mines.set(username, mine);
+  if (!mines.has(username)) mines.set(username, []);
+  const list = mines.get(username);
+  const existing = list.find(m => m.country === country);
+  if (existing) return existing;
+  const mine = { id: `${username}_${country}_${Date.now()}`, username, country, level: 1, startedAt: Date.now(), totalMined: 0 };
+  list.push(mine);
   return mine;
 }
 
-function getMine(username) {
-  return mines.get(username) || null;
+function getMines(username) {
+  return mines.get(username) || [];
+}
+
+function getMine(username, country) {
+  const list = mines.get(username);
+  if (!list) return null;
+  if (country) return list.find(m => m.country === country) || null;
+  return list[0] || null;
+}
+
+function findMineById(username, mineId) {
+  const list = mines.get(username);
+  if (!list) return null;
+  return list.find(m => m.id === mineId) || null;
 }
 
 function getMineLevel(level) {
   return MINE_LEVELS.find(m => m.level === level) || MINE_LEVELS[0];
 }
 
-async function upgradeMine(username) {
-  const mine = mines.get(username);
+async function upgradeMine(username, mineId) {
+  const mine = findMineById(username, mineId);
   if (!mine) return { success: false, error: 'No mine found' };
   const nextLevel = MINE_LEVELS.find(m => m.level === mine.level + 1);
   if (!nextLevel) return { success: false, error: 'Max level reached' };
@@ -68,7 +84,9 @@ function getAllMines() {
 module.exports = {
   MINE_LEVELS,
   initMine,
+  getMines,
   getMine,
+  findMineById,
   getMineLevel,
   upgradeMine,
   getMineOutput,
