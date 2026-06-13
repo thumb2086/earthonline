@@ -596,7 +596,7 @@ regions.forEach(regionName => {
         const oldSocket = nsp.sockets.get(oldSocketId);
         if (oldSocket && oldSocket.connected) {
           oldSocket.emit('auth_error', { message: '您的帳號已在其他裝置登入，此連線已中斷。' });
-          setTimeout(() => { try { oldSocket.disconnect(true); } catch(e) {} }, 500);
+          setTimeout(() => { try { oldSocket.disconnect(true); } catch(e) { console.error('[SYS] Error disconnecting old socket:', e); } }, 500);
         }
         connectedUsers.delete(oldSocketId);
         // Also clear the stale session entry so the db reflects truth
@@ -620,7 +620,9 @@ regions.forEach(regionName => {
       const pop = await db.getRegionPopulation(regionName);
 
       // Disconnect compensation: calculate missed time
-      const lastHeartbeat = heartbeatTimestamps.get(decoded.username);
+      // Fall back to DB field if in-memory map was cleared (server restart)
+      let lastHeartbeat = heartbeatTimestamps.get(decoded.username);
+      if (!lastHeartbeat && dbUser?.lastHeartbeat) lastHeartbeat = dbUser.lastHeartbeat;
       let offlineEarnings = null;
       const lastComp = lastCompTime.get(decoded.username) || 0;
       const canCompensate = Date.now() - lastComp >= 300000;
@@ -661,7 +663,9 @@ regions.forEach(regionName => {
           }
         }
       }
-      heartbeatTimestamps.set(decoded.username, Date.now());
+      const now = Date.now();
+      heartbeatTimestamps.set(decoded.username, now);
+      User.updateOne({ username: decoded.username }, { $set: { lastHeartbeat: now } }).catch(() => {});
 
       socket.emit('init_data', {
         userId: user.id,

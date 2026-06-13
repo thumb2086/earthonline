@@ -48,6 +48,15 @@ async function getRegionPopulation(homeRegion) {
   return await User.countDocuments({ homeRegion });
 }
 
+async function getAllRegionsPopulation() {
+  const result = await User.aggregate([
+    { $group: { _id: '$homeRegion', count: { $sum: 1 } } }
+  ]);
+  const pops = {};
+  for (const r of result) pops[r._id] = r.count;
+  return pops;
+}
+
 async function updateUserDiscord(username, discordData) {
   const result = await User.findOneAndUpdate(
     { username },
@@ -146,6 +155,7 @@ module.exports = {
   findUserByUsernameOrEmail,
   createUser,
   getRegionPopulation,
+  getAllRegionsPopulation,
   updateUserDiscord,
   getGlobalProduction,
   getRegionProduction,

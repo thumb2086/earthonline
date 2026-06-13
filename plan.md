@@ -16,16 +16,19 @@
 | 事件與目標 (v1.11.x) | ✅ | 全域事件投票、每日任務、成就、週結算 |
 | 新功能 (v1.12.1~v1.12.3) | ✅ | 離線收益、天賦系統、區域對抗統計 |
 | Offline-First (v2.0.0) | ✅ | GameEngine + IndexedDB + PWA SW + Mobile CSS |
+| 手機 UI Redesign (v2.0.1) | ✅ | 底部 4 Tab 導航 (Dashboard/Globe/Chat/Profile) |
 | 管理員判定修復 | ✅ | 角色同步搬到 init_data 之前 |
 
-### 進行中
+### v1.14.0 已完成
 
-| 項目 | 狀態 |
+| Task | 狀態 |
 |------|------|
-| v1.12.4 區域結算+前端面板 | ⬜ |
-| v1.12.5 多背景風格 | ⬜ |
-| v1.13.x 安全/效能/測試 | ⬜ |
-| v1.14.0 正式發布文件 | ⬜ |
+| 修復 server.js catch(e) => {} 靜默失敗 | ✅ |
+| 修復 /api/global/stats 硬編碼 region=asia (改為所有 region 聚合) | ✅ |
+| 修復 heartbeatTimestamps 重啟消失 (fallback 到 DB lastHeartbeat) | ✅ |
+| App.jsx 元件拆分 (-556 行，抽出 5 個 Modal 到獨立檔案) | ✅ |
+| 更新 README + CHANGELOG | ⬜ |
+| 更新 AGENTS.md | ⬜ |
 
 ---
 
@@ -347,7 +350,8 @@ desktop/
 | 版本 | 主題 | 預計天數 | 相依性 | 優先級 |
 |------|------|---------|--------|--------|
 | v2.0.1a-e | 行動版 UI Redesign (底部 Tab) | 5 天 | v2.0.0 | High | ✅ |
-| v1.14.0 | 正式發布 + 問題修正 | 7 天 | — | High |
+| v1.14.0a-d | 問題修正 + App.jsx 拆分 -556 行 | 4 天 | — | High | ✅ |
+| v1.14.0e-f | 文件更新 (README/CHANGELOG/AGENTS) | 2 天 | — | Medium |
 | v2.1.0a-c | Electron 發布管道 | 3 天 | v2.0.0 | High |
 | v2.1.1a-c | Steamworks 整合 | 5 天 | v2.1.0 | Medium |
 | v2.1.2a-b | Discord RPC 強化 + 視窗管理 | 2 天 | v2.1.0 | Low |
