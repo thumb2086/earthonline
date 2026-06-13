@@ -903,24 +903,27 @@ body {
     overflow-x: hidden;
   }
 
-  /* Header stacks vertically */
+  /* Header compact on mobile */
   .system-header {
     flex-direction: column;
-    gap: 6px;
-    padding: 8px 10px;
+    gap: 4px;
+    padding: 6px 10px;
     height: auto;
+    min-height: auto;
   }
   .system-title {
     width: 100%;
     justify-content: center;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
   }
+  .system-title span { display: none; }
   .header-right {
     width: 100%;
     justify-content: center;
     flex-wrap: wrap;
     gap: 4px;
   }
+  .header-right > a { display: none !important; }
   .system-stats {
     font-size: 0.7rem;
     padding: 3px 6px;
@@ -1046,6 +1049,24 @@ body {
   /* Sidebar compact */
   .metric-group { padding: 6px 8px !important; }
   .brand-banner { padding-bottom: 8px !important; margin-bottom: 8px !important; }
+
+  /* Mobile layout fixes */
+  .mobile-layout {
+    background: var(--bg-color);
+    height: 100%;
+  }
+  .mobile-content {
+    padding-top: 0;
+  }
+  .mobile-nav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    background: var(--surface-color);
+    border-top: 2px solid var(--border-color);
+  }
+  .mobile-nav-btn {
+    padding: 8px 0;
+    font-size: 0.65rem;
+  }
 }
 
 /* =========================================
@@ -1145,8 +1166,10 @@ body {
 .mobile-layout {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
+  background: var(--bg-color);
 }
 
 .mobile-content {
