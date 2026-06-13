@@ -47,7 +47,8 @@ const userSchema = new mongoose.Schema({
   activeSession: { type: String, default: null },
   cosmetics: { type: Map, of: Boolean, default: {} },
   covenantAccepted: { type: Boolean, default: false },
-  covenantAcceptedAt: { type: Number, default: null }
+  covenantAcceptedAt: { type: Number, default: null },
+  faction: { type: String, default: null }
 });
 
 userSchema.index({ 'discord.id': 1 });

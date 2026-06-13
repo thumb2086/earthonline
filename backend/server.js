@@ -122,7 +122,7 @@ runStartupMigrations();
 
 function obfuscateIp(ip) {
   if (!ip) return '0.0.0.0';
-  const ipv4Match = ip.match(/^(d{1,3}.d{1,3}).d{1,3}.d{1,3}$/);
+  const ipv4Match = ip.match(/^(\d{1,3}\.\d{1,3})\.\d{1,3}\.\d{1,3}$/);
   if (ipv4Match) return ipv4Match[1] + '.x.x';
   const ipv6Match = ip.match(/^([0-9a-f:]+:[0-9a-f:]+):/i);
   if (ipv6Match) return ipv6Match[1] + ':xxxx:xxxx';
@@ -158,9 +158,8 @@ app.use(helmet({ contentSecurityPolicy: {
 // Health check for Render
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() }));
 
-app.use('/api/auth/discord', discordAuthLimiter);
 // Discord OAuth — must be BEFORE :region route mounts to avoid Express 5 path conflict
-app.get('/api/auth/discord', (req, res) => {
+app.get('/api/auth/discord', discordAuthLimiter, (req, res) => {
   const state = req.query.state;
   if (!state) return res.status(400).send('Missing state');
   const redirectUri = `${BACKEND_URL}/api/auth/discord/callback`;
@@ -261,7 +260,7 @@ startCleanupInterval(heartbeatTimestamps, reviveCounts, chatCooldowns, roleCache
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] }
 });
 
 discordBot.setIoInstance(io);
@@ -306,6 +305,9 @@ setInterval(() => {
   }
 }, 5000);
 
+process.on('SIGTERM', () => { console.log('[SYS] SIGTERM received, shutting down...'); process.exit(0); });
+process.on('SIGINT', () => { console.log('[SYS] SIGINT received, shutting down...'); process.exit(0); });
+
 regions.forEach(regionName => {
   const nsp = io.of(`/${regionName}`);
   const state = regionStates[regionName];
@@ -320,7 +322,7 @@ regions.forEach(regionName => {
 
   let lastPausedState = false;
 
-  setInterval(async () => {
+  const tickInterval = setInterval(async () => {
     const nowPaused = isPaused();
     if (nowPaused !== lastPausedState) {
       lastPausedState = nowPaused;
@@ -457,6 +459,13 @@ regions.forEach(regionName => {
       console.error(err);
       socket.emit('buy_result', { success: false, message: '系統錯誤' });
     }
+  });
+
+  socket.on('select_faction', async (faction) => {
+    if (!socket.user || !faction || typeof faction !== 'string') return;
+    await User.updateOne({ username: socket.user.username }, { $set: { faction } });
+    socket.emit('faction_selected', { faction });
+    socket.user.faction = faction;
   });
 
   socket.on('use_item', async (itemId) => {
@@ -603,6 +612,8 @@ regions.forEach(regionName => {
         accumulatedTime: dbUser?.accumulatedTime || 0,
         accumulatedBonusPoints: dbUser?.accumulatedBonusPoints || 0,
         health: dbUser?.health !== undefined ? dbUser.health : 100,
+        honor: dbUser?.honor || 0,
+        weeklyScore: dbUser?.weeklyScore || 0,
         inventory: dbUser?.inventory ? Object.fromEntries(dbUser.inventory) : {},
         activeBuffs: dbUser?.activeBuffs ? Object.fromEntries(dbUser.activeBuffs) : {},
         createdAt: dbUser?.createdAt || Date.now(),
@@ -774,12 +785,13 @@ regions.forEach(regionName => {
 
   // Mine handlers
   const { initMine, getMine, upgradeMine, getCountryMines } = require('./services/mineService');
-  socket.on('establish_mine', () => {
+  socket.on('establish_mine', (data = {}) => {
     if (!socket.user) return;
     const username = socket.user.username;
-    const dbUser = connectedUsers.get(username);
+    const dbUser = connectedUsers.get(socket.id);
     if (!dbUser) return;
-    const mine = initMine(username, dbUser.country || 'UNKNOWN');
+    const country = data.country || dbUser.country || 'UNKNOWN';
+    const mine = initMine(username, country);
     socket.emit('mine_state', mine);
     nspIo.emit('mine_established', { username, country: dbUser.country });
   });

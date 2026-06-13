@@ -38,7 +38,8 @@ async function checkQuestReset(username) {
   const user = await User.findOne({ username });
   if (!user || !user.dailyQuests) return false;
   const now = Date.now();
-  const resetAt = Object.values(user.dailyQuests)[0]?.resetAt || 0;
+  const firstQuest = user.dailyQuests.size > 0 ? user.dailyQuests.values().next().value : null;
+  const resetAt = firstQuest?.resetAt || 0;
   const weekStart = getQuestWeekStart();
   if (weekStart > resetAt) {
     await User.updateOne({ username }, { $set: { dailyQuests: getDefaultQuests() } });

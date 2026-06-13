@@ -7,7 +7,7 @@ const RARITIES = [
   { name: '神話', weight: 3,  color: '#f59e0b', icon: '★' },
 ];
 
-export default function LotteryModal({ pt, artifacts = [], onDraw, onSmelt, onClose }) {
+export default function LotteryModal({ pt, artifacts = [], onDraw, onSmelt, onClose, lastResult }) {
   const [rolling, setRolling] = useState(false);
   const [result, setResult] = useState(null);
   const [showInventory, setShowInventory] = useState(false);
@@ -20,6 +20,10 @@ export default function LotteryModal({ pt, artifacts = [], onDraw, onSmelt, onCl
       setRolling(false);
     }, 1500);
   };
+
+  const rarityColors = { common: '#94a3b8', uncommon: '#3b82f6', rare: '#a855f7', mythic: '#f59e0b' };
+  const rarityIcons = { common: '▫', uncommon: '◇', rare: '◆', mythic: '★' };
+  const streak = lastResult?.streak || 0;
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{
@@ -35,6 +39,26 @@ export default function LotteryModal({ pt, artifacts = [], onDraw, onSmelt, onCl
         <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#64748b', marginBottom: '16px' }}>
           每次 2,000 PT · 有機會獲得永久加成遺物
         </p>
+
+        {lastResult && !rolling && (
+          <div style={{
+            textAlign: 'center', padding: '10px', marginBottom: '12px',
+            background: `${rarityColors[lastResult.rarity] || '#64748b'}15`,
+            border: `1px solid ${rarityColors[lastResult.rarity] || '#64748b'}44`,
+            borderRadius: '8px', fontSize: '1.2rem',
+          }}>
+            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '4px' }}>
+              {rarityIcons[lastResult.rarity] || '?'}
+            </span>
+            <div style={{ color: rarityColors[lastResult.rarity] || '#64748b', fontWeight: 'bold' }}>
+              {lastResult.name || '未知遺物'}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+              {lastResult.rarity === 'mythic' ? '🌟 神話級！全服公告！' : `${lastResult.rarityText || ''}`}
+              {streak > 0 && ` (連抽 ${streak} 次)`}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginBottom: '16px' }}>
           {RARITIES.map(r => (

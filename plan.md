@@ -139,7 +139,8 @@ v2.5.x ── 真實數據 + P2P 聊天 + 反作弊 + 備援節點
   - 驗證：`npm run dev:electron` 啟動後載入本機 Vite dev server
 
 - **v2.1.0b electron-builder 設定** ✅
-  - 做什麼：在 client/package.json 加入 `build` 區塊（win/mac/linux targets），加入 `electron-updater` 支援自動更新
+  - 做什麼：在 client/package.json 加入 `build` 區塊（win/mac/linux targets）
+  - 注意：Electron 僅為網站套殼，內容靠 Cloudflare Pages 即時更新，故不實作 `electron-updater` 自動更新
   - 改哪個檔案： `client/package.json`
   - 驗證：`npm run build:electron` 產出 `.exe` / `.dmg` / `.AppImage`
 

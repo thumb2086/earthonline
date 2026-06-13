@@ -896,12 +896,14 @@ body {
    Mobile Responsive Layout (≤768px)
    ========================================= */
 @media (max-width: 768px) {
-  body { overflow: hidden; position: fixed; width: 100%; height: 100%; }
+  body { overflow: hidden; position: fixed; width: 100%; height: 100%; height: 100dvh; }
   .app-container {
     height: 100dvh;
     min-height: 100dvh;
     max-height: 100dvh;
     overflow: hidden;
+    height: 100vh;
+    height: 100dvh;
   }
 
   /* Hide header on mobile - MobileLayout has its own nav */

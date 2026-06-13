@@ -14,6 +14,7 @@ const { JWT_SECRET, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, BACKEND_URL, FRONT
 const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, message: { error: 'Too many registrations from this IP, please try again later' } });
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many login attempts, please try again later' } });
 const sendVerificationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 3, message: { error: 'Too many verification emails sent, please try again later' } });
+const resetPasswordLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, message: { error: 'Too many password reset attempts, please try again later' } });
 
 function obfuscateIp(ip) {
   if (!ip) return '0.0.0.0';
@@ -99,7 +100,7 @@ router.post('/auth/generate-recovery-key', async (req, res, next) => {
   } catch (err) { res.status(401).json({ error: 'Invalid token' }); }
 });
 
-router.post('/reset-password', async (req, res, next) => {
+router.post('/reset-password', resetPasswordLimiter, async (req, res, next) => {
   try {
     const { username, recoveryKey, newPassword } = req.body;
     if (!username || !recoveryKey || !newPassword) return res.status(400).json({ error: 'Missing fields' });

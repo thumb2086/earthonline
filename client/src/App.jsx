@@ -53,6 +53,16 @@ function Dashboard({ token, onLogout, region }) {
   const [showAdRevive, setShowAdRevive] = useState(false);
   const [adCountdown, setAdCountdown] = useState(0);
   const [adReviveRemaining, setAdReviveRemaining] = useState(3);
+  const AD_SLOGANS = [
+    { title: '🔥 子熙 Casino — 百萬獎金等你拿', lines: ['註冊即送 1000 籌碼', '邀請好友再拿 500'] },
+    { title: '📱 子熙生態系 APP', lines: ['一鍵管理所有節點', '即時通知 + 遠端監控'] },
+    { title: '⚡ 高速 VPS 限時優惠', lines: ['全球節點延遲 <20ms', '使用折扣碼 EARTH20'] },
+    { title: '🎰 每日免費轉輪盤', lines: ['子熙 Casino 每天送', '最高 10000 籌碼！'] },
+  ];
+  const AD_LINKS = {
+    '/ads/zixi_casino.png': 'https://zixi-casino.vercel.app/landing',
+    '/ads/zixi_app.png': 'https://zixi-casino.vercel.app/app',
+  };
   const [currentAd, setCurrentAd] = useState('');
   const [adPlaying, setAdPlaying] = useState(false);
   const [adSlogan, setAdSlogan] = useState('');
@@ -371,14 +381,6 @@ function Dashboard({ token, onLogout, region }) {
     const s = socket;
 
     addLog(t('驗證金鑰已發送，等待授權...'));
-    s.on('auth_error', (data) => {
-      const msg = data?.message || t('授權已過期，請重新登入');
-      addLog(`[SYSTEM] ${msg}`);
-      alert(msg);
-      setIsConnected(false);
-      onLogout();
-    });
-
     s.on('init_data', async (data) => {
       addLog(`身分確認：節點 [${data.username}] 成功接入全球網路`);
       if (data.discordProfile && data.discordProfile.id) {
@@ -1778,10 +1780,12 @@ function Dashboard({ token, onLogout, region }) {
             <FactionSelect
               existingFaction={null}
               onSelect={(faction) => {
+                if (socket?.connected) socket.emit('select_faction', faction);
                 setShowFactionSelect(false);
                 if (window.electronAPI) {
                   window.electronAPI.updatePresence({ details: `陣營: ${faction}`, state: '探索地球在線' });
                 }
+                showToast(`✅ 已選擇陣營：${faction}`, 'success');
               }}
               onSkip={() => setShowFactionSelect(false)}
             />
@@ -1815,7 +1819,7 @@ function Dashboard({ token, onLogout, region }) {
                   if (!mine && socket?.connected) {
                     setDispatchedCountry(countryName);
                     setShowDispatchAnim(true);
-                    socket.emit('establish_mine');
+                    socket.emit('establish_mine', { country: countryName });
                   }
                   setShowWorldMap(false);
                   setSelectedCountry(null);
@@ -1846,6 +1850,7 @@ function Dashboard({ token, onLogout, region }) {
         <LotteryModal
           pt={myNode?.accumulatedBonusPoints || 0}
           artifacts={lotteryInventory}
+          lastResult={lastLotteryResult}
           onDraw={() => { if (socket?.connected) socket.emit('lottery_draw'); }}
           onSmelt={(id) => { if (socket?.connected) socket.emit('lottery_smelt', id); }}
           onClose={() => setShowLottery(false)}

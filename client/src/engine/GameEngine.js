@@ -113,7 +113,7 @@ export default class GameEngine {
       ? 1 + (onlineCount - COLLECTIVE_LOAD_THRESHOLD) * 0.01
       : 1;
 
-    const isDead = (this.state.health || 0) <= 0;
+    let isDead = (this.state.health || 0) <= 0;
     let decay = 0;
 
     if (!isDead) {
@@ -122,6 +122,11 @@ export default class GameEngine {
         const survivalHours = (this.state.accumulatedTime || 0) / 3600000;
         const curveMultiplier = 1 / Math.sqrt(Math.max(survivalHours, 0.1));
         decay = BASE_DECAY_PER_TICK * curveMultiplier * loadMultiplier * decayReduction;
+
+        const hasCooling = this.state.activeBuffs?.cooling > now;
+        const hasQuantumCooling = this.state.activeBuffs?.quantum_cooling > now;
+        if (hasCooling) decay *= 0.5;
+        if (hasQuantumCooling) decay *= 0.7;
       }
     }
 
@@ -130,7 +135,15 @@ export default class GameEngine {
       if (hasBackup) {
         this.state.health = 30;
         this.state.cosmetics = { ...this.state.cosmetics, backup_node: undefined };
+        isDead = false;
       }
+    }
+
+    // Passive health recovery when low (online, caps at 50)
+    let recovery = 0;
+    if (!isDead && (this.state.health || 0) > 0 && (this.state.health || 0) < 50) {
+      const room = 50 - (this.state.health || 0);
+      recovery = Math.min(room, (this.state.health || 0) < 25 ? 0.2 : 0.1);
     }
 
     let ptPerTick = 0;
@@ -144,17 +157,28 @@ export default class GameEngine {
         ptPerTick *= 2;
       }
 
+      if (this.state.activeBuffs?.speed > now) {
+        ptPerTick *= 1.66;
+      }
+
+      if (this.state.activeBuffs?.generator_boost > now) {
+        ptPerTick += 0.05;
+      }
+
       const hasCooling = this.state.activeBuffs?.cooling > now;
       if (hasCooling && this.currentGlobalEvent?.type === 'SYSTEM_MAINTENANCE') {
         decay = 0;
         ptPerTick += 0.05;
       }
 
-      timeEarned = TIME_EARNED_PER_TICK / 1000;
+      timeEarned = TIME_EARNED_PER_TICK;
     }
 
     if (decay > 0) {
       this.state.health = Math.max(0, (this.state.health || 0) - decay);
+    }
+    if (recovery > 0) {
+      this.state.health = Math.min(50, (this.state.health || 0) + recovery);
     }
     if (ptPerTick > 0) {
       this.state.accumulatedBonusPoints = (this.state.accumulatedBonusPoints || 0) + ptPerTick;
