@@ -33,6 +33,12 @@ async function processTick(state, connectedUsers, regionName) {
         const survivalHours = (user.accumulatedTime || 0) / 3600000;
         const curveMultiplier = 1 / Math.sqrt(Math.max(survivalHours, 0.1));
         decay = BASE_DECAY_PER_TICK * curveMultiplier * loadMultiplier * decayReduction;
+
+        // Cooling buffs reduce decay
+        const hasCooling = user.activeBuffs && user.activeBuffs.get('cooling') > Date.now();
+        const hasQuantumCooling = user.activeBuffs && user.activeBuffs.get('quantum_cooling') > Date.now();
+        if (hasCooling) decay *= 0.5;
+        if (hasQuantumCooling) decay *= 0.7;
       }
     }
     if (user.health <= 0) {
@@ -67,9 +73,18 @@ async function processTick(state, connectedUsers, regionName) {
         ptPerTick *= 2;
       }
 
-      const hasCooling = user.activeBuffs && user.activeBuffs.get('cooling') > Date.now();
-      if (hasCooling && state.currentGlobalEvent?.type === 'SYSTEM_MAINTENANCE') {
+      // Speed drive: +66% PT per tick
+      if (user.activeBuffs && user.activeBuffs.get('speed') > Date.now()) {
+        ptPerTick *= 1.66;
+      }
+
+      if (user.activeBuffs && user.activeBuffs.get('cooling') > Date.now() && state.currentGlobalEvent?.type === 'SYSTEM_MAINTENANCE') {
         decay = 0;
+        ptPerTick += 0.05;
+      }
+
+      // Generator boost: extra PT after revive
+      if (user.activeBuffs && user.activeBuffs.get('generator_boost') > Date.now()) {
         ptPerTick += 0.05;
       }
 

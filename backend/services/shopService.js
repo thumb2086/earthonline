@@ -65,15 +65,16 @@ async function useItem(username, itemId) {
       return { success: false, message: '伺服器已死機，無法使用散熱道具！請先用備用發電機。' };
     }
     const newHealth = Math.min(100, dbUser.health + item.value);
-    extraUpdate = { $set: { health: newHealth } };
-    message = `❤️ 健康度恢復 +${item.value}%（現在 ${Math.floor(newHealth)}%）`;
+    const quantumExpiry = Date.now() + 1800000; // 30 min decay reduction
+    extraUpdate = { $set: { health: newHealth, 'activeBuffs.quantum_cooling': quantumExpiry } };
+    message = `❤️ 健康度恢復 +${item.value}%（現在 ${Math.floor(newHealth)}%），❄️ 衰減 -30% 持續 30 分鐘`;
 
   } else if (item.effect === 'buff') {
     const expiry = Date.now() + item.duration;
     extraUpdate = { $set: { [`activeBuffs.${item.type}`]: expiry } };
     const minLabel = Math.floor(item.duration / 60000);
     message = item.type === 'overclock'
-      ? `⚡ PT 收益 ×3.0 倍，持續 ${minLabel} 分鐘！`
+      ? `⚡ PT 收益 ×2.0 倍，持續 ${minLabel} 分鐘！`
       : item.type === 'cooling'
         ? `❄️ 液態氮冷卻啟動，衰減 -50% 且免疫維護懲罰，持續 ${minLabel} 分鐘！`
         : item.type === 'firewall'
@@ -86,12 +87,13 @@ async function useItem(username, itemId) {
       await User.updateOne({ username }, { $inc: { [`inventory.${itemId}`]: 1 } });
       return { success: false, message: '伺服器仍在運作，不需要發電機！' };
     }
-    extraUpdate = { $set: { health: item.value } };
-    message = `🔋 伺服器強制重啟！健康度恢復至 ${item.value}%`;
+    const boostExpiry = Date.now() + 1800000; // 30 min extra PT
+    extraUpdate = { $set: { health: item.value, 'activeBuffs.generator_boost': boostExpiry } };
+    message = `🔋 伺服器強制重啟！健康度恢復至 ${item.value}%，⚡ 30 分鐘內每 tick 額外 +0.05 PT`;
 
   } else if (item.effect === 'cosmetic') {
     extraUpdate = { $set: { [`cosmetics.${itemId}`]: true } };
-    message = '🌈 霓虹燈管已安裝，裝飾效果已套用！';
+    message = '🌈 霓虹燈管已安裝，好友上限 +5，裝飾效果已套用！';
 
   } else if (item.effect === 'random') {
     const rand = Math.random();
