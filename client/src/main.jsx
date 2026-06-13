@@ -2,6 +2,18 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
+
+const updateSW = registerSW({
+  onNeedRefresh() {
+    if (confirm('新版本已就緒，更新嗎？')) {
+      updateSW(true);
+    }
+  },
+  onOfflineReady() {
+    console.log('[PWA] 離線模式已就緒');
+  },
+});
 
 class ErrorBoundary extends React.Component {
   constructor(props) {

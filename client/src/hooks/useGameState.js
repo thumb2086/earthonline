@@ -9,7 +9,6 @@ export default function useGameState(socket, API_URL, BASE_URL) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [currentEvent, setCurrentEvent] = useState(null);
 
-  // Fetch hub stats periodically (with race condition protection)
   useEffect(() => {
     let reqId = 0;
     const fetchHub = async () => {
@@ -24,7 +23,6 @@ export default function useGameState(socket, API_URL, BASE_URL) {
     return () => clearInterval(inv);
   }, [BASE_URL]);
 
-  // Fetch leaderboard periodically (with race condition protection)
   useEffect(() => {
     let reqId = 0;
     const fetchLB = async () => {
@@ -39,7 +37,6 @@ export default function useGameState(socket, API_URL, BASE_URL) {
     return () => clearInterval(intv);
   }, [API_URL]);
 
-  // Socket event listeners for game state
   useEffect(() => {
     if (!socket) return;
     const s = socket;

@@ -819,176 +819,210 @@ body {
 }
 
 /* =========================================
-   Mobile UI Responsive Layout
+   Tablet Responsive Layout (≤1024px)
+   ========================================= */
+@media (max-width: 1024px) {
+  .metrics-terminal {
+    width: 260px;
+  }
+}
+
+/* =========================================
+   Mobile Responsive Layout (≤768px)
    ========================================= */
 @media (max-width: 768px) {
-  /* Allow scrolling on mobile, map is fixed height at top, stats at bottom */
-  body {
-    overflow-y: auto;
-  }
+  body { overflow-y: auto; }
   .app-container {
     height: auto;
     min-height: 100dvh;
     overflow-x: hidden;
   }
-  .main-content {
-    flex-direction: column-reverse;
-    height: auto;
-  }
-  
-  /* Map on top */
-  .geographic-matrix {
-    height: 50vh;
-    min-height: 400px;
-    flex: none;
-    width: 100vw;
-  }
 
-  /* Stats sidebar on bottom */
-  .metrics-terminal {
-    width: 100%;
-    margin: 0;
-    height: auto;
-    border-radius: 0;
-    box-shadow: none;
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-    padding: 20px 15px;
-  }
-
-  /* Login and Modals */
-  .login-box {
-    width: 90%;
-    padding: 25px 20px;
-  }
-  
-  .modal-box {
-    width: 95%;
-    padding: 20px 15px;
-  }
-  
-  /* Doc overlay */
-  .pro-doc-header {
-    padding: 0 15px;
-  }
-  .pro-doc-body {
-    flex-direction: column;
-    padding: 20px 15px;
-    gap: 30px;
-  }
-  .pro-doc-sidebar {
-    width: 100%;
-  }
-  .pro-doc-sidebar ul {
-    position: static;
-    display: flex;
-    overflow-x: auto;
-    gap: 15px;
-    padding-bottom: 10px;
-  }
-  .pro-doc-sidebar li {
-    white-space: nowrap;
-    margin-bottom: 0;
-  }
-  .doc-grid {
-    grid-template-columns: 1fr;
-    gap: 5px;
-  }
-
-  /* Overlays */
-  .map-overlays {
-    top: 10px;
-    right: 10px;
-    gap: 5px;
-  }
-  .overlay-box {
-    padding: 10px 15px;
-    min-width: 100px;
-  }
-  .overlay-value {
-    font-size: 1.2rem;
-  }
-  
-  /* Terminal / Log console */
-  .bottom-log-console {
-    width: calc(100% - 20px);
-    left: 10px;
-    bottom: 10px;
-    max-height: 120px;
-  }
-
-  /* Hide header right section to save space on very small screens, or adjust */
-  .header-right {
-    gap: 5px;
-  }
-  .system-header {
-    padding: 0 10px;
-    font-size: 0.8rem;
-  }
-  .main-content {
-    flex-direction: column;
-    padding: 10px;
-  }
-  .metrics-terminal {
-    width: 100%;
-    max-height: none;
-    order: 2;
-  }
-  .geographic-matrix {
-    width: 100%;
-    order: 1;
-    min-height: 50vh;
-  }
+  /* Header stacks vertically */
   .system-header {
     flex-direction: column;
-    gap: 8px;
-    padding: 10px;
+    gap: 6px;
+    padding: 8px 10px;
     height: auto;
   }
   .system-title {
     width: 100%;
     justify-content: center;
+    font-size: 0.85rem;
   }
   .header-right {
     width: 100%;
     justify-content: center;
     flex-wrap: wrap;
+    gap: 4px;
   }
   .system-stats {
-    font-size: 0.75rem;
-    padding: 4px 8px;
+    font-size: 0.7rem;
+    padding: 3px 6px;
+    gap: 6px;
   }
+  .header-dropdown { font-size: 0.75rem; }
+  .header-dropdown-content {
+    right: 0;
+    left: auto;
+    min-width: 200px;
+  }
+
+  /* Main content: map on top, sidebar below */
+  .main-content {
+    flex-direction: column;
+    height: auto;
+    padding: 0;
+  }
+  .geographic-matrix {
+    width: 100%;
+    height: 50vh;
+    min-height: 350px;
+    flex: none;
+    order: 1;
+  }
+  .metrics-terminal {
+    width: 100%;
+    margin: 0;
+    height: auto;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 15px 12px;
+    order: 2;
+  }
+
+  /* Map overlays */
   .map-overlays {
     position: relative;
     top: auto;
     right: auto;
     width: 100%;
+    gap: 4px;
   }
   .map-overlays .floating-panel {
     width: 100%;
     flex-wrap: wrap;
-    gap: 10px;
-    padding: 10px;
+    gap: 6px;
+    padding: 8px;
   }
+  .overlay-box {
+    padding: 6px 10px;
+    min-width: 80px;
+  }
+  .overlay-value { font-size: 1rem; }
+
+  /* Login & Modals */
   .login-box {
+    width: 92%;
+    padding: 20px 16px;
+  }
+  .modal-overlay {
+    align-items: flex-end;
+  }
+  .modal-overlay > div {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    max-height: 85vh !important;
+    margin-top: auto;
+    overflow-y: auto;
+  }
+  .modal-box {
     width: 95%;
-    padding: 20px 15px;
+    padding: 16px 12px;
   }
+
+  /* Doc overlay */
+  .pro-doc-header { padding: 0 12px; }
+  .pro-doc-body {
+    flex-direction: column;
+    padding: 16px 12px;
+    gap: 20px;
+  }
+  .pro-doc-sidebar { width: 100%; }
+  .pro-doc-sidebar ul {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding-bottom: 8px;
+  }
+  .pro-doc-sidebar li {
+    white-space: nowrap;
+    margin-bottom: 0;
+  }
+  .doc-grid { grid-template-columns: 1fr; gap: 4px; }
+
+  /* Bottom Log Console */
   .bottom-log-console {
-    width: calc(100% - 10px);
-    left: 5px;
-    bottom: 5px;
+    width: calc(100% - 12px);
+    left: 6px;
+    bottom: 6px;
+    height: 200px;
     max-height: 100px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    padding: 8px 10px;
   }
+
+  /* Event banner: allow wrapping */
+  .pro-doc-overlay > div:not(.pro-doc-header):not(.pro-doc-body) {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Touch-friendly buttons */
+  .terminal-btn { padding: 10px 8px !important; font-size: 0.9rem !important; }
+  button, .dropdown-item { min-height: 36px; }
+
+  /* Sidebar compact */
+  .metric-group { padding: 6px 8px !important; }
+  .brand-banner { padding-bottom: 8px !important; margin-bottom: 8px !important; }
 }
 
-/* 1024px breakpoint */
-@media (max-width: 1024px) and (min-width: 769px) {
-  .metrics-terminal {
-    width: 260px;
+/* =========================================
+   Phone Responsive Layout (≤480px)
+   ========================================= */
+@media (max-width: 480px) {
+  .system-header {
+    padding: 4px 6px;
+    gap: 4px;
   }
+  .system-title { font-size: 0.75rem; }
+  .system-stats { font-size: 0.65rem; padding: 2px 4px; }
+  .header-dropdown-content { min-width: 160px; right: -10px; }
+
+  .geographic-matrix {
+    height: 40vh;
+    min-height: 280px;
+  }
+
+  .metrics-terminal {
+    padding: 10px 8px;
+  }
+
+  .modal-overlay > div {
+    border-radius: 12px 12px 0 0 !important;
+    padding: 16px 12px !important;
+  }
+
+  .bottom-log-console {
+    height: 150px;
+    max-height: 80px;
+    font-size: 0.65rem;
+    padding: 6px 8px;
+  }
+
+  .brand-banner h3 { font-size: 0.9rem !important; }
+  .metric-group { padding: 4px 6px !important; }
+  .map-overlays .floating-panel { padding: 6px; }
+  .overlay-value { font-size: 0.85rem; }
+
+  .login-box { padding: 14px 10px; }
+  .logout-btn { padding: 4px 10px !important; font-size: 0.75rem !important; }
 }
 
 /* Four-Petal Spiral Loading */

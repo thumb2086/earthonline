@@ -171,15 +171,83 @@ export function startAutoSave(engine) {
 }
 ```
 
-### 離線遊玩流程
+### 先決條件：Service Worker（頁面離線載入）
+
+> 這是整個 Offline-First 架構的前提：沒有 Service Worker，即便 GameEngine 寫再好，瀏覽器沒網路時連頁面都載入不了。
+
+`earthonline.qzz.io` 是普通網頁，HTML/JS/CSS 都存在 Cloudflare Pages 上。要讓它「離線可用」，需要：
+
+**Service Worker 策略：Cache-First（快取優先）**
 
 ```
-1. 使用者打開瀏覽器
-2. 檢查 localStorage 有無 token
-   ├─ 有 → 嘗試連線伺服器
+第一次訪問（有網路）：
+  ┌─ 註冊 Service Worker
+  └─ SW 安裝時把 client build 結果全部快取到 Cache API
+      ├─ 所有 JS bundle
+      ├─ CSS
+      ├─ HTML (index.html)
+      ├─ 字型 / 圖片 / 音效
+      └─ manifest.json / icon
+
+後續訪問（無網路）：
+  ┌─ 瀏覽器請求頁面
+  ├─ SW 攔截請求 → 檢查 Cache API
+  │   ├─ 有快取 → 直接回應（立即載入）
+  │   └─ 無快取 → 回退到網路（首次或新版本）
+  └─ 頁面載入後 GameEngine + IndexedDB 接管
+      遊戲狀態完全在本地，不需要伺服器
+```
+
+**實作方式：**
+
+建立 `client/sw.js`（約 40 行）：
+```javascript
+const CACHE = 'earthonline-v1';
+const ASSETS = self.__WB_MANIFEST || []; // Vite 自動產出
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+  self.skipWaiting();
+});
+
+self.addEventListener('fetch', (e) => {
+  e.respondWith(
+    caches.match(e.request).then((r) => r || fetch(e.request))
+  );
+});
+```
+
+在 `client/src/main.jsx` 註冊：
+```javascript
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+```
+
+**Vite 整合：** 使用 `vite-plugin-pwa` 套件，自動處理 SW 生成、版本管理、manifest.json。
+
+| 整合方式 | 優點 | 缺點 |
+|---------|------|------|
+| vite-plugin-pwa | 自動處理更新、無需手動維護 hash | 多一個依賴 |
+| 手寫 sw.js | 完全控制、無依賴 | 需管理版本更新邏輯 |
+
+建議使用 `vite-plugin-pwa`，產出約 5KB 的 SW，支援自動更新提示。
+
+### 離線遊玩流程（含 Service Worker）
+
+```
+1. 使用者打開瀏覽器 → 輸入 earthonline.qzz.io
+2. Service Worker 攔截請求
+   ├─ 已安裝且快取 → 立即渲染頁面（可離線）
+   └─ 首次訪問 → 從 Cloudflare 載入，SW 背景快取
+3. 頁面載入後 GameEngine 初始化
+4. 檢查 localStorage 有無 token
+   ├─ 有 → 嘗試連線伺服器（fetch 可能失敗，因離線）
    │        ├─ 成功 → 同步本地引擎 vs 伺服器狀態（取較大值）
    │        └─ 失敗 → 啟動本地引擎 + IndexedDB 繼續玩
    └─ 無 → 顯示登入頁（可選「離線試玩」模式）
+5. 遊戲中：GameEngine 每 5 秒 tick，IndexedDB 每 10 秒存檔
+6. 重新連線時：狀態合併（取較大值 + 庫存聯集）
 ```
 
 ### 伺服器降級為「同步層」
@@ -545,3 +613,487 @@ class GossipProtocol {
 
 > 「把客戶端當伺服器」不是工程口號，而是 Earth Online 作為放置遊戲的天然優勢。
 > 因為它本質上就是單機遊戲，只是剛好有聊天室而已。
+
+---
+
+## 可行性評估
+
+> 基於 2026-06-13 專案審計結果，對 hybrid P2P 架構進行技術與實務可行性分析。
+
+### 專案現狀摘要
+
+| 項目 | 狀態 |
+|------|------|
+| 客戶端角色 | **純顯示層**，無任何本地遊戲引擎 |
+| IndexedDB 使用 | **零** — 無任何本地持久化 |
+| 離線能力 | 斷線時客戶端凍結，無法累積任何進度 |
+| P2P 實作 | **零** — WebRTC、Gossip 通訊協定均未實作 |
+| 伺服器依賴 | **完全依賴** — Render 掛了則全部人無法遊戲 |
+| server.js | 790 行（含 auth、socket、game loop、admin 邏輯） |
+| App.jsx | 2357 行（單體元件） |
+
+### Layer 1 可行性：★★★★★（立即可行）
+
+**分數：9/10**
+
+| 面向 | 評估 |
+|------|------|
+| 技術難度 | 低 — 純粹的程式碼搬移 + IndexedDB 封裝 |
+| 風險 | 極低 — 不影響現有伺服器邏輯，可逐步上線 |
+| 維護成本 | 低 — GameEngine 邏輯與後端一致即可 |
+| 對玩家影響 | 正向 — 斷線不再中斷遊戲 |
+| 實作時間 | 2-3 天 |
+
+**關鍵考量：**
+
+- **最重要的前提：Service Worker + PWA**。沒有 SW，離線時連頁面都載入不了。這項技術極成熟（caniuse 96%+），使用 `vite-plugin-pwa` 約 30 分鐘可完成整合。
+- GameEngine.js 的 tick 邏輯可以直接 mirror `backend/services/gameLoop.js` 的 `processTick`（109 行），但需注意：
+  - 離線補償邏輯目前在 `server.js` 的 authenticate 區塊（約 50 行），需獨立為共用函數
+  - 成就/任務檢查目前分散在 `achievementService.js` / `questService.js`，客戶端版本需簡化（僅檢查本地可驗證的條件）
+- IndexedDB 存檔頻率：10 秒自動存 + 每個關鍵動作（升級、購物）即時存，離線時沒有 flush 問題
+- 重新連線合併策略：**取較大值**對 PT/時間足夠安全，但需注意：
+  - 庫存（inventory）應採**聯集而非取代**（避免購物後斷線遺失）
+  - 成就/任務進度應取最大值
+- **建議立即開始 Layer 1，這是風險最低、回報最高的投資**
+
+### Layer 2 可行性：★★★☆☆（可行但有條件）
+
+**分數：6/10**
+
+| 面向 | 評估 |
+|------|------|
+| 技術難度 | 中高 — WebRTC NAT 穿透、TURN 成本、瀏覽器相容性 |
+| 風險 | 中 — 可能部分玩家無法 P2P 連線，需降級方案 |
+| 維護成本 | 中 — 需監控 TURN 用量、處理連線問題 |
+| 對玩家影響 | 中 — 聊天功能從 socket.io 改為 P2P |
+| 實作時間 | 3-5 天（基本 Mesh）、再 3-5 天（排行榜+事件）|
+
+**主要風險：**
+
+1. **NAT 穿透失敗率**：根據 WebRTC 統計，約 8-15% 的連線需要 TURN relay。免費 TURN 方案（如 Google STUN）僅適用 STUN，TURN 需自建或付費。
+   - 緩解：使用 Cloudflare TURN（或 coturn 自建，約 $5/mo VPS）
+   - 最低成本方案：當 P2P 失敗時降級為 socket.io relay（仍在 Render 上跑）
+
+2. **聊天系統的去中心化代價**：
+   - 歷史訊息：P2P 節點離線後歷史訊息遺失，新加入節點無法看到過往聊天
+   - 解決方案：每個節點保留最近 N 條訊息的本地 log；或指定志願節點存歷史
+   - Mod 管理（刪除/禁言）：需要公鑰基礎設施來驗證 mod 身份，增加複雜度
+
+3. **排行榜收斂時間**：
+   - Gossip-based 排行榜需 3-5 個傳播週期才能收斂（約 60-90 秒）
+   - 對放置遊戲可接受，但可能引起玩家困惑（「我明明 2000 PT 為什麼榜上只有 1800？」）
+   - 建議：顯示「P2P 排行榜（約 60 秒內收斂）」標籤；仍有伺服器時以伺服器為準
+
+4. **瀏覽器 Tab 生命週期**：
+   - WebRTC 連線在 Tab 關閉時立即中斷，不像伺服器可以緩衝
+   - Mesh 網路會頻繁重組，Gossip fan-out 需處理節點動態加入/離開
+
+**建議策略：** Layer 2 應以**聊天先行**，排行榜和事件留在伺服器（或同時支援兩種模式），不追求完全去中心化。混合模式（聊天 P2P + 分數伺服器）可在降低複雜度的同時達到 Render 節省目標。
+
+### Layer 3 可行性：★★☆☆☆（長期目標）
+
+**分數：3/10**
+
+| 面向 | 評估 |
+|------|------|
+| 技術難度 | 高 — 安全模型、身份驗證、資料一致性 |
+| 風險 | 高 — 惡意節點、法律責任、可靠性 |
+| 維護成本 | 高 — 社群管理、節點審核、版本相容性 |
+| 對玩家影響 | 不確定 — 取決於社群參與度 |
+| 實作時間 | 1-2 個月 |
+
+**關鍵問題：**
+
+1. **惡意節點風險**：志願者節點可以篡改排行榜、偽造事件結果、甚至盜取使用者資料（即便只是 relay，仍可記錄 IP/活動）
+   - 緩解：採用「多節點驗證」— 客戶端同時詢問多個節點，比對結果一致性
+   - 但這增加了延遲和複雜度
+
+2. **法律責任**：社群成員的機器可能被用於非法活動（作為 relay 節點），專案維護者可能承擔法律風險
+   - 緩解：志願節點僅限 relay + 已驗證的程式碼，不儲存使用者資料
+
+3. **可靠性**：社群節點不能保證 SLA，玩家體驗可能不一致
+   - 緩解：志願節點僅作為 Render 的輔助，非替代。Render 仍為主要伺服器
+
+4. **MongoDB 授權**：提案中志願節點可選 MongoDB/SQLite，但 MongoDB 的商業授權限制（SSPL）可能不允許社群自由使用
+   - 建議：志願節點僅使用 SQLite 或 JSON 檔案
+
+**建議策略：** Layer 3 應降級為「輕量備援節點」而非完整替代 Render。初始版本只需做到：
+- Render 掛掉時自動切換到備援節點（可由專案維護者或信任社群成員運作）
+- 備援節點只做 relay + 最小狀態維護
+- 不求完全去中心化
+
+### 綜合建議
+
+```
+優先順序：
+  1. Layer 1 (Offline-First) ─── 立即開始 ★★★★★
+  2. 混合模式聊天 P2P ───────── v2.0.0 後 ★★★☆☆
+  3. 備援節點 (輕量版) ──────── v2.1.0 後 ★★☆☆☆
+  4. 完全去中心化 ────────────── 長期目標 ★★☆☆☆
+```
+
+| 階段 | Render 節省 | 實作成本 | 風險 |
+|------|------------|---------|------|
+| Layer 1 完成 | 0%（但仍改善 UX） | 低 | 極低 |
+| Layer 1 + 聊天 P2P | 30%（可非尖峰關 Render） | 中 | 中低 |
+| + 備援節點 | 70%（Render 僅備援） | 中高 | 中 |
+| 完全去中心化 | 100% | 高 | 高 |
+
+**最終結論：** Hybrid P2P 的方向正確，但 Layer 1 的 Offline-First 應是唯一立即投入資源的項目。Layer 2 和 Layer 3 需要更多設計和驗證，建議在 v2.0.0 主力功能完成後再評估。
+
+---
+
+## 可行方案（修正後）
+
+### 短期（v1.14.x → v2.0.0）— Offline-First 優先
+
+不再等待完整 P2P 實作，先讓客戶端具備離線能力：
+
+#### 實作項目
+
+**Phase A: Service Worker + GameEngine.js + StorageAdapter.js**
+- 使用 `vite-plugin-pwa` 整合 Service Worker（Cache-First 策略，所有 JS/CSS/HTML/字型快取）
+- 從 `backend/services/gameLoop.js` 複製 processTick 邏輯到 `client/src/engine/GameEngine.js`
+- 建立 `client/src/engine/StorageAdapter.js`（IndexedDB 封裝）
+- 每 10 秒自動存檔，關鍵操作（購物/升級）即時存
+- `useGameState.js` 整合 GameEngine — 伺服器在線時以伺服器為準，離線時本機運作
+
+**Phase B: 狀態合併策略**
+- 重新連線時：accumulatedTime / PT / level 取最大值
+- inventory：合併（伺服器庫存 + 離線期間新增）
+- achievements / quests：取進度較大值
+- activeBuffs：取較晚 expiry
+- 衝突記錄寫入 `localStorage.conflictLog` 供除錯
+
+**Phase C: 離線模式 UI**
+- 斷線時顯示「離線模式」標籤，不再顯示 loading spinner
+- 離線期間仍可開啟商城（但無法購買）、檢視背包、聊天（僅本地 log）
+- 連線恢復時顯示離線收益摘要
+
+### 中期（v2.0.x 主力功能完成後）— 選擇性 P2P
+
+#### 實作項目
+
+**Phase D: WebRTC 聊天（選擇性啟用）**
+- 使用 Cloudflare Worker 做信號交換（免費方案每日 10 萬請求已足夠）
+- 聊天走 P2P，但保留 socket.io 聊天作為 fallback
+- 玩家可在設定中選擇「P2P 聊天」/「伺服器聊天」
+
+**Phase E: 備援節點（Light 版本）**
+- 建立 `desktop/VolunteerNode.js` — 僅 100-150 行
+- 功能：WebSocket relay + 可選 SQLite 持久化
+- 僅供專案維護者和信任社群使用（非公開志願者計劃）
+- Render 健康度監控 + 自動切換
+
+### Render 節省估算（修正版）
+
+| 階段 | Render 運行時間/月 | 費用節省 | 備註 |
+|------|-------------------|---------|------|
+| 目前 | 720h (24/7) | 基準 | — |
+| Phase A 完成 | 720h | 0% | 但仍可關 Render 維護 |
+| Phase B 完成 | 720h | 0% | 維護時玩家無感 |
+| Phase D 完成 | 500h (離峰時關) | 30% | 聊天不依賴 Render |
+| Phase E 完成 | 200h (僅備援) | 72% | Render 每月約 $7→$2 |
+| 完全去中心化 | 0h | 100% | 長期目標 |
+
+---
+
+## v2.0.0 版本更新計劃（融合版）
+
+> 將 hybrid-p2p-architecture.md 的分散式方案與 plan.md / v2.0.0-planning.md 的原有更新內容整合為統一的版本規劃。
+> 核心原則：Offline-First 先行，原有功能並行開發，P2P 作為選擇性優化。
+
+### 版本路線圖（融合後）
+
+```
+v1.14.0 (正式發布)
+  │
+  ├── v2.0.0 (Offline-First 核心 + Pixel Art 視覺重設計)
+  │   ├── 離線遊戲引擎 (Phase A + B)
+  │   ├── 登入與條約頁點陣化
+  │   ├── 導航欄與選單點陣化
+  │   ├── 3D 像素藝術字元件
+  │   └── 登入公約與引導流程
+  │
+  ├── v2.1.0 (滿版地圖 + 派遣掛機)
+  │   ├── 2D 像素世界地圖
+  │   ├── 跨國派遣礦場
+  │   ├── 五大礦層升級
+  │   └── 萬人開採動畫
+  │
+  ├── v2.2.0 (全服秘寶抽獎)
+  │   ├── 抽獎系統核心
+  │   ├── 神物庫存管理
+  │   └── 神物效果與轉生
+  │
+  ├── v2.3.0 (真實數據 + P2P 聊天)
+  │   ├── 真實在線人數 (Redis)
+  │   ├── 國家 GDP 連動
+  │   ├── 全服氣運排行
+  │   └── WebRTC 聊天 (Phase D)
+  │
+  └── v2.4.0 (反作弊 + 備援節點)
+      ├── 後端資產驗證
+      ├── 安全抽獎校驗
+      └── 備援節點輕量版 (Phase E)
+```
+
+### v2.0.0 — Offline-First + Pixel Art 視覺重設計
+
+> 這是整個融合計畫的起點，目標是讓遊戲不再完全依賴伺服器，同時完成視覺重設計。
+
+#### v2.0.0a — Service Worker + GameEngine.js（Phase A）✅ 已完成
+
+- **做什麼：** 整合 `vite-plugin-pwa`（injectManifest 模式），Service Worker 自動注入 precache manifest。建立 `client/src/engine/GameEngine.js`（mirror backend gameLoop），建立 `client/src/engine/StorageAdapter.js`（IndexedDB 封裝）。`main.jsx` 改用 `virtual:pwa-register` 自動註冊 SW 並支援版本更新提示。
+- **改哪個檔案：** `client/sw.js`（重寫，支援 __WB_MANIFEST）、`client/public/manifest.json`（新建）、`client/vite.config.js`（加入 VitePWA 插件）、`client/src/main.jsx`（改用 registerSW）、`client/package.json`（vite-plugin-pwa 相依）、`client/src/engine/GameEngine.js`（新建）、`client/src/engine/StorageAdapter.js`（新建）
+- **驗證：** 關掉 WiFi → 重開瀏覽器 → 輸入 earthonline.qzz.io → 頁面正常載入 → 離線 tick 正常執行 → PT/時間/等級正確累積
+
+#### v2.0.0b — IndexedDB 持久層（Phase A）✅ 已完成
+
+- **做什麼：** 已整合至 StorageAdapter.js，支援 `saveGameState`、`loadGameState`、`startAutoSave`（每 10 秒自動存檔）。
+- **改哪個檔案：** `client/src/engine/StorageAdapter.js`（已建立）
+- **驗證：** 關閉頁籤後重開，離線期間的進度正確還原
+
+#### v2.0.0c — 離線模式整合（Phase B）✅ 已完成
+
+- **做什麼：** 修改 `GameContext.jsx` 整合 GameEngine + StorageAdapter。啟動時從 IndexedDB 讀取存檔，發動機開始 tick。伺服器連線時接收 `user_state_update` 同步引擎。斷線時自動切換離線模式，引擎持續運作。提供 `isOfflineMode`、`getEngineState()` 給元件使用。
+- **改哪個檔案：** `client/src/context/GameContext.jsx`（重寫）
+- **驗證：** 拔掉網路 → 遊戲繼續運作（PT/時間持續累積）→ 接回網路 → 離線成長合併至伺服器
+
+#### v2.0.0d — 離線模式 UI（Phase C）✅ 已完成
+
+- **做什麼：** 斷線時 Header 顯示「⚡ 離線模式」標籤（橙色警告風格），而非紅色「已斷線」。側邊欄 PT/累積時間在離線時顯示本地引擎數值。加入 `offlineState` 每秒同步引擎狀態至 UI。
+- **改哪個檔案：** `client/src/App.jsx`（新增 offlineState state + 離線 UI 切換）
+- **驗證：** 斷線時顯示「⚡ 離線模式」，PT/時間持續跳動，無凍結畫面
+
+#### v2.0.0e — 行動版排版修正 ✅ 已完成
+
+- **做什麼：** 重構整個 mobile CSS。合併重複的 768px media query（原本有兩段互相衝突的規則），新增 480px 小螢幕斷點。修正：Header 垂直堆疊、選單不溢出、Modal 從底部彈出（bottom-sheet 風格）、地圖佔 40-50vh 不是滿版、觸控按鈕至少 36px 高、底欄 log 縮小。
+- **改哪個檔案：** `client/src/index.css`（重寫 Mobile media query，新增 480px & 1024px 斷點）
+- **驗證：** iPhone SE / Android 小螢幕上 Header 不重疊、Modal 可操作、地圖可縮放、按鈕可點擊
+
+#### v2.0.0e — 登入頁點陣化（原 v2.0.1）
+
+- **做什麼：** 登入頁背景改為深褐色粗糙礦岩點陣紋理，中央登入框為深灰色半透明面板，亮綠色發光邊框。底部條約改為深邃草地綠點陣條。
+- **改哪個檔案：** `client/src/index.css`、`client/src/components/LoginGateway.jsx`
+- **驗證：** 登入頁呈現礦岩紋理 + 亮綠邊框
+
+#### v2.0.0f — 導航欄點陣化（原 v2.0.2）
+
+- **做什麼：** 導航欄改為深石磚灰點陣紋理，左側 LOGO 改為黃色立體爆裂紋藝術字。下拉選單改為深灰色格子物品欄視覺。
+- **改哪個檔案：** `client/src/App.jsx`、`client/src/index.css`
+- **驗證：** 導航欄呈現石磚灰點陣 + 黃色爆裂紋
+
+#### v2.0.0g — PixelWordArt 元件（原 v2.0.3）
+
+- **做什麼：** 建立 `<PixelWordArt>` 元件（多重 text-shadow + linear-gradient），全站標題套用。
+- **改哪個檔案：** `client/src/components/PixelWordArt.jsx`（新建）、`client/src/App.jsx`
+- **驗證：** 所有標題呈現 3D 立體像素字效果
+
+#### v2.0.0h — 登入公約流程（原 v2.1.1）
+
+- **做什麼：** 強制公約勾選、Discord 一鍵登入整合、後端記錄 covenantAccepted。
+- **改哪個檔案：** `client/src/components/LoginGateway.jsx`、`backend/models/User.js`、`backend/routes/auth.js`、`client/src/i18n.js`
+- **驗證：** 未勾約時按鈕禁用，勾約後可登入
+
+#### v2.0.0i — 引導式文檔（原 v2.1.2）
+
+- **做什麼：** 登入後單頁引導頁，三大陣營介紹 + 點陣化照片。
+- **改哪個檔案：** `client/src/components/OnboardingGuide.jsx`（新建）、`client/src/components/FactionSelect.jsx`（新建）、`client/src/App.jsx`、`client/src/i18n.js`
+- **驗證：** 登入後先看到引導頁，可選擇陣營
+
+### v2.1.0 — 滿版世界地圖與派遣掛機
+
+#### v2.1.0a — 2D 像素世界地圖（原 v2.2.1）
+
+- **做什麼：** 滿畫面 2D 像素世界地圖（含各國國旗），支援自由拖曳與滾輪縮放，點陣紋理疊加。
+- **改哪個檔案：** `client/src/components/WorldMap.jsx`（新建）、`client/src/App.jsx`
+- **驗證：** 地圖可拖曳縮放，各國位置正確，點陣風格
+
+#### v2.1.0b — 跨國派遣礦場（原 v2.2.2）
+
+- **做什麼：** 點擊國家彈出情報窗（在線人數、GDP/秒、已進駐玩家數），點擊「建立礦場」開始自動掛機。
+- **改哪個檔案：** `client/src/components/CountryInfoPanel.jsx`（新建）、`client/src/App.jsx`、`backend/socket/gameHandler.js`
+- **驗證：** 派遣後掛機金幣跳動，資料庫更新
+
+#### v2.1.0c — 五大礦層升級（原 v2.2.3）
+
+- **做什麼：** Lv.1 碎石地層 → Lv.5 地球星核，指數級產出公式。前端顯示當前礦層與升級按鈕。
+- **改哪個檔案：** `backend/config/constants.js`、`backend/services/mineService.js`（新建）、`client/src/components/MinePanel.jsx`（新建）
+- **驗證：** 升級花費與產出符合指數曲線，動畫播放
+
+#### v2.1.0d — 萬人開採動畫（原 v2.2.4）
+
+- **做什麼：** 十字鎬像素敲擊動畫，數量與進駐玩家數成正比。
+- **改哪個檔案：** `client/src/components/PickaxeAnimation.jsx`（新建）、`client/src/components/WorldMap.jsx`
+- **驗證：** 有玩家的國家上方出現十字鎬動畫
+
+### v2.2.0 — 全服限量秘寶抽獎
+
+#### v2.2.0a — 抽獎系統核心（原 v2.3.1）
+
+- **做什麼：** 抽獎 API（Common 89.99% / Epic 9.9% / Mythic 0.1% / Unique 0.001%），安全隨機數、方塊加載動畫。
+- **改哪個檔案：** `backend/services/lotteryService.js`（新建）、`client/src/components/LotteryModal.jsx`（新建）、`backend/config/constants.js`
+- **驗證：** 抽獎機率符合設定，資金正確扣除
+
+#### v2.2.0b — 神物庫存管理（原 v2.3.2）
+
+- **做什麼：** MongoDB 行級鎖（findOneAndUpdate 原子操作），庫存歸零即拒發。管理介面設定限量。
+- **改哪個檔案：** `backend/services/lotteryService.js`
+- **驗證：** 高併發不超發，庫存 0 時回傳錯誤
+
+#### v2.2.0c — 神物效果與轉生（原 v2.3.3）
+
+- **做什麼：** 史詩 +5%、神話 +20% 掛機速度；全服廣播 + Discord 通知。熔煉轉生系統。
+- **改哪個檔案：** `backend/services/gameLoop.js`、`backend/discordBot.js`、`client/src/components/LotteryModal.jsx`
+- **驗證：** 神物效果正確，轉生後產出加成生效
+
+### v2.3.0 — 真實數據 + P2P 聊天
+
+#### v2.3.0a — 真實在線人數統計（原 v2.4.1）
+
+- **做什麼：** Redis Set 統計每個國家當前在線玩家，切換國家時實時 +1/-1。
+- **改哪個檔案：** `backend/services/redisService.js`（新建）、`backend/server.js`、`backend/socket/gameHandler.js`
+- **驗證：** 切換國家後 Redis Set 正確增減
+
+#### v2.3.0b — 國家 GDP 即時加總（原 v2.4.2）
+
+- **做什麼：** 點擊國家顯示的總產出/秒由該國所有在線玩家真實開採時薪加總，每秒更新。
+- **改哪個檔案：** `backend/services/gdpService.js`（新建）、`client/src/components/CountryInfoPanel.jsx`
+- **驗證：** 高階玩家進駐後 GDP 暴漲，離開後下跌
+
+#### v2.3.0c — 全服氣運值排行（原 v2.4.3）
+
+- **做什麼：** 每 5 分鐘 SUM 三大陣營神物權重 + 轉生次數，第一名陣營地圖金色粒子特效。
+- **改哪個檔案：** `backend/services/luckService.js`（新建）、`client/src/components/WorldMap.jsx`
+- **驗證：** 氣運排行第一的陣營顯示金色粒子特效
+
+#### v2.3.0d — WebRTC 聊天（Phase D，P2P 選擇性啟用）
+
+- **做什麼：** 實作 WebRTC Mesh 聊天，Gossip 廣播 + 去重。使用現有 Render 伺服器做信號交換（或 Cloudflare Worker）。保留 socket.io 聊天作為 fallback。設定頁新增「P2P 聊天」開關。
+- **改哪個檔案：** `client/src/engine/P2PNetwork.js`（新建）、`client/src/engine/GossipProtocol.js`（新建，可合併）、`backend/server.js`（新增信號端點）、`client/src/hooks/useSocket.js`、`client/src/App.jsx`、`client/src/i18n.js`
+- **驗證：** 關掉 Render 後兩個瀏覽器可互發聊天；開啟 Render 時聊天正常
+
+### v2.4.0 — 反作弊 + 備援節點
+
+#### v2.4.0a — 後端資產驗證（原 v2.5.1）
+
+- **做什麼：** 升級/抽獎時後端根據「上次存檔時間 × 理論每秒產出」重算，拒絕前端偽造數據。
+- **改哪個檔案：** `backend/services/validationService.js`（新建）、`backend/services/gameLoop.js`
+- **驗證：** 修改前端請求數值被後端拒絕
+
+#### v2.4.0b — 安全抽獎校驗（原 v2.5.2）
+
+- **做什麼：** 抽獎亂數由 crypto.randomBytes() 生成，前端僅播放動畫。
+- **改哪個檔案：** `backend/services/lotteryService.js`
+- **驗證：** 前後端結果一致，無法偽造
+
+#### v2.4.0c — 備援節點輕量版（Phase E）
+
+- **做什麼：** 建立 `desktop/VolunteerNode.js`（100-150 行），功能：WebSocket relay + SQLite 持久化（可選）。Render 健康度監控 + 自動切換客戶端連線。不設公開志願者計劃，僅由維護者或信任社群運作。
+- **改哪個檔案：** `desktop/VolunteerNode.js`（新建）、`desktop/package.json`、`client/src/hooks/useSocket.js`（新增節點健康度邏輯）
+- **驗證：** 關掉 Render，客戶端自動切換到備援節點，所有核心功能正常
+
+### v1.14.0 — 正式發布（前置任務）
+
+> 在開始 v2.0.0 之前，須先完成 v1.14.0 發布。以下為從 plan.md 承接的未完成任務。
+
+#### 執行前確認
+
+完成 v1.12.4 區域對抗系統的未完成項目、以及 v1.13.x 所有安全/效能修正。
+
+- [ ] **v1.12.4b** 區域結算 + 獎勵（backend）— 整合 warStats 到 settlementService
+- [ ] **v1.12.4c** 前端區域對抗面板（frontend）
+- [ ] **v1.12.5a** 背景架構 + Style 1 保留
+- [ ] **v1.12.5b** Style 2: 伺服器機房
+- [ ] **v1.12.5c** Style 3~5 + 切換 UI
+- [ ] **v1.13.1a** 修復外洩 secrets
+- [ ] **v1.13.1b** 修復 CORS 與啟用 helmet
+- [ ] **v1.13.1c** 修復 crash.log 與 IP 洩漏
+- [ ] **v1.13.1d** 修復 terminalHandler 未定義變數
+- [ ] **v1.13.1e** 移除重複程式碼
+- [ ] **v1.13.1f** 清理未使用 import
+- [ ] **v1.13.2a** MongoDB Indexes
+- [ ] **v1.13.2b** 快取層
+- [ ] **v1.13.2c** App.jsx 組件拆分
+- [ ] **v1.13.2d** 統一 Discord 角色分配
+- [ ] **v1.13.3a** ESLint + Prettier
+- [ ] **v1.13.3b** Rate Limiting 補完
+- [ ] **v1.13.3c** 離線補償防重複
+- [ ] **v1.13.4a** 大量連線模擬
+- [ ] **v1.13.4b** 邊界情況驗證
+- [ ] **v1.13.4c** 完整回歸測試
+- [ ] **v1.14.0a** 更新 README.md
+- [ ] **v1.14.0b** 更新 AGENTS.md
+- [ ] **v1.14.0c** 更新 CHANGELOG
+- [ ] **v1.14.0d** dev → main merge + CF Pages 部署
+
+### 總版本時程表
+
+| 版本 | 主題 | 預計天數 | 相依性 | 優先級 |
+|------|------|---------|--------|--------|
+| v1.14.0 | 正式發布（承接 plan.md 未完成項） | 14 天 | v1.12.3 | High |
+| v2.0.0a | Service Worker + vite-plugin-pwa + GameEngine + StorageAdapter | 2 天 | v1.14.0 | High | ✅ |
+| v2.0.0b | IndexedDB 持久層 | 1 天 | v2.0.0a | High | ✅ |
+| v2.0.0c | 離線模式整合 (GameContext) | 2 天 | v2.0.0b | High | ✅ |
+| v2.0.0d | 離線模式 UI (App.jsx) | 1 天 | v2.0.0c | Medium | ✅ |
+| v2.0.0e | 行動版排版修正 | 1 天 | — | High | ✅ |
+| v2.0.0f | 登入頁點陣化 | 2 天 | — | Medium |
+| v2.0.0f | 導航欄點陣化 | 2 天 | — | Medium |
+| v2.0.0g | PixelWordArt 元件 | 1 天 | — | Low |
+| v2.0.0h | 登入公約流程 | 2 天 | v2.0.0e | Medium |
+| v2.0.0i | 引導式文檔 | 3 天 | v2.0.0h | Medium |
+| v2.1.0a | 像素世界地圖 | 4 天 | v2.0.0i | High |
+| v2.1.0b | 跨國派遣礦場 | 3 天 | v2.1.0a | High |
+| v2.1.0c | 五大礦層升級 | 3 天 | v2.1.0b | High |
+| v2.1.0d | 萬人開採動畫 | 2 天 | v2.1.0b | Low |
+| v2.2.0a | 抽獎系統核心 | 3 天 | v2.1.0c | High |
+| v2.2.0b | 神物庫存管理 | 2 天 | v2.2.0a | High |
+| v2.2.0c | 神物效果與轉生 | 3 天 | v2.2.0b | Medium |
+| v2.3.0a | Redis 在線統計 | 2 天 | v2.1.0a | Medium |
+| v2.3.0b | 國家 GDP 連動 | 2 天 | v2.3.0a | Medium |
+| v2.3.0c | 全服氣運排行 | 2 天 | v2.3.0b | Low |
+| v2.3.0d | WebRTC 聊天 | 4 天 | v2.0.0c | Medium |
+| v2.4.0a | 後端資產驗證 | 2 天 | v2.0.0a | Medium |
+| v2.4.0b | 安全抽獎校驗 | 1 天 | v2.2.0a | Medium |
+| v2.4.0c | 備援節點輕量版 | 3 天 | v2.3.0d | Low |
+
+**總計：24 個子版本，約 60 個工作日（~3 個月）**
+
+### Render 節省時間表（更新版）
+
+| 版本完成後 | Render 運行/月 | 節省 | 關鍵理由 |
+|-----------|---------------|------|---------|
+| 目前 | 720h | 基準 | 完全依賴 |
+| v1.14.0 | 720h | 0% | 安全修正 + 重構，仍完全依賴 |
+| v2.0.0d (Offline-First) | 720h | 0% | 玩家離線可玩，但伺服器仍需為連線玩家服務 |
+| v2.0.0i (全部 v2.0.0) | 720h | 0% | 仍需要伺服器做資料持久化 |
+| v2.3.0d (P2P 聊天) | 500h | ~30% | 離峰時聊天不依賴 Render |
+| v2.4.0c (備援節點) | 200h | ~72% | Render 可關閉大部分時間，僅備援 |
+
+> 最終 Render 每月費用從約 $7 降至約 $2（備援模式下）。
+
+### 版本標記規則
+
+```
+✅ = 已完成（v1.8.x ~ v1.12.3 認定完成）
+⬜ = 待執行
+🔄 = 進行中
+⚠️ = 阻塞
+```
+
+### 風險登記
+
+| 風險 | 影響版本 | 可能性 | 影響 | 緩解措施 |
+|------|---------|--------|------|---------|
+| WebRTC NAT 穿透失敗率高 | v2.3.0d | 中 | 部分玩家無法 P2P | TURN server + 降級至 socket.io |
+| IndexedDB 被使用者清除 | v2.0.0a-v2.0.0c | 低 | 本地進度遺失 | 伺服器同步作為備份 |
+| 礦層經濟平衡失調 | v2.1.0c | 中 | 遊戲進程破壞 | 上線後監控數據並調整參數 |
+| Secret 再次外洩 | v1.14.0 | 低 | 安全事件 | 嚴格遵守 AGENTS.md Secrets 鐵則 |
+| 志願節點惡意行為 | v2.4.0c | 低 | 資料被篡改 | 僅限信任節點 + 多節點驗證 |
+| 瀏覽器 Tab 生命週期限制 | v2.3.0d | 中 | P2P 網路頻繁重組 | 離線補償機制已存在 |
+
+---
+
+> 最後更新：2026-06-13
+> 分支：dev
