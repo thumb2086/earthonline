@@ -19,6 +19,7 @@ import DonateBanner from './components/DonateBanner';
 import LoginGateway from './components/LoginGateway';
 import FourPetalSpiral from './components/FourPetalSpiral';
 import DocumentationOverlay from './components/DocumentationOverlay';
+import GameBackground from './components/GameBackground';
 import './index.css';
 
 const VITE_API = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
@@ -768,12 +769,14 @@ function Dashboard({ token, onLogout, region }) {
         <FourPetalSpiral text={t('正在連線至全球節點網路...')} />
       ) : (
     <div className="app-container" style={{
+      position: 'relative',
       boxShadow: [
         getEventGlow(),
         myNode?.cosmetics?.neon_strip ? 'inset 0 0 60px rgba(255,0,255,0.12), 0 0 30px rgba(255,0,255,0.08)' : ''
       ].filter(Boolean).join(', ') || 'none',
       transition: 'box-shadow 1s ease-in-out'
     }}>
+      <GameBackground />
       {show100Celebration && (
         <div className="celebration-overlay">
           <div className="celebration-emoji">🎉</div>
