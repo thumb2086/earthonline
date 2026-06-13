@@ -185,22 +185,22 @@ v2.5.x ── 真實數據 + P2P 聊天 + 反作弊 + 備援節點
 
 ## 七、v2.3.x — 滿版世界地圖 + 派遣掛機
 
-### v2.3.0 — 像素世界地圖
+### v2.3.0 — 像素世界地圖 ✅ 已完成
 
-| Task | 說明 | 檔案 |
-|------|------|------|
-| v2.3.0a 2D 像素世界地圖 | 滿畫面地圖，支援拖曳縮放 | `WorldMap.jsx`（新建） |
-| v2.3.0b 地圖點陣紋理疊加 | pixel-art 濾鏡 + 粗邊框 | `WorldMap.jsx` |
+| Task | 說明 | 檔案 | 狀態 |
+|------|------|------|------|
+| v2.3.0a 2D 像素世界地圖 | 滿畫面地圖，支援拖曳縮放 | `WorldMap.jsx`（新建） | ✅ |
+| v2.3.0b 地圖點陣紋理疊加 | pixel-art 濾鏡 + 粗邊框 | `WorldMap.jsx` | ✅ |
 
-### v2.3.1 — 跨國派遣 + 礦層
+### v2.3.1 — 跨國派遣 + 礦層 ✅ 已完成
 
-| Task | 說明 | 檔案 |
-|------|------|------|
-| v2.3.1a 國家情報窗 | 在線人數/GDP/進駐玩家 | `CountryInfoPanel.jsx` |
-| v2.3.1b 派遣建立礦場 | 點擊國家建立礦場，自動跳錢 | `App.jsx`, `gameHandler.js` |
-| v2.3.1c 五大礦層升級邏輯 | Lv.1 碎石→Lv.5 星核，指數產出 | `constants.js`, `mineService.js` |
-| v2.3.1d 礦層升級 UI | 升級按鈕 + 點陣爆炸動畫 | `MinePanel.jsx` |
-| v2.3.1e 十字鎬敲擊動畫 | 進駐國家上方實時動畫 | `PickaxeAnimation.jsx` |
+| Task | 說明 | 檔案 | 狀態 |
+|------|------|------|------|
+| v2.3.1a 國家情報窗 | 在線人數/GDP/進駐玩家 | `CountryInfoPanel.jsx` | ✅ |
+| v2.3.1b 派遣建立礦場 | 點擊國家建立礦場，自動跳錢 | `App.jsx`, `server.js`, `mineService.js` | ✅ |
+| v2.3.1c 五大礦層升級邏輯 | Lv.1 碎石→Lv.5 星核，指數產出 | `mineService.js`, `constants.js` | ✅ |
+| v2.3.1d 礦層升級 UI | 升級按鈕 + 點陣爆炸動畫 | `MinePanel.jsx` | ✅ |
+| v2.3.1e 十字鎬敲擊動畫 | 進駐國家上方實時動畫 | `PickaxeAnimation.jsx` | ✅ |
 
 ---
 
@@ -285,8 +285,8 @@ v2.5.x ── 真實數據 + P2P 聊天 + 反作弊 + 備援節點
 | v1.14.0e-f | 文件更新 (README/CHANGELOG/AGENTS) | 2 天 | — | Medium | ✅ |
 | v2.1.0a-c | Electron 發布管道 | 3 天 | v2.0.0 | High | ✅ |
 | v2.1.1a-b | Discord RPC 強化 + 視窗管理 | 2 天 | v2.1.0 | Low |
-| v2.2.0a-f | Pixel Art 登入+導航 | 5 天 | — | Medium |
-| v2.2.1a-d | 登入公約+引導流程 | 4 天 | v2.2.0 | Medium |
+| v2.2.0a-f | Pixel Art 登入+導航 | 5 天 | — | Medium | ✅ |
+| v2.2.1a-d | 登入公約+引導流程 | 4 天 | v2.2.0 | Medium | ✅ |
 | v2.3.0a-b | 像素世界地圖 | 4 天 | v2.2.1 | High |
 | v2.3.1a-e | 跨國派遣+礦層 | 6 天 | v2.3.0 | High |
 | v2.4.0a-d | 抽獎系統核心 | 4 天 | v2.3.1 | High |

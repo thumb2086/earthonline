@@ -23,6 +23,9 @@ import GameBackground from './components/GameBackground';
 import PixelWordArt from './components/PixelWordArt';
 import OnboardingGuide from './components/OnboardingGuide';
 import FactionSelect from './components/FactionSelect';
+import WorldMap from './components/WorldMap';
+import CountryInfoPanel from './components/CountryInfoPanel';
+import MinePanel from './components/MinePanel';
 import './index.css';
 
 const VITE_API = import.meta.env.VITE_API_URL || 'https://earthonline.onrender.com';
@@ -79,6 +82,9 @@ function Dashboard({ token, onLogout, region }) {
     try { return localStorage.getItem('eo_onboarding_done') !== 'true'; } catch { return true; }
   });
   const [showFactionSelect, setShowFactionSelect] = useState(false);
+  const [showWorldMap, setShowWorldMap] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [mine, setMine] = useState(null);
   const [toast, setToast] = useState(null); // { message, type } for non-blocking notifications
   const toastTimerRef = useRef(null);
   const { theme, setTheme, themeData: currentThemeData, themes } = useTheme();
@@ -235,6 +241,22 @@ function Dashboard({ token, onLogout, region }) {
       logEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [logs]);
+
+  // Mine socket handlers
+  useEffect(() => {
+    if (!socket) return;
+    const hMineState = (data) => { if (data) setMine(data); };
+    const hMineUpgrade = (data) => {
+      if (data.success) addLog(`[SYS] 礦場升級至 Lv.${data.level}（${data.name}）`);
+      else addLog(`[SYS] 礦場升級失敗：${data.error}`);
+    };
+    socket.on('mine_state', hMineState);
+    socket.on('mine_upgrade_result', hMineUpgrade);
+    return () => {
+      socket.off('mine_state', hMineState);
+      socket.off('mine_upgrade_result', hMineUpgrade);
+    };
+  }, [socket]);
 
   // Fetch online users when admin panel opens
   useEffect(() => {
@@ -897,6 +919,9 @@ function Dashboard({ token, onLogout, region }) {
             </div>
           </div>
 
+          <button onClick={() => setShowWorldMap(true)} style={{padding: '5px 12px', borderRadius: '8px', background: 'rgba(0,255,136,0.08)', border: '1px solid rgba(0,255,136,0.2)', color: '#4ade80', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'monospace'}}>
+            🌍 {t('世界地圖')}
+          </button>
           <button onClick={toggleBgm} style={{padding: '5px 12px', borderRadius: '8px', background: bgmEnabled ? 'rgba(0,255,136,0.1)' : 'rgba(255,50,50,0.1)', border: bgmEnabled ? '1px solid rgba(0,255,136,0.3)' : '1px solid rgba(255,50,50,0.3)', color: bgmEnabled ? 'var(--success-color)' : 'var(--danger-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'monospace'}} title={bgmEnabled ? t('關閉背景音樂') : t('開啟背景音樂')}>
 {bgmEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
 {bgmEnabled ? 'BGM ON' : 'BGM OFF'}
@@ -1711,6 +1736,53 @@ function Dashboard({ token, onLogout, region }) {
             />
           </div>
         </div>
+      )}
+
+      {showWorldMap && myNode && (
+        <div className="modal-overlay" onClick={() => setShowWorldMap(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9998,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '90vw', height: '80vh', maxWidth: '800px',
+            background: '#0a1628', border: '2px solid #00ff41',
+            position: 'relative', overflow: 'hidden',
+          }}>
+            <div style={{ position: 'absolute', top: 8, right: 12, zIndex: 10, cursor: 'pointer', color: '#64748b', fontSize: '1.2rem' }}
+              onClick={() => setShowWorldMap(false)}>✕</div>
+            <WorldMap
+              players={nodes || []}
+              onCountryClick={(c) => setSelectedCountry(c)}
+              style={{ width: '100%', height: '100%' }}
+            />
+            {selectedCountry && (
+              <CountryInfoPanel
+                country={selectedCountry}
+                hasMine={!!mine}
+                onEstablish={() => {
+                  if (!mine && socket?.connected) {
+                    socket.emit('establish_mine');
+                  }
+                  setShowWorldMap(false);
+                  setSelectedCountry(null);
+                  if (mine || getMine) setTimeout(() => {
+                    if (socket?.connected) socket.emit('get_mine');
+                  }, 300);
+                }}
+                onClose={() => setSelectedCountry(null)}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {mine && socket?.connected && (
+        <MinePanel
+          mine={mine}
+          pt={myNode?.accumulatedBonusPoints || 0}
+          onUpgrade={() => socket.emit('upgrade_mine')}
+          onClose={() => setMine(null)}
+        />
       )}
     </div>
       )}
