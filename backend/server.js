@@ -510,20 +510,13 @@ regions.forEach(regionName => {
       if (ip && ip.includes(',')) ip = ip.split(',')[0].trim();
       const dbUser = await db.findUserByUsername(decoded.username);
 
-      // Sync role: check ADMIN_USERNAMES env var first (no Discord dependency)
-      const adminUsernames = (process.env.ADMIN_USERNAMES || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-      if (adminUsernames.includes(decoded.username.toLowerCase())) {
-        if (dbUser?.role !== 'admin') {
-          await User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } });
-          if (dbUser) dbUser.role = 'admin';
-          console.log(`[SYS] Admin promoted via ADMIN_USERNAMES: ${decoded.username}`);
-        }
-      } else if (dbUser?.discord?.id) {
-        // Fallback: check Discord server role
+      // Sync Discord role to in-app role
+      if (dbUser?.discord?.id) {
         const adminIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
         if (adminIds.includes(dbUser.discord.id)) {
           await User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } });
           if (dbUser) dbUser.role = 'admin';
+          console.log(`[SYS] Admin promoted via ADMIN_DISCORD_IDS: ${decoded.username}`);
         } else {
           try {
             const discordRole = await discordBot.getHighestRole(dbUser.discord.id);
@@ -531,15 +524,21 @@ regions.forEach(regionName => {
               if (discordRole.includes('地球管理團隊')) {
                 await User.updateOne({ username: decoded.username }, { $set: { role: 'admin' } });
                 if (dbUser) dbUser.role = 'admin';
+                console.log(`[SYS] Admin promoted via Discord role: ${decoded.username} (${discordRole})`);
               } else if (dbUser?.role === 'admin' && !discordRole.includes('地球管理團隊')) {
                 await User.updateOne({ username: decoded.username }, { $set: { role: 'user' } });
                 if (dbUser) dbUser.role = 'user';
+                console.log(`[SYS] Admin demoted via Discord role: ${decoded.username}`);
               }
+            } else {
+              console.log(`[SYS] Role sync: no Discord role found for ${decoded.username} (bot ready: ${discordBot.isReady()})`);
             }
           } catch (err) {
             console.error('[SYS] Discord role sync error:', err);
           }
         }
+      } else {
+        console.log(`[SYS] Role sync: ${decoded.username} has no Discord linked`);
       }
       
       // Ban check — reject banned users

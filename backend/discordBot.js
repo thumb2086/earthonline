@@ -365,5 +365,6 @@ module.exports = {
   setIoInstance,
   sendChatMessageToDiscord,
   getHighestRole,
-  assignWeeklyRoles
+  assignWeeklyRoles,
+  isReady: () => isBotReady
 };
