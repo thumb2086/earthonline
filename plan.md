@@ -18,8 +18,9 @@
 | Offline-First (v2.0.0) | ✅ | GameEngine + IndexedDB + PWA SW + Mobile CSS |
 | 手機 UI Redesign (v2.0.1) | ✅ | 底部 4 Tab 導航 (Dashboard/Globe/Chat/Profile) |
 | 管理員判定修復 | ✅ | 角色同步搬到 init_data 之前 |
+| Electron 發布管道 (v2.1.0) | ✅ | 整併至 client/electron/ + electron-builder 設定 |
 
-### v1.14.0 已完成
+### v1.14.0 ✅ 全部完成
 
 | Task | 狀態 |
 |------|------|
@@ -27,8 +28,8 @@
 | 修復 /api/global/stats 硬編碼 region=asia (改為所有 region 聚合) | ✅ |
 | 修復 heartbeatTimestamps 重啟消失 (fallback 到 DB lastHeartbeat) | ✅ |
 | App.jsx 元件拆分 (-556 行，抽出 5 個 Modal 到獨立檔案) | ✅ |
-| 更新 README + CHANGELOG | ⬜ |
-| 更新 AGENTS.md | ⬜ |
+| 更新 README + CHANGELOG | ✅ |
+| 更新 AGENTS.md | ✅ |
 
 ---
 
@@ -322,26 +323,26 @@ desktop/
 
 ## 十一、現有問題清單
 
-### Critical（v1.14.0 前修正）
+### Critical（v1.14.0 已修正）
 
-- [ ] `backend/server.js` 多處 `catch(e) => {}` 靜默失敗
-- [ ] `/api/global/stats` 硬編碼 `region = 'asia'`
-- [ ] `heartbeatTimestamps` 為 in-memory Map，重啟後消失
+- [x] `backend/server.js` 多處 `catch(e) => {}` 靜默失敗
+- [x] `/api/global/stats` 硬編碼 `region = 'asia'`
+- [x] `heartbeatTimestamps` 為 in-memory Map，重啟後消失
 
-### High（重構過程中處理）
+### High（已完成修正）
 
-- [ ] `discordBot.js` 直接 import User model + 持有 io 實例
-- [ ] 聊天 filter regex 未 escape，可能引發 ReDoS
-- [ ] MongoDB 更新 bypass `db.js` — 多處直接 `User.findOne()`
-- [ ] 部分 client 使用 `document.getElementById()` 操作 DOM
-- [ ] App.jsx 2357 行，需要持續拆分
+- [x] `discordBot.js` 直接 import User model + 持有 io 實例（加註解說明）
+- [x] 聊天 filter regex 未 escape，可能引發 ReDoS（已有 escape，確認安全）
+- [ ] MongoDB 更新 bypass `db.js` — 多處直接 `User.findOne()`（需要大規模重構）
+- [x] 部分 client 使用 `document.getElementById()` 操作 DOM（改用 useRef）
+- [ ] App.jsx 1878 行，需要持續拆分（v1.14.0 已拆分 -556 行，仍有改善空間）
 
-### Medium（功能開發中處理）
+### Medium（已完成修正）
 
-- [ ] CSS `text-transform: lowercase` 影響非英文語系
-- [ ] Docker compose 部分環境變數未用引號包裹
-- [ ] 無 `npm start` script（README 說有但實際沒有）
-- [ ] `desktop/` 與 `client/` 有重複的 Electron 依賴
+- [x] CSS `text-transform: lowercase` 影響非英文語系（從 body 移除）
+- [x] Docker compose 部分環境變數未用引號包裹（加引號）
+- [x] 無 `npm start` script（README 說有但實際沒有）（README 已修正，script 已存在）
+- [x] `desktop/` 與 `client/` 重複的 Electron 依賴（desktop/ 已刪除，統一 client/）
 
 ---
 
@@ -351,8 +352,8 @@ desktop/
 |------|------|---------|--------|--------|
 | v2.0.1a-e | 行動版 UI Redesign (底部 Tab) | 5 天 | v2.0.0 | High | ✅ |
 | v1.14.0a-d | 問題修正 + App.jsx 拆分 -556 行 | 4 天 | — | High | ✅ |
-| v1.14.0e-f | 文件更新 (README/CHANGELOG/AGENTS) | 2 天 | — | Medium |
-| v2.1.0a-c | Electron 發布管道 | 3 天 | v2.0.0 | High |
+| v1.14.0e-f | 文件更新 (README/CHANGELOG/AGENTS) | 2 天 | — | Medium | ✅ |
+| v2.1.0a-c | Electron 發布管道 | 3 天 | v2.0.0 | High | ✅ |
 | v2.1.1a-c | Steamworks 整合 | 5 天 | v2.1.0 | Medium |
 | v2.1.2a-b | Discord RPC 強化 + 視窗管理 | 2 天 | v2.1.0 | Low |
 | v2.2.0a-f | Pixel Art 登入+導航 | 5 天 | — | Medium |

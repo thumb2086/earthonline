@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, REST, Routes, EmbedBuilder } = require('discord.js');
 const cron = require('node-cron');
-const User = require('./models/User');
+const db = require('./db');
+const User = require('./models/User'); // kept for complex queries not exposed by db.js
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = '1512345209005015101';
 const VOICE_CHANNEL_ID = '1512595434588209324';

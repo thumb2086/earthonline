@@ -403,6 +403,9 @@ function Dashboard({ token, onLogout, region }) {
     return () => clearInterval(id);
   }, [isOfflineMode, engineReady, getEngineState]);
 
+  const muteDurationRef = useRef(null);
+  const banDurationRef = useRef(null);
+
   const [pmTarget, setPmTarget] = useState(null);
   const [pmInput, setPmInput] = useState('');
   const [pmLog, setPmLog] = useState({});
@@ -897,7 +900,7 @@ function Dashboard({ token, onLogout, region }) {
 
   const handleAdminMute = () => {
     if (!socket || !adminTarget.trim()) return;
-    const duration = parseInt(document.getElementById('muteDuration')?.value || '5', 10);
+    const duration = parseInt(muteDurationRef.current?.value || '5', 10);
     socket.emit('mod_mute_user', { targetUsername: adminTarget.trim(), duration });
     addLog(`[MOD] 發出禁言指令：${adminTarget.trim()} ${duration} 分鐘`);
     setTimeout(() => socket.emit('get_all_players'), 300);
@@ -918,7 +921,7 @@ function Dashboard({ token, onLogout, region }) {
 
   const handleAdminBan = () => {
     if (!socket || !adminTarget.trim()) return;
-    const duration = parseInt(document.getElementById('banDuration')?.value || '1440', 10);
+    const duration = parseInt(banDurationRef.current?.value || '1440', 10);
     socket.emit('mod_ban_user', { targetUsername: adminTarget.trim(), duration });
     addLog(`[MOD] 發出封鎖指令：${adminTarget.trim()} ${duration} 分鐘`);
     setTimeout(() => socket.emit('get_all_players'), 300);
@@ -1646,7 +1649,7 @@ function Dashboard({ token, onLogout, region }) {
                       <div style={{ marginBottom: '14px' }}>
                         <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('禁言 MUTE')}</div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <select id="muteDuration" defaultValue="5" style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.82rem', outline: 'none' }}>
+                          <select ref={muteDurationRef} defaultValue="5" style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.82rem', outline: 'none' }}>
                             <option value="1">{t('1 分鐘')}</option>
                             <option value="5">{t('5 分鐘')}</option>
                             <option value="10">{t('10 分鐘')}</option>
@@ -1664,7 +1667,7 @@ function Dashboard({ token, onLogout, region }) {
                       <div style={{ marginBottom: '14px' }}>
                         <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('封鎖 BAN')}</div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <select id="banDuration" defaultValue="1440" style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.82rem', outline: 'none' }}>
+                          <select ref={banDurationRef} defaultValue="1440" style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.82rem', outline: 'none' }}>
                             <option value="60">{t('1 小時')}</option>
                             <option value="360">{t('6 小時')}</option>
                             <option value="1440">{t('24 小時')}</option>

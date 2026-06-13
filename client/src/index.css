@@ -56,7 +56,6 @@ body {
   font-family: var(--font-mono);
   overflow: hidden; /* Hide scrollbars for the terminal feel */
   user-select: none;
-  text-transform: lowercase;
 }
 
 /* Three-column Layout */
