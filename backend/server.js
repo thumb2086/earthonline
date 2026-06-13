@@ -802,6 +802,34 @@ regions.forEach(regionName => {
   }, 2 * 60 * 60 * 1000);
 });
 
+// Full role sync for offline users — runs after startup once Discord bot is ready
+async function syncAllOfflineRoles() {
+  try {
+    const users = await User.find({ 'discord.id': { $exists: true } }, 'username discord role').lean();
+    let synced = 0;
+    for (const u of users) {
+      try {
+        const adminIds = (process.env.ADMIN_DISCORD_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
+        let newRole = 'user';
+        if (adminIds.includes(u.discord?.id)) {
+          newRole = 'admin';
+        } else {
+          const discordRole = await discordBot.getHighestRole(u.discord?.id);
+          if (discordRole?.includes('地球管理團隊')) newRole = 'admin';
+        }
+        if (newRole !== (u.role || 'user')) {
+          await User.updateOne({ _id: u._id }, { $set: { role: newRole } });
+          synced++;
+        }
+      } catch (err) { /* skip individual errors */ }
+    }
+    if (synced > 0) console.log(`[SYS] Role sync: updated ${synced} offline users`);
+  } catch (err) {
+    console.error('[SYS] Role sync error:', err);
+  }
+}
+setTimeout(syncAllOfflineRoles, 15000);
+
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`[SYS] Earth Online Backend Core initialized on port ${PORT}`);
