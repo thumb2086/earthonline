@@ -8,15 +8,40 @@ const MINE_LEVELS = [
   { level: 5, name: '星核層',    cost: 30000,output: 80,  icon: '⭐' },
 ];
 
-const mines = new Map(); // Map<username, mine[]>
+const mines = new Map();
 
-function initMine(username, country) {
+// ─── DB persistence ──────────────────────────────────────────────
+async function loadUserMines(username) {
+  const user = await db.findUserByUsername(username);
+  if (!user || !user.minesData || user.minesData.size === 0) return [];
+  const list = [];
+  for (const [id, data] of user.minesData) {
+    list.push({ id, username, ...data.toObject ? data.toObject() : data });
+  }
+  mines.set(username, list);
+  return list;
+}
+
+async function saveMines(username) {
+  const list = mines.get(username);
+  if (!list) return;
+  const mapData = {};
+  for (const m of list) {
+    mapData[m.id] = { country: m.country, level: m.level, totalMined: m.totalMined || 0, startedAt: m.startedAt };
+  }
+  await db.updateUser(username, { $set: { minesData: mapData } }).catch(() => {});
+}
+
+// ─── Mine operations ─────────────────────────────────────────────
+async function initMine(username, country) {
+  await loadUserMines(username);
   if (!mines.has(username)) mines.set(username, []);
   const list = mines.get(username);
   const existing = list.find(m => m.country === country);
   if (existing) return existing;
   const mine = { id: `${username}_${country}_${Date.now()}`, username, country, level: 1, startedAt: Date.now(), totalMined: 0 };
   list.push(mine);
+  await saveMines(username);
   return mine;
 }
 
@@ -53,6 +78,7 @@ async function upgradeMine(username, mineId) {
   await db.incrementUser(username, { accumulatedBonusPoints: -nextLevel.cost });
   mine.level = nextLevel.level;
   mine.totalMined = mine.totalMined || 0;
+  await saveMines(username);
   return { success: true, level: nextLevel.level, name: nextLevel.name, output: nextLevel.output };
 }
 
@@ -63,26 +89,35 @@ function getMineOutput(mine) {
 
 function getCountryMines(country) {
   const result = [];
-  for (const [, mine] of mines) {
-    if (mine.country === country) result.push(mine);
+  for (const [, mineList] of mines) {
+    for (const mine of mineList) {
+      if (mine.country === country) result.push(mine);
+    }
   }
   return result;
 }
 
 function tickMines() {
-  for (const [, mine] of mines) {
-    const output = getMineOutput(mine);
-    db.incrementUser(mine.username, { accumulatedBonusPoints: output }).catch(() => {});
-    mine.totalMined = (mine.totalMined || 0) + output;
+  for (const [, mineList] of mines) {
+    for (const mine of mineList) {
+      const output = getMineOutput(mine);
+      db.incrementUser(mine.username, { accumulatedBonusPoints: output }).catch(() => {});
+      mine.totalMined = (mine.totalMined || 0) + output;
+    }
   }
 }
 
 function getAllMines() {
-  return Array.from(mines.values());
+  const result = [];
+  for (const [, mineList] of mines) {
+    result.push(...mineList);
+  }
+  return result;
 }
 
 module.exports = {
   MINE_LEVELS,
+  loadUserMines,
   initMine,
   getMines,
   getMine,

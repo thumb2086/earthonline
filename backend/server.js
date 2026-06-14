@@ -33,6 +33,7 @@ const { processTick } = require('./services/gameLoop');
 const { getWarStats, recordEventCompletion, resetWarStats } = require('./state/regionState');
   const { getRandomEvent, getEventDuration, getEventMultiplier, applyEventEndRewards, createVoteSession, tallyVote } = require('./services/eventSystem');
 const { buyItem, useItem } = require('./services/shopService');
+const mineService = require('./services/mineService');
 const { registerChatHandlers } = require('./socket/chatHandler');
 const { registerSocialHandlers } = require('./socket/socialHandler');
 const { registerTerminalHandlers } = require('./socket/terminalHandler');
@@ -734,6 +735,9 @@ regions.forEach(regionName => {
         socket.emit('tick_paused');
       }
 
+      // Load persisted mine data from DB
+      mineService.loadUserMines(decoded.username).catch(() => {});
+
       if (connectedUsers.size % 10 === 0 && connectedUsers.size > 0) {
         sendDiscordWebhook(`🌐 **【地理節點高載通報】**\n偵測到大量節點湧入，目前全服掛機人數已達 **${connectedUsers.size}** 人！\n來自 \`${user.country}\` 的節點點亮了板塊。`);
       }
@@ -787,15 +791,15 @@ regions.forEach(regionName => {
   registerTalentHandlers(socket, connectedUsers);
 
   // Mine handlers
-  const { initMine, getMines, getMine, findMineById, upgradeMine, getCountryMines } = require('./services/mineService');
   socket.on('establish_mine', (data = {}) => {
     if (!socket.user) return;
     const username = socket.user.username;
     const dbUser = connectedUsers.get(socket.id);
     if (!dbUser) return;
     const country = data.country || dbUser.country || 'UNKNOWN';
-    const mine = initMine(username, country);
-    socket.emit('mines_state', getMines(username));
+    mineService.initMine(username, country).then(() => {
+      socket.emit('mines_state', mineService.getMines(username));
+    });
     nspIo.emit('mine_established', { username, country: dbUser.country });
   });
   socket.on('get_mine', (data) => {
@@ -803,20 +807,20 @@ regions.forEach(regionName => {
     const username = socket.user.username;
     const country = data?.country;
     if (country) {
-      const mine = getMine(username, country);
+      const mine = mineService.getMine(username, country);
       socket.emit('mine_state', mine || null);
     } else {
-      socket.emit('mines_state', getMines(username));
+      socket.emit('mines_state', mineService.getMines(username));
     }
   });
   socket.on('upgrade_mine', async (data) => {
     if (!socket.user) return;
     const mineId = data?.mineId;
     const username = socket.user.username;
-    const result = await upgradeMine(username, mineId);
+    const result = await mineService.upgradeMine(username, mineId);
     socket.emit('mine_upgrade_result', result);
     if (result.success) {
-      socket.emit('mines_state', getMines(username));
+      socket.emit('mines_state', mineService.getMines(username));
     }
   });
   socket.on('get_country_mines', (country) => {
