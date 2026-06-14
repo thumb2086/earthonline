@@ -48,7 +48,13 @@ const userSchema = new mongoose.Schema({
   cosmetics: { type: Map, of: Boolean, default: {} },
   covenantAccepted: { type: Boolean, default: false },
   covenantAcceptedAt: { type: Number, default: null },
-  faction: { type: String, default: null }
+  faction: { type: String, default: null },
+  minesData: { type: Map, of: {
+    country: String,
+    level: Number,
+    totalMined: Number,
+    startedAt: Number
+  }, default: {} }
 });
 
 userSchema.index({ 'discord.id': 1 });
