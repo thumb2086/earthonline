@@ -615,7 +615,7 @@ export default function EarthGlobe({ onlineCount = 0, region = 'asia', activeEve
   const myNodeExists = myNodeId && nodes && nodes.some(n => n.id === myNodeId);
 
   return (
-    <div className="earth-globe-wrapper"
+    <div className="earth-globe-wrapper" style={{ touchAction: 'none' }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
