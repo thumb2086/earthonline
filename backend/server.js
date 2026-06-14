@@ -382,9 +382,11 @@ regions.forEach(regionName => {
       
       state.globalProduction = await db.getRegionProduction(regionName);
       
+      const allPops = await db.getAllRegionsPopulation().catch(() => ({}));
+      const globalPop = Object.values(allPops).reduce((a, b) => a + b, 0);
       nsp.emit('global_stats', {
         activeUsers: state.activeUsers,
-        totalPopulation: await db.getRegionPopulation(regionName).catch(() => 0),
+        totalPopulation: globalPop,
         globalProduction: state.globalProduction,
         socialCompression: state.socialCompression,
         multiplier: state.multiplier,
@@ -649,7 +651,8 @@ regions.forEach(regionName => {
 
       console.log(`[SYS] Node Authenticated: ${user.username} | Region: ${user.country}`);
 
-      const pop = await db.getRegionPopulation(regionName);
+      const allPopsForInit = await db.getAllRegionsPopulation().catch(() => ({}));
+      const globalPopForInit = Object.values(allPopsForInit).reduce((a, b) => a + b, 0);
 
       // Disconnect compensation: calculate missed time
       // Fall back to DB field if in-memory map was cleared (server restart)
@@ -722,7 +725,7 @@ regions.forEach(regionName => {
         createdAt: user.createdAt,
         connectedAt: user.connectedAt,
         activeUsers: connectedUsers.size,
-        totalPopulation: pop,
+        totalPopulation: globalPopForInit,
         currentGlobalEvent: currentGlobalEvent // Send current event to newly connected users
       });
 
