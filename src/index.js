@@ -35,6 +35,15 @@ export default {
       });
     }
 
+    // Manifest.json: Cloudflare blocks .json static files, serve with explicit content type
+    if (path === '/manifest.json') {
+      const manifestRes = await env.ASSETS.fetch(new Request(new URL('/manifest.json', request.url)));
+      return new Response(manifestRes.body, {
+        status: manifestRes.status,
+        headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+      });
+    }
+
     // Serve static assets — SPA fallback: serve index.html for unknown paths
     const response = await env.ASSETS.fetch(request);
     if (response.status === 404) {
