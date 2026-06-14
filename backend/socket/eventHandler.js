@@ -18,16 +18,19 @@ function registerEventHandlers(socket, nspIo, state) {
     if (type === 'SOLAR_STORM' && (choice === 'shelter' || choice === 'ride_out')) {
       if (!state.eventChoices[choice]) state.eventChoices[choice] = [];
       state.eventChoices[choice].push(user.username);
-      socket.emit('terminal_response', `[SYS] 你選擇了${choice === 'shelter' ? '避難' : '硬撐'}`);
+      const label = choice === 'shelter' ? '避難' : '硬撐';
+      socket.emit('chat_system_message', { message: `✅ 你選擇了「${label}」！${choice === 'shelter' ? '已斷線保護，風暴結束後自動補償。' : '撐過風暴可獲得 200 PT 獎勵！'}` });
+      socket.emit('terminal_response', `[SYS] 你選擇了${label}`);
       if (choice === 'shelter') {
         socket.disconnect(true);
       }
     } else if (type === 'SYSTEM_MAINTENANCE' && (choice === 'assist' || choice === 'ignore')) {
       if (!state.eventChoices[choice]) state.eventChoices[choice] = [];
       state.eventChoices[choice].push(user.username);
-      socket.emit('terminal_response', `[SYS] 你選擇了${choice === 'assist' ? '協助維護' : '漠視觀望'}`);
+      const label = choice === 'assist' ? '協助維護' : '漠視觀望';
+      socket.emit('chat_system_message', { message: `✅ 你選擇了「${label}」！${choice === 'assist' ? '維護時間將縮短 50%。' : '事件結束後可獲得 500 PT。'}` });
+      socket.emit('terminal_response', `[SYS] 你選擇了${label}`);
       if (choice === 'assist') {
-        // Shorten maintenance by 50%
         state.currentGlobalEvent.endTime = Date.now() + getEventDuration(type) / 2;
       }
     }

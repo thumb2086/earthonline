@@ -526,6 +526,7 @@ function Dashboard({ token, onLogout, region }) {
 
     s.on('chat_system_message', (data) => {
       addLog(data.message);
+      if (data.message?.startsWith('✅')) showToast(data.message, 'success');
     });
 
     s.on('online_users', (users) => {
