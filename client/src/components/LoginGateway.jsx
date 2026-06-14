@@ -200,7 +200,7 @@ function LoginGateway({ onLogin }) {
           <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '5px'}}>{t('全球節點觀測與管理中心')}</p>
         </div>
         
-        <form className="login-form">
+        <form className="login-form" onSubmit={handleSubmit}>
           {error && <div className="error-message">{error}</div>}
           {successMsg && <div style={{color: '#00ffaa', marginBottom: '10px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold'}}>{successMsg}</div>}
           
@@ -213,8 +213,23 @@ function LoginGateway({ onLogin }) {
             </select>
           </div>
 
+          <div className="form-group" style={{marginBottom: '12px'}}>
+            <label style={{color: 'var(--accent-color)'}}>{t('使用者名稱 USERNAME')}</label>
+            <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="terminal-input" placeholder={t('請輸入節點名稱')} style={{width: '100%', boxSizing: 'border-box'}} />
+          </div>
+
+          <div className="form-group" style={{marginBottom: '15px'}}>
+            <label style={{color: 'var(--accent-color)'}}>{t('密碼 PASSWORD')}</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="terminal-input" placeholder={t('請輸入密碼')} style={{width: '100%', boxSizing: 'border-box'}} />
+          </div>
+
+          <div style={{display: 'flex', gap: '8px', marginBottom: '15px'}}>
+            <button type="submit" className="terminal-btn" style={{flex: 1, background: 'rgba(0,255,65,0.15)', border: '1px solid #00ff41', color: '#00ff41', cursor: 'pointer', padding: '10px', fontWeight: 'bold'}}>{t('登入 LOGIN')}</button>
+            <button type="button" onClick={() => { setIsRegister(p => !p); setError(''); setSuccessMsg(''); }} className="terminal-btn" style={{flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid #334155', cursor: 'pointer', padding: '10px', color: 'var(--text-secondary)'}}>{isRegister ? t('返回登入') : t('註冊 REGISTER')}</button>
+          </div>
+
           <div style={{textAlign: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(0,255,170,0.08)', borderRadius: '6px', border: '1px solid rgba(0,255,170,0.2)'}}>
-            <span style={{color: '#00ffaa', fontSize: '0.85rem'}}>{t('帳號/密碼 或 Discord 均可登入')}</span>
+            <span style={{color: '#00ffaa', fontSize: '0.85rem'}}>{t('或使用 Discord 快速登入')}</span>
           </div>
 
           <label style={{display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', cursor: 'pointer', padding: '8px 12px', background: 'rgba(0,255,65,0.05)', border: '1px solid rgba(0,255,65,0.15)', borderRadius: '4px', fontSize: '0.82rem', color: 'var(--text-secondary)'}}>
@@ -249,6 +264,9 @@ function LoginGateway({ onLogin }) {
             <svg width="22" height="22" viewBox="0 0 127.14 96.36" fill="#fff"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a67.59,67.59,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
             {t('使用 Discord 快速登入')}
           </button>
+          <div style={{textAlign: 'center', marginTop: '12px'}}>
+            <button type="button" onClick={() => { setIsForgot(p => !p); setError(''); setSuccessMsg(''); }} style={{background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline'}}>{t('忘記密碼？')}</button>
+          </div>
         </form>
       </div>
     </div>
