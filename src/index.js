@@ -35,17 +35,11 @@ const MAINTENANCE_HTML = `<!DOCTYPE html>
 
 export default {
   async fetch(request, env) {
-    if (MAINTENANCE_MODE) {
-      return new Response(MAINTENANCE_HTML, {
-        headers: { 'content-type': 'text/html;charset=UTF-8' },
-      });
-    }
-
     try {
       const url = new URL(request.url);
       const path = url.pathname;
 
-      // Proxy API and socket requests to Render
+      // Proxy API and socket requests to Render (always, even in maintenance)
       if (path.startsWith('/api/') || path.startsWith('/socket.io/')) {
         const targetUrl = 'https://earthonline-bay7.onrender.com' + path + url.search;
         const proxyResponse = await fetch(targetUrl, {
@@ -80,6 +74,13 @@ export default {
       if (path === '/manifest.json') {
         const manifest = { name: "Earth Online", short_name: "EarthOnline", description: "全球節點觀測與管理中心", start_url: "/", display: "standalone", background_color: "#0a0e17", theme_color: "#00ff41", lang: "en", scope: "/", icons: [{ src: "/favicon.ico", sizes: "64x64", type: "image/x-icon" }] };
         return new Response(JSON.stringify(manifest), { headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+      }
+
+      // Maintenance mode: show maintenance page for non-API requests
+      if (MAINTENANCE_MODE) {
+        return new Response(MAINTENANCE_HTML, {
+          headers: { 'content-type': 'text/html;charset=UTF-8' },
+        });
       }
 
       // Serve static assets — SPA fallback: serve index.html for unknown paths
