@@ -1,6 +1,6 @@
 // ─── Maintenance Mode ────────────────────────────────────────────
 // Set to true during upgrades to show maintenance page to all visitors
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false; // Set to true to show maintenance page
 
 const MAINTENANCE_HTML = `<!DOCTYPE html>
 <html lang="zh-TW">

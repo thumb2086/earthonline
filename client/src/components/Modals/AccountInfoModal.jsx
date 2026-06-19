@@ -115,7 +115,7 @@ export default function AccountInfoModal({ token, apiUrl, onClose, onLogout }) {
           </h2>
           <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
             {!window.electronAPI && (
-              <a href="https://earthonline.onrender.com/downloads/EarthOnlineSetup.exe" style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--success-color)', textDecoration: 'none', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', fontWeight: '600'}}>
+              <a href={window.location.origin + "/downloads/EarthOnlineSetup.exe"} style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--success-color)', textDecoration: 'none', background: 'rgba(16, 185, 129, 0.1)', padding: '6px 12px', borderRadius: '8px', fontWeight: '600'}}>
                 {t('📥 下載專屬電腦版')}
               </a>
             )}

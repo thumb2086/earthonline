@@ -1,4 +1,4 @@
-const CACHE = 'earthonline-v2';
+const CACHE = 'earthonline-v3';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
