@@ -1,0 +1,13 @@
+{
+  "name": "earth-online-pterodactyl",
+  "version": "1.0.0",
+  "main": "start.js",
+  "scripts": {
+    "start": "node start.js",
+    "postinstall": "cd ../backend && npm install"
+  },
+  "dependencies": {
+    "cloudflared": "^0.7.0",
+    "dotenv": "^16.4.7"
+  }
+}

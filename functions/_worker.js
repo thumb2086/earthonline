@@ -1,6 +1,13 @@
 // ─── Earth Online Pages Function ────────────────────────────────
-// This file is auto-deployed by Cloudflare Pages git integration.
-// Place in functions/_worker.js to intercept all requests.
+// Auto-deployed by Cloudflare Pages git integration from functions/ directory.
+// Proxy API calls through to backend (Render or Cloudflare Tunnel).
+//
+// To use Cloudflare Tunnel instead of Render:
+// 1. Set up tunnel from your server to Cloudflare
+// 2. Add TUNNEL_URL env var in Cloudflare Pages dashboard →
+//    Settings → Environment variables → Production
+//    Example: TUNNEL_URL = https://backend.earthonline.qzz.io
+// 3. Redeploy. The function will use the tunnel URL if available.
 
 export default {
   async fetch(request, env) {
@@ -9,9 +16,12 @@ export default {
       const url = new URL(request.url);
       path = url.pathname;
 
-      // Proxy API and socket requests to Render backend
+      // Determine backend URL: use tunnel if configured, else fall back to Render
+      const BACKEND_URL = env.TUNNEL_URL || 'https://earthonline-7odc.onrender.com';
+
+      // Proxy API and socket requests to backend
       if (path.startsWith('/api/') || path.startsWith('/socket.io/')) {
-        const targetUrl = 'https://earthonline-7odc.onrender.com' + path + url.search;
+        const targetUrl = BACKEND_URL + path + url.search;
         const proxyResponse = await fetch(targetUrl, {
           method: request.method,
           headers: request.headers,
