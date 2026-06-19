@@ -4,6 +4,11 @@ import App from './App.jsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
+// Clear stale Service Worker caches on load
+if ('caches' in window) {
+  caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('earthonline')).map(k => caches.delete(k))));
+}
+
 const updateSW = registerSW({
   onNeedRefresh() {
     if (confirm('新版本已就緒，更新嗎？')) {
