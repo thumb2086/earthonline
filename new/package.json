@@ -1,0 +1,13 @@
+{
+  "name": "pterodactyl-web-server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cloudflared": "^0.7.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
