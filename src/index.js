@@ -35,13 +35,14 @@ const MAINTENANCE_HTML = `<!DOCTYPE html>
 
 export default {
   async fetch(request, env) {
+    let path = '';
     try {
       const url = new URL(request.url);
-      const path = url.pathname;
+      path = url.pathname;
 
       // Proxy API and socket requests to Render (always, even in maintenance)
       if (path.startsWith('/api/') || path.startsWith('/socket.io/')) {
-        const targetUrl = 'https://earthonline-bay7.onrender.com' + path + url.search;
+        const targetUrl = 'https://earthonline-7odc.onrender.com' + path + url.search;
         const proxyResponse = await fetch(targetUrl, {
           method: request.method,
           headers: request.headers,
@@ -90,7 +91,13 @@ export default {
       }
       return response;
     } catch (err) {
-      // Global fallback: serve index.html on any Worker error
+      // For API requests, return a JSON error instead of HTML
+      if (path?.startsWith('/api/')) {
+        return new Response(JSON.stringify({ error: 'Backend unavailable', detail: err.message }), {
+          status: 502, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+        });
+      }
+      // For page requests, serve index.html as fallback
       return env.ASSETS.fetch(new Request(new URL('/index.html', request.url)));
     }
   },
