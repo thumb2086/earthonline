@@ -1,6 +1,14 @@
 {
-  "name": "earthonline-proxy",
+  "name": "earthonline",
   "compatibility_date": "2026-06-10",
+  "main": "functions/_worker.js",
+  "assets": {
+    "directory": "client/dist",
+    "binding": "ASSETS"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "build": {
     "command": "cd client && npm install && npm run build"
   }
