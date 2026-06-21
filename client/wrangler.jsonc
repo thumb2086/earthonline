@@ -1,0 +1,15 @@
+{
+  "name": "earthonline-proxy",
+  "compatibility_date": "2026-06-10",
+  "main": "../src/index.js",
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "build": {
+    "command": "npm install && npm run build"
+  }
+}
