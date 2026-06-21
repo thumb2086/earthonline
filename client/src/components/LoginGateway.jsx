@@ -78,7 +78,7 @@ function LoginGateway({ onLogin }) {
     const verifyToken = params.get('verifyToken');
     if (verifyToken) {
       window.history.replaceState({}, document.title, window.location.pathname);
-      const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline-7odc.onrender.com';
+      const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin;
       fetch(`${BASE_URL}/api/${region}/auth/verify-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,7 +101,7 @@ function LoginGateway({ onLogin }) {
     }
   }, [onLogin, region]);
 
-  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://earthonline-7odc.onrender.com';
+  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin;
   const API_URL = `${BASE_URL}/api/${region}`;
 
   const handleDiscordLogin = () => {
