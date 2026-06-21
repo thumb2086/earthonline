@@ -1,6 +1,10 @@
 {
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "earthonline-proxy",
   "compatibility_date": "2026-06-10",
+  "observability": {
+    "enabled": true
+  },
   "main": "src/index.js",
   "assets": {
     "directory": "client/dist",
