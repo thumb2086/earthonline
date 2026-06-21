@@ -1,5 +1,5 @@
 {
-  "name": "earthonline",
+  "name": "earthonline-proxy",
   "compatibility_date": "2026-06-10",
   "main": "src/index.js",
   "assets": {
