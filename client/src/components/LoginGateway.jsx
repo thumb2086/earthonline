@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Globe2 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
-import PixelWordArt from './PixelWordArt';
 import '../index.css';
 
 function LoginGateway({ onLogin }) {
@@ -39,9 +38,6 @@ function LoginGateway({ onLogin }) {
   
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [covenantAccepted, setCovenantAccepted] = useState(() => {
-    try { return localStorage.getItem('eo_covenant') === 'true'; } catch { return false; }
-  });
 
   const getAudioCtx = () => {
     if (!window.__eoAudioCtx) window.__eoAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -87,16 +83,16 @@ function LoginGateway({ onLogin }) {
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          setSuccessMsg('?»å??µä»¶é©—è??å?ï¼?);
+          setSuccessMsg('email verification ok');
           setTimeout(() => setSuccessMsg(''), 5000);
         } else {
-          setError(data.error || 'é©—è?å¤±æ?');
+          setError(data.error || 'verification failed');
           setTimeout(() => setError(''), 5000);
         }
       })
       .catch(err => {
         console.error(err);
-        setError('???å¤±æ?');
+        setError('connection failed');
       });
     }
   }, [onLogin, region]);
@@ -122,12 +118,12 @@ function LoginGateway({ onLogin }) {
           body: JSON.stringify({ username, recoveryKey, newPassword: password })
         });
         const data = await res.json();
-        if (!res.ok) return setError(data.error || '?ç½®å¤±æ?');
-        setSuccessMsg('å¯†ç¢¼?ç½®?å?ï¼Œè?ä½¿ç”¨?°å?ç¢¼ç™»??);
+        if (!res.ok) return setError(data.error || 'reset failed');
+        setSuccessMsg('password reset ok, please login');
         setIsForgot(false);
         setPassword('');
       } catch (err) {
-        setError('ä¼ºæ??¨é€??å¤±æ?');
+        setError('server connection failed');
       }
       return;
     }
@@ -148,7 +144,7 @@ function LoginGateway({ onLogin }) {
       }
       
       if (isRegister) {
-        alert(`è¨»å??å?ï¼\n?è??™å?ä¿å??¨ç??¢å¾©?‘é‘°?‘\n${data.recoveryKey}\n\nå¦‚æ??¨å?è¨˜å?ç¢¼ï??™æ˜¯?¯ä??¾å?å¸³è??„æ–¹å¼ï?`);
+        alert(`é–®é¤ƒ??î“?åš—î»”n?î“‘??î©“?é½î³‡??å‡½??ï¼·å„”?î•¯î”¶?î”„n${data.recoveryKey}\n\næ†’î¿™??å…¸?é–®î¦¶?è£æ½˜??î©”î¦€?è‡­??æ›‰?æ’£å”¾??ï„“î¡æ’˜î»?`);
         onLogin(data.token, data.username, region);
       } else {
         onLogin(data.token, data.user.username, region);
@@ -162,7 +158,7 @@ function LoginGateway({ onLogin }) {
         localStorage.removeItem('saved_username');
       }
     } catch (err) {
-      setError('ä¼ºæ??¨é€??å¤±æ?');
+      setError('éš¡ç®¸??åˆ¸Â€??æ†­æœ›?');
     }
   };
 
@@ -170,7 +166,6 @@ function LoginGateway({ onLogin }) {
     <div className="login-gateway">
       <div className="login-bg">
         <div className="nasa-bg"></div>
-        <div className="login-pixel-grid"></div>
         <div className="nasa-stars">
           {Array.from({ length: 80 }, (_, i) => (
             <div key={i} className="nasa-star" style={{
@@ -188,68 +183,35 @@ function LoginGateway({ onLogin }) {
         <div className="nasa-glow"></div>
       </div>
 
-      <div className="login-pixel-bar"></div>
-
       <div className="login-box">
         <div style={{textAlign: 'center', marginBottom: '25px', zIndex: 10, position: 'relative'}}>
           <div className="login-earth"></div>
           <h2 style={{fontFamily: 'var(--font-sans)', color: 'var(--text-main)', fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'}}>
-            <Globe2 className="icon-glow icon-spin" size={32} /> <PixelWordArt text={t('?°ç??¨ç?')} size={28} color="#00ff41" depth={3} />
+            <Globe2 className="icon-glow icon-spin" size={32} /> {t('?å•??å‡½?')}
           </h2>
-          <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '5px'}}>{t('?¨ç?ç¯€é»è?æ¸¬è?ç®¡ç?ä¸­å?')}</p>
+          <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '5px'}}>{t('?å‡½?è­Â€æšºîµ§?çšœç¥ˆ?èâˆ ?éŠå‰–?')}</p>
         </div>
         
-        <form className="login-form" onSubmit={handleSubmit}>
+        <form className="login-form">
           {error && <div className="error-message">{error}</div>}
           {successMsg && <div style={{color: '#00ffaa', marginBottom: '10px', textAlign: 'center', fontSize: '0.9rem', fontWeight: 'bold'}}>{successMsg}</div>}
           
           <div className="form-group" style={{marginBottom: '15px'}}>
-            <label style={{color: 'var(--accent-color)'}}>{t('GLOBAL REGION (ä¼ºæ??¨å??€)')}</label>
+            <label style={{color: 'var(--accent-color)'}}>{t('GLOBAL REGION (éš¡ç®¸??å…¸??Â€)')}</label>
             <select value={region} onChange={e => setRegion(e.target.value)} className="terminal-input" style={{appearance: 'auto', background: 'var(--surface-color)', color: 'var(--accent-color)', fontWeight: 'bold'}}>
-              <option value="asia">{t('[Asia-East] äºæ´²æ¨ç?')}</option>
-              <option value="us">{t('[US-West] ç¾æ´²ä¸­æ?')}</option>
-              <option value="eu">{t('[EU-Central] æ­æ´²???')}</option>
+              <option value="asia">{t('[Asia-East] éˆ­îµ¥æ•£ç’…îµ¦?')}</option>
+              <option value="us">{t('[US-West] è¢î•æ•£éŠå‰œ?')}</option>
+              <option value="eu">{t('[EU-Central] ç”‡î“æ•£???')}</option>
             </select>
           </div>
 
-          <div className="form-group" style={{marginBottom: '12px'}}>
-            <label style={{color: 'var(--accent-color)'}}>{t('ä½¿ç”¨?…å?ç¨?USERNAME')}</label>
-            <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="terminal-input" placeholder={t('è«‹è¼¸?¥ç?é»å?ç¨?)} style={{width: '100%', boxSizing: 'border-box'}} />
-          </div>
-
-          <div className="form-group" style={{marginBottom: '15px'}}>
-            <label style={{color: 'var(--accent-color)'}}>{t('å¯†ç¢¼ PASSWORD')}</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="terminal-input" placeholder={t('è«‹è¼¸?¥å?ç¢?)} style={{width: '100%', boxSizing: 'border-box'}} />
-          </div>
-
-          <div style={{display: 'flex', gap: '8px', marginBottom: '15px'}}>
-            <button type="submit" className="terminal-btn" style={{flex: 1, background: 'rgba(0,255,65,0.15)', border: '1px solid #00ff41', color: '#00ff41', cursor: 'pointer', padding: '10px', fontWeight: 'bold'}}>{t('?»å…¥ LOGIN')}</button>
-            <button type="button" onClick={() => { setIsRegister(p => !p); setError(''); setSuccessMsg(''); }} className="terminal-btn" style={{flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid #334155', cursor: 'pointer', padding: '10px', color: 'var(--text-secondary)'}}>{isRegister ? t('è¿”å??»å…¥') : t('è¨»å? REGISTER')}</button>
-          </div>
-
           <div style={{textAlign: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(0,255,170,0.08)', borderRadius: '6px', border: '1px solid rgba(0,255,170,0.2)'}}>
-            <span style={{color: '#00ffaa', fontSize: '0.85rem'}}>{t('?–ä½¿??Discord å¿«é€Ÿç™»??)}</span>
+            <span style={{color: '#00ffaa', fontSize: '0.85rem'}}>{t('æ’£å”¾?/æ’–ï‰â…£ ??Discord ?ï‹©î»?é¤ƒï…¯')}</span>
           </div>
-
-          <label style={{display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', cursor: 'pointer', padding: '8px 12px', background: 'rgba(0,255,65,0.05)', border: '1px solid rgba(0,255,65,0.15)', borderRadius: '4px', fontSize: '0.82rem', color: 'var(--text-secondary)'}}>
-            <input
-              type="checkbox"
-              checked={covenantAccepted}
-              onChange={e => {
-                setCovenantAccepted(e.target.checked);
-                localStorage.setItem('eo_covenant', e.target.checked);
-              }}
-              style={{accentColor: 'var(--accent-color)', width: '16px', height: '16px', cursor: 'pointer', flexShrink: 0}}
-            />
-            {t('?‘å·²?±è?ä¸¦å??ã€Šåœ°?ƒåœ¨ç·šæ??™æ?æ¬¾ã€?)}
-          </label>
 
           <button 
             type="button" 
-            onClick={() => {
-              if (!covenantAccepted) { setError(t('è«‹å??Œæ??å?æ¢æ¬¾')); return; }
-              handleDiscordLogin();
-            }}
+            onClick={handleDiscordLogin}
             style={{
               width: '100%', padding: '14px', background: '#5865F2', color: '#fff',
               border: 'none', borderRadius: '6px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer',
@@ -261,11 +223,8 @@ function LoginGateway({ onLogin }) {
             onMouseOut={e => e.target.style.background = '#5865F2'}
           >
             <svg width="22" height="22" viewBox="0 0 127.14 96.36" fill="#fff"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a67.59,67.59,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
-            {t('ä½¿ç”¨ Discord å¿«é€Ÿç™»??)}
+            {t('login with Discord')}
           </button>
-          <div style={{textAlign: 'center', marginTop: '12px'}}>
-            <button type="button" onClick={() => { setIsForgot(p => !p); setError(''); setSuccessMsg(''); }} style={{background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline'}}>{t('å¿˜è?å¯†ç¢¼ï¼?)}</button>
-          </div>
         </form>
       </div>
     </div>
