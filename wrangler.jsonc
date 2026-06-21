@@ -10,6 +10,6 @@
     "nodejs_compat"
   ],
   "build": {
-    "command": "echo build-skip"
+    "command": "cd client && npm install && npm run build"
   }
 }

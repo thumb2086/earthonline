@@ -5,6 +5,11 @@ export default {
       const url = new URL(request.url);
       path = url.pathname;
 
+      if (path === '/manifest.json' || path === '/manifest.pwa') {
+        const manifest = { name: "Earth Online", short_name: "EarthOnline", description: "全球節點觀測與管理中心", start_url: "/", display: "standalone", background_color: "#0a0e17", theme_color: "#00ff41", lang: "en", scope: "/", icons: [{ src: "/favicon.ico", sizes: "64x64", type: "image/x-icon" }] };
+        return new Response(JSON.stringify(manifest), { headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } });
+      }
+
       if (path.startsWith('/api/') || path.startsWith('/socket.io/')) {
         const BACKEND_URL = env.TUNNEL_URL || 'https://earthonline-7odc.onrender.com';
         const targetUrl = BACKEND_URL + path + url.search;
@@ -27,7 +32,7 @@ export default {
       return response;
     } catch (err) {
       if (path.startsWith('/api/') || path.startsWith('/socket.io/')) {
-        return new Response(JSON.stringify({ error: 'Backend unavailable' }), {
+        return new Response(JSON.stringify({ error: 'Backend unavailable', message: err.message }), {
           status: 502, headers: { 'content-type': 'application/json' },
         });
       }
