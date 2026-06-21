@@ -31,7 +31,6 @@ import DispatchAnimation from './components/DispatchAnimation';
 import MobileLayout from './components/Mobile/MobileLayout';
 import './index.css';
 
-
 const VITE_API = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
 
 
@@ -55,10 +54,10 @@ function Dashboard({ token, onLogout, region }) {
   const [adCountdown, setAdCountdown] = useState(0);
   const [adReviveRemaining, setAdReviveRemaining] = useState(3);
   const AD_SLOGANS = [
-    { title: '?? ¤lº³ Casino ¡X ¦Ê¸U¼úª÷µ¥§A®³', lines: ['µù¥U§Y°e 1000 Äw½X', 'ÁÜ½Ğ¦n¤Í¦A®³ 500'] },
-    { title: '?? ¤lº³¥ÍºA¨t APP', lines: ['¤@ÁäºŞ²z©Ò¦³¸`ÂI', '§Y®É³qª¾ + »·ºİºÊ±±'] },
-    { title: '? °ª³t VPS ­­®ÉÀu´f', lines: ['¥ş²y¸`ÂI©µ¿ğ <20ms', '¨Ï¥Î§é¦©½X EARTH20'] },
-    { title: '?? ¨C¤é§K¶OÂà½ü½L', lines: ['¤lº³ Casino ¨C¤Ñ°e', '³Ì°ª 10000 Äw½X¡I'] },
+    { title: 'ğŸ”¥ å­ç†™ Casino â€” ç™¾è¬çé‡‘ç­‰ä½ æ‹¿', lines: ['è¨»å†Šå³é€ 1000 ç±Œç¢¼', 'é‚€è«‹å¥½å‹å†æ‹¿ 500'] },
+    { title: 'ğŸ“± å­ç†™ç”Ÿæ…‹ç³» APP', lines: ['ä¸€éµç®¡ç†æ‰€æœ‰ç¯€é»', 'å³æ™‚é€šçŸ¥ + é ç«¯ç›£æ§'] },
+    { title: 'âš¡ é«˜é€Ÿ VPS é™æ™‚å„ªæƒ ', lines: ['å…¨çƒç¯€é»å»¶é² <20ms', 'ä½¿ç”¨æŠ˜æ‰£ç¢¼ EARTH20'] },
+    { title: 'ğŸ° æ¯æ—¥å…è²»è½‰è¼ªç›¤', lines: ['å­ç†™ Casino æ¯å¤©é€', 'æœ€é«˜ 10000 ç±Œç¢¼ï¼'] },
   ];
   const AD_LINKS = {
     '/ads/zixi_casino.png': 'https://zixi-casino.vercel.app/landing',
@@ -67,7 +66,7 @@ function Dashboard({ token, onLogout, region }) {
   const [currentAd, setCurrentAd] = useState('');
   const [adPlaying, setAdPlaying] = useState(false);
   const [adSlogan, setAdSlogan] = useState('');
-  // ºŞ²z­û­±ªO¶}±Ò®É¦Û°Ê¸ü¤J¥ş³¡ª±®a¦W³æ
+  // ç®¡ç†å“¡é¢æ¿é–‹å•Ÿæ™‚è‡ªå‹•è¼‰å…¥å…¨éƒ¨ç©å®¶åå–®
   useEffect(() => {
     if (showAdminPanel && socket?.connected) {
       socket.emit('get_all_players');
@@ -214,7 +213,7 @@ function Dashboard({ token, onLogout, region }) {
   const terminalEndRef = useRef(null);
   const logEndRef = useRef(null);
   const dropdownRef = useRef(null);
-  // #11: ¼s§i­p®É¾¹ ref¡A¥Î©ó cleanup
+  // #11: å»£å‘Šè¨ˆæ™‚å™¨ refï¼Œç”¨æ–¼ cleanup
   const adTimerRef = useRef(null);
   const adSloganTimerRef = useRef(null);
 
@@ -275,26 +274,26 @@ function Dashboard({ token, onLogout, region }) {
         setMines(data);
         const newest = data.reduce((a, b) => a.startedAt > b.startedAt ? a : b, data[0]);
         if (newest) {
-          showToast(`?? ¤w¦b ${newest.country} «Ø¥ßÄq³õ¡ILv.${newest.level} ¶}©l¦Û°Ê«õÄq`, 'success');
-          addLog(`[SYS] ? ¤w¦b ${newest.country} «Ø¥ßÄq³õ¡]Lv.${newest.level}¡^`);
+          showToast(`ğŸš€ å·²åœ¨ ${newest.country} å»ºç«‹ç¤¦å ´ï¼Lv.${newest.level} é–‹å§‹è‡ªå‹•æŒ–ç¤¦`, 'success');
+          addLog(`[SYS] âœ… å·²åœ¨ ${newest.country} å»ºç«‹ç¤¦å ´ï¼ˆLv.${newest.level}ï¼‰`);
         }
       } else if (data) {
         setMines([data]);
-        showToast(`?? ¤w¦b ${data.country} «Ø¥ßÄq³õ¡ILv.${data.level} ¶}©l¦Û°Ê«õÄq`, 'success');
-        addLog(`[SYS] ? ¤w¦b ${data.country} «Ø¥ßÄq³õ¡]Lv.${data.level}¡^`);
+        showToast(`ğŸš€ å·²åœ¨ ${data.country} å»ºç«‹ç¤¦å ´ï¼Lv.${data.level} é–‹å§‹è‡ªå‹•æŒ–ç¤¦`, 'success');
+        addLog(`[SYS] âœ… å·²åœ¨ ${data.country} å»ºç«‹ç¤¦å ´ï¼ˆLv.${data.level}ï¼‰`);
       }
     };
     const hMineUpgrade = (data) => {
       if (data.success) {
-        addLog(`[SYS] Äq³õ¤É¯Å¦Ü Lv.${data.level}¡]${data.name}¡^`);
-        showToast(`?? Äq³õ¤É¯Å¦¨¥\¡ILv.${data.level} ${data.name}`, 'success');
+        addLog(`[SYS] ç¤¦å ´å‡ç´šè‡³ Lv.${data.level}ï¼ˆ${data.name}ï¼‰`);
+        showToast(`â›ï¸ ç¤¦å ´å‡ç´šæˆåŠŸï¼Lv.${data.level} ${data.name}`, 'success');
       } else {
-        addLog(`[SYS] Äq³õ¤É¯Å¥¢±Ñ¡G${data.error}`);
-        showToast(`? Äq³õ¤É¯Å¥¢±Ñ¡G${data.error}`, 'error');
+        addLog(`[SYS] ç¤¦å ´å‡ç´šå¤±æ•—ï¼š${data.error}`);
+        showToast(`âŒ ç¤¦å ´å‡ç´šå¤±æ•—ï¼š${data.error}`, 'error');
       }
     };
     const hMineEstablished = (data) => {
-      addLog(`[SYS] ${data.username} ¤w¦b ${data.country} «Ø¥ßÄq³õ¡I`);
+      addLog(`[SYS] ${data.username} å·²åœ¨ ${data.country} å»ºç«‹ç¤¦å ´ï¼`);
     };
     socket.on('mines_state', hMinesState);
     socket.on('mine_state', hMinesState);
@@ -314,13 +313,13 @@ function Dashboard({ token, onLogout, region }) {
     const hResult = (data) => {
       setLastLotteryResult(data);
       if (data.success && data.artifact) {
-        addLog(`[SYS] ©â¤¤¡i${data.artifact.rarity}¡j¿òª« (¡Ñ${data.artifact.multiplier})`);
+        addLog(`[SYS] æŠ½ä¸­ã€${data.artifact.rarity}ã€‘éºç‰© (Ã—${data.artifact.multiplier})`);
       }
     };
     const hInv = (data) => setLotteryInventory(data || []);
     const hSmelt = (data) => {
-      if (data.success) addLog(`[SYS] º²·Ò¿òª«¦^¦¬ ${data.refund} PT`);
-      else addLog(`[SYS] º²·Ò¥¢±Ñ¡G${data.error}`);
+      if (data.success) addLog(`[SYS] ç†”ç…‰éºç‰©å›æ”¶ ${data.refund} PT`);
+      else addLog(`[SYS] ç†”ç…‰å¤±æ•—ï¼š${data.error}`);
       if (socket) socket.emit('lottery_inventory');
     };
     socket.on('lottery_result', hResult);
@@ -362,12 +361,12 @@ function Dashboard({ token, onLogout, region }) {
     if (!discordId) return;
     
     if (!/^\d{17,20}$/.test(discordId)) {
-      alert('½Ğ¿é¤J±zªº Discord¡u¨Ï¥ÎªÌ ID¡v(17~20½X¼Æ¦r)¡I');
+      alert('è«‹è¼¸å…¥æ‚¨çš„ Discordã€Œä½¿ç”¨è€… IDã€(17~20ç¢¼æ•¸å­—)ï¼');
       return;
     }
 
     try {
-      addLog(`[SYS] ¹Á¸Õ¤â°Ê¸j©w Discord ID: ${discordId}...`);
+      addLog(`[SYS] å˜—è©¦æ‰‹å‹•ç¶å®š Discord ID: ${discordId}...`);
       const res = await fetch(`${API_URL}/bind-discord-manual`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -379,10 +378,10 @@ function Dashboard({ token, onLogout, region }) {
           avatar: `https://cdn.discordapp.com/embed/avatars/${(BigInt(discordId) >> 22n) % 6n}.png`
         });
         setShowDiscordModal(false);
-        addLog(`¨t²Î³qª¾¡G¤â°Ê¸j©w¦¨¥\¡I`);
+        addLog(`ç³»çµ±é€šçŸ¥ï¼šæ‰‹å‹•ç¶å®šæˆåŠŸï¼`);
       }
     } catch (err) {
-      alert('¸j©w¥¢±Ñ');
+      alert('ç¶å®šå¤±æ•—');
     }
   };
 
@@ -391,9 +390,9 @@ function Dashboard({ token, onLogout, region }) {
     if (!socket) return;
     const s = socket;
 
-    addLog(t('ÅçÃÒª÷Æ_¤wµo°e¡Aµ¥«İ±ÂÅv...'));
+    addLog(t('é©—è­‰é‡‘é‘°å·²ç™¼é€ï¼Œç­‰å¾…æˆæ¬Š...'));
     s.on('init_data', async (data) => {
-      addLog(`¨­¤À½T»{¡G¸`ÂI [${data.username}] ¦¨¥\±µ¤J¥ş²yºô¸ô`);
+      addLog(`èº«åˆ†ç¢ºèªï¼šç¯€é» [${data.username}] æˆåŠŸæ¥å…¥å…¨çƒç¶²è·¯`);
       if (data.discordProfile && data.discordProfile.id) {
         setBoundDiscord({ username: data.discordProfile.username, avatar: data.discordProfile.avatar });
       } else {
@@ -412,7 +411,7 @@ function Dashboard({ token, onLogout, region }) {
     });
 
     s.on('terminal_response', (msg) => {
-      // #1: ­­¨î terminalHistory ¤W­­ 100 ±ø
+      // #1: é™åˆ¶ terminalHistory ä¸Šé™ 100 æ¢
       setTerminalHistory(prev => [...prev, msg].slice(-100));
     });
 
@@ -422,7 +421,7 @@ function Dashboard({ token, onLogout, region }) {
     });
 
     s.on('chat_message', (data) => {
-      const adminBadge = data.isAdmin ? ' [ºŞ²z­û]' : '';
+      const adminBadge = data.isAdmin ? ' [ç®¡ç†å“¡]' : '';
       if (data.isDiscord) {
         addLog(`[DC_CHAT] ${data.username}: ${data.message}`);
       } else {
@@ -440,13 +439,13 @@ function Dashboard({ token, onLogout, region }) {
     });
 
     s.on('friend_online', (data) => {
-      addLog(`[SYSTEM] ¦n¤Í ${data.username} ¤W½u¤F¡I`);
+      addLog(`[SYSTEM] å¥½å‹ ${data.username} ä¸Šç·šäº†ï¼`);
       playBeep(660, 120);
       setTimeout(() => playBeep(880, 120), 140);
     });
 
     s.on('friend_offline', (data) => {
-      addLog(`[SYSTEM] ¦n¤Í ${data.username} Â÷½u¤F`);
+      addLog(`[SYSTEM] å¥½å‹ ${data.username} é›¢ç·šäº†`);
     });
 
     s.on('private_message', (data) => {
@@ -458,23 +457,23 @@ function Dashboard({ token, onLogout, region }) {
       addLog(`[PM] ${data.from}: ${data.message}`);
       playBeep(1100, 60);
       if (!showPmRef.current || pmTargetRef.current !== data.from) {
-        addLog(`[SYSTEM] ¦¬¨ì¨Ó¦Û ${data.from} ªº¨p°T¡I`);
+        addLog(`[SYSTEM] æ”¶åˆ°ä¾†è‡ª ${data.from} çš„ç§è¨Šï¼`);
       }
     });
 
     s.on('friend_request_received', (data) => {
-      addLog(`[SYSTEM] ¦¬¨ì¨Ó¦Û ${data.from} ªº¦n¤ÍÁÜ½Ğ¡I`);
+      addLog(`[SYSTEM] æ”¶åˆ°ä¾†è‡ª ${data.from} çš„å¥½å‹é‚€è«‹ï¼`);
       playBeep(880, 150);
       setTimeout(() => playBeep(1100, 150), 170);
       s.emit('get_social_data');
     });
 
     s.on('node_connected', (node) => {
-      addLog(`Äµ§i¡G°»´ú¨ì·sª«²z¸`ÂI¬¡°Ê©ó®y¼Ğ [${node.lat.toFixed(2)}, ${node.lon.toFixed(2)}]`);
+      addLog(`è­¦å‘Šï¼šåµæ¸¬åˆ°æ–°ç‰©ç†ç¯€é»æ´»å‹•æ–¼åº§æ¨™ [${node.lat.toFixed(2)}, ${node.lon.toFixed(2)}]`);
     });
 
     s.on('node_disconnected', () => {
-      addLog(`³qª¾¡G¸`ÂI³s½u¤¤Â_¡A¥¿¦b­«·s­pºâªÀ·|Á`À£­¢±`¼Æ`);
+      addLog(`é€šçŸ¥ï¼šç¯€é»é€£ç·šä¸­æ–·ï¼Œæ­£åœ¨é‡æ–°è¨ˆç®—ç¤¾æœƒç¸½å£“è¿«å¸¸æ•¸`);
     });
     
     s.on('all_players_list', (list) => {
@@ -489,7 +488,7 @@ function Dashboard({ token, onLogout, region }) {
           setMyNode(prev => prev ? { ...prev, inventory: data.inventory } : prev);
         }
       } else {
-        addLog(`[SYSTEM] ?? ${data.message}`);
+        addLog(`[SYSTEM] âš ï¸ ${data.message}`);
       }
     });
 
@@ -498,7 +497,7 @@ function Dashboard({ token, onLogout, region }) {
         addLog(`[SYSTEM] ${data.message}`);
         showToast(data.message, 'success');
       } else {
-        addLog(`[SYSTEM] ?? ${data.message}`);
+        addLog(`[SYSTEM] âš ï¸ ${data.message}`);
       }
     });
 
@@ -519,7 +518,7 @@ function Dashboard({ token, onLogout, region }) {
           updated = updated.filter(l => !l.text?.includes(` ${data.targetUsername}: `));
         }
         const time = new Date().toISOString().substring(11, 19);
-        updated = [...updated, { text: `[MOD] ºŞ²z­û ${data.modUsername} §R°£¤F¤@«h°T®§`, time }];
+        updated = [...updated, { text: `[MOD] ç®¡ç†å“¡ ${data.modUsername} åˆªé™¤äº†ä¸€å‰‡è¨Šæ¯`, time }];
         if (updated.length > 200) updated = updated.slice(-200);
         return updated;
       });
@@ -527,7 +526,7 @@ function Dashboard({ token, onLogout, region }) {
 
     s.on('chat_system_message', (data) => {
       addLog(data.message);
-      if (data.message?.startsWith('?')) showToast(data.message, 'success');
+      if (data.message?.startsWith('âœ…')) showToast(data.message, 'success');
     });
 
     s.on('online_users', (users) => {
@@ -537,17 +536,17 @@ function Dashboard({ token, onLogout, region }) {
     s.on('ad_revive_result', (data) => {
       setAdPlaying(false);
       if (data.success) {
-        addLog(`[SYSTEM] ¼s§i´_¬¡¦¨¥\¡I¦øªA¾¹°·±d«×«ì´_¦Ü ${data.health}%¡]¤µ¤é³Ñ¾l ${data.remaining} ¦¸¡^`);
+        addLog(`[SYSTEM] å»£å‘Šå¾©æ´»æˆåŠŸï¼ä¼ºæœå™¨å¥åº·åº¦æ¢å¾©è‡³ ${data.health}%ï¼ˆä»Šæ—¥å‰©é¤˜ ${data.remaining} æ¬¡ï¼‰`);
         setAdReviveRemaining(data.remaining);
         setShowAdRevive(false);
       } else {
-        addLog(`[SYSTEM] ¼s§i´_¬¡¥¢±Ñ¡G${data.message}`);
+        addLog(`[SYSTEM] å»£å‘Šå¾©æ´»å¤±æ•—ï¼š${data.message}`);
       }
     });
 
     s.on('chat_verification_required', (data) => {
-      addLog(`[SYSTEM] ?? ${data.message}`);
-      alert('?? ' + data.message);
+      addLog(`[SYSTEM] âš ï¸ ${data.message}`);
+      alert('âš ï¸ ' + data.message);
     });
 
     return () => {
@@ -585,7 +584,7 @@ function Dashboard({ token, onLogout, region }) {
         const now = Date.now();
         const diff = currentEvent.endTime - now;
         if (diff <= 0) {
-          setTimeLeft(t('§Y±Nµ²§ô...'));
+          setTimeLeft(t('å³å°‡çµæŸ...'));
           return;
         }
         
@@ -594,9 +593,9 @@ function Dashboard({ token, onLogout, region }) {
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
         
         if (hours > 0) {
-          setTimeLeft(`${t('µ²§ô­Ë¼Æ: ')}${hours}${t('¤p®É')}${minutes}${t('¤À')}${seconds}${t('¬í')}`);
+          setTimeLeft(`${t('çµæŸå€’æ•¸: ')}${hours}${t('å°æ™‚')}${minutes}${t('åˆ†')}${seconds}${t('ç§’')}`);
         } else {
-          setTimeLeft(`${t('µ²§ô­Ë¼Æ: ')}${minutes}${t('¤À')}${seconds}${t('¬í')}`);
+          setTimeLeft(`${t('çµæŸå€’æ•¸: ')}${minutes}${t('åˆ†')}${seconds}${t('ç§’')}`);
         }
       };
       
@@ -616,7 +615,7 @@ function Dashboard({ token, onLogout, region }) {
           color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '10px 20px', fontWeight: 'bold', fontSize: '1rem', flexShrink: 0, gap: '15px', flexWrap: 'wrap'
         }}>
-          <span>{t('¨Æ¥ó§ë²¼¶i¦æ¤¤¡I³Ñ¾l®É¶¡ ')}{(eventVote.options||[]).length}{t('¿ï¶µ')}</span>
+          <span>{t('äº‹ä»¶æŠ•ç¥¨é€²è¡Œä¸­ï¼å‰©é¤˜æ™‚é–“ ')}{(eventVote.options||[]).length}{t('é¸é …')}</span>
           {eventVote.options?.map(opt => (
             <button key={opt} onClick={() => socket?.emit('event_vote', { event: opt })} style={{
               padding: '6px 16px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.4)',
@@ -635,32 +634,32 @@ function Dashboard({ token, onLogout, region }) {
       case 'QUANTUM_BURST':
         bgColor = 'linear-gradient(90deg, #00d2ff, #3a7bd5)';
         icon = <Zap size={18} />;
-        text = t('¡i¶q¤lÃzµo¡j¥ş¦øªA¾¹ÂI¼Æ²Ö¿n³t«× x 3.0 ­¿¡I');
+        text = t('ã€é‡å­çˆ†ç™¼ã€‘å…¨ä¼ºæœå™¨é»æ•¸ç´¯ç©é€Ÿåº¦ x 3.0 å€ï¼');
         break;
       case 'SOLAR_STORM':
         bgColor = 'linear-gradient(90deg, #ff416c, #ff4b2b)';
         icon = <Tornado size={18} />;
-        text = t('¡i¤Ó¶§­·¼É¡jºô¸ô¼@¯Pªi°Ê¡I´Á¶¡Â_½u±N¦©°£ 100 ÂI¡A¼µ¹L¥h¥iÀò 200 ÂI¡I');
+        text = t('ã€å¤ªé™½é¢¨æš´ã€‘ç¶²è·¯åŠ‡çƒˆæ³¢å‹•ï¼æœŸé–“æ–·ç·šå°‡æ‰£é™¤ 100 é»ï¼Œæ’éå»å¯ç² 200 é»ï¼');
         break;
       case 'DATA_GOLD_RUSH':
         bgColor = 'linear-gradient(90deg, #fceabb, #f8b500)';
         icon = <Coins size={18} />;
-        text = t('¡i¼Æ¾Ú²^ª÷¼é¡jµu´ÁÃzµo¡I¥ş¦øªA¾¹ÂI¼Æ²Ö¿n³t«×öt¤É¦Ü 5.0 ­¿¡I');
+        text = t('ã€æ•¸æ“šæ·˜é‡‘æ½®ã€‘çŸ­æœŸçˆ†ç™¼ï¼å…¨ä¼ºæœå™¨é»æ•¸ç´¯ç©é€Ÿåº¦é£†å‡è‡³ 5.0 å€ï¼');
         break;
       case 'SATELLITE_ALIGNMENT':
         bgColor = 'linear-gradient(90deg, #11998e, #38ef7d)';
         icon = <Satellite size={18} />;
-        text = t('¡i½Ã¬P³s½u³Ì¨Î¤Æ¡j°ÊºA­¿²v±Ò°Ê¡A¦b½u¤H¼Æ¶V¦h²£¥X¶V°ª¡I');
+        text = t('ã€è¡›æ˜Ÿé€£ç·šæœ€ä½³åŒ–ã€‘å‹•æ…‹å€ç‡å•Ÿå‹•ï¼Œåœ¨ç·šäººæ•¸è¶Šå¤šç”¢å‡ºè¶Šé«˜ï¼');
         break;
       case 'SYSTEM_MAINTENANCE':
         bgColor = 'linear-gradient(90deg, #8e9eab, #eef2f3)';
         icon = <AlertTriangle size={18} />;
-        text = t('¡i¨t²ÎºûÅ@¼Ò¦¡¡jºâ¤O­°ÀW(0.5­¿)¡Aºû«ù³s½u¤£Â_½u¥iÀò¸ÉÀv¼úÀy¡I');
+        text = t('ã€ç³»çµ±ç¶­è­·æ¨¡å¼ã€‘ç®—åŠ›é™é »(0.5å€)ï¼Œç¶­æŒé€£ç·šä¸æ–·ç·šå¯ç²è£œå„Ÿçå‹µï¼');
         break;
       case 'DATA_BLACK_MARKET':
         bgColor = 'linear-gradient(90deg, #667eea, #764ba2)';
         icon = <Coins size={18} />;
-        text = t('¡i¼Æ¾Ú¶Â¥«¡jµ}¦³¨Æ¥ó¡I­­®É 5 ¤ÀÄÁ¡A¥i¥Î PT §I´«µ}¦³¹D¨ã¡I');
+        text = t('ã€æ•¸æ“šé»‘å¸‚ã€‘ç¨€æœ‰äº‹ä»¶ï¼é™æ™‚ 5 åˆ†é˜ï¼Œå¯ç”¨ PT å…Œæ›ç¨€æœ‰é“å…·ï¼');
         break;
     }
       
@@ -686,14 +685,14 @@ function Dashboard({ token, onLogout, region }) {
         <span style={{ marginLeft: '10px', background: 'var(--bg-light)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.9rem', color: currentEvent.type === 'SYSTEM_MAINTENANCE' || currentEvent.type === 'DATA_GOLD_RUSH' ? '#000' : '#fff' }}>{timeLeft}</span>
         {currentEvent.type === 'SOLAR_STORM' && (
           <>
-            <button onClick={() => socket?.emit('event_choice', { choice: 'shelter' })} style={{marginLeft:'10px', padding:'4px 12px', borderRadius:'6px', border:'1px solid rgba(255,255,255,0.4)', background:'rgba(255,255,255,0.15)', color:'#fff', cursor:'pointer', fontWeight:'bold', fontSize:'0.85rem'}}>{t('Á×Ãø(-50PT)')}</button>
-            <button onClick={() => socket?.emit('event_choice', { choice: 'ride_out' })} style={{padding:'4px 12px', borderRadius:'6px', border:'1px solid rgba(255,255,255,0.4)', background:'rgba(255,100,100,0.3)', color:'#fff', cursor:'pointer', fontWeight:'bold', fontSize:'0.85rem'}}>{t('µw¼µ(+400PT -15%HP)')}</button>
+            <button onClick={() => socket?.emit('event_choice', { choice: 'shelter' })} style={{marginLeft:'10px', padding:'4px 12px', borderRadius:'6px', border:'1px solid rgba(255,255,255,0.4)', background:'rgba(255,255,255,0.15)', color:'#fff', cursor:'pointer', fontWeight:'bold', fontSize:'0.85rem'}}>{t('é¿é›£(-50PT)')}</button>
+            <button onClick={() => socket?.emit('event_choice', { choice: 'ride_out' })} style={{padding:'4px 12px', borderRadius:'6px', border:'1px solid rgba(255,255,255,0.4)', background:'rgba(255,100,100,0.3)', color:'#fff', cursor:'pointer', fontWeight:'bold', fontSize:'0.85rem'}}>{t('ç¡¬æ’(+400PT -15%HP)')}</button>
           </>
         )}
         {currentEvent.type === 'SYSTEM_MAINTENANCE' && (
           <>
-            <button onClick={() => socket?.emit('event_choice', { choice: 'assist' })} style={{marginLeft:'10px', padding:'4px 12px', borderRadius:'6px', border:'1px solid rgba(255,255,255,0.4)', background:'rgba(100,200,255,0.2)', color:'#fff', cursor:'pointer', fontWeight:'bold', fontSize:'0.85rem'}}>{t('¨ó§U(-100PT,ÁYµu®É¶¡)')}</button>
-            <button onClick={() => socket?.emit('event_choice', { choice: 'ignore' })} style={{padding:'4px 12px', borderRadius:'6px', border:'1px solid rgba(255,255,255,0.4)', background:'rgba(255,255,255,0.1)', color:'#fff', cursor:'pointer', fontWeight:'bold', fontSize:'0.85rem'}}>{t('ºzµø(+500PT)')}</button>
+            <button onClick={() => socket?.emit('event_choice', { choice: 'assist' })} style={{marginLeft:'10px', padding:'4px 12px', borderRadius:'6px', border:'1px solid rgba(255,255,255,0.4)', background:'rgba(100,200,255,0.2)', color:'#fff', cursor:'pointer', fontWeight:'bold', fontSize:'0.85rem'}}>{t('å”åŠ©(-100PT,ç¸®çŸ­æ™‚é–“)')}</button>
+            <button onClick={() => socket?.emit('event_choice', { choice: 'ignore' })} style={{padding:'4px 12px', borderRadius:'6px', border:'1px solid rgba(255,255,255,0.4)', background:'rgba(255,255,255,0.1)', color:'#fff', cursor:'pointer', fontWeight:'bold', fontSize:'0.85rem'}}>{t('æ¼ è¦–(+500PT)')}</button>
           </>
         )}
       </div>
@@ -724,7 +723,7 @@ function Dashboard({ token, onLogout, region }) {
     e.preventDefault();
     if (!pmTarget || !pmInput.trim() || !socket) return;
     socket.emit('send_private_message', { targetUsername: pmTarget, message: pmInput });
-    const msg = { from: '§Ú', text: pmInput, time: new Date().toISOString().substring(11, 19), incoming: false };
+    const msg = { from: 'æˆ‘', text: pmInput, time: new Date().toISOString().substring(11, 19), incoming: false };
     setPmLog(prev => ({
       ...prev,
       [pmTarget]: [...(prev[pmTarget] || []), msg],
@@ -736,35 +735,35 @@ function Dashboard({ token, onLogout, region }) {
     if (!socket || !adminTarget.trim()) return;
     const duration = parseInt(muteDurationRef.current?.value || '5', 10);
     socket.emit('mod_mute_user', { targetUsername: adminTarget.trim(), duration });
-    addLog(`[MOD] µo¥X¸T¨¥«ü¥O¡G${adminTarget.trim()} ${duration} ¤ÀÄÁ`);
+    addLog(`[MOD] ç™¼å‡ºç¦è¨€æŒ‡ä»¤ï¼š${adminTarget.trim()} ${duration} åˆ†é˜`);
     setTimeout(() => socket.emit('get_all_players'), 300);
   };
 
   const handleAdminUnmute = () => {
     if (!socket || !adminTarget.trim()) return;
     socket.emit('mod_unmute_user', { targetUsername: adminTarget.trim() });
-    addLog(`[MOD] µo¥X¸Ñ¸T«ü¥O¡G${adminTarget.trim()}`);
+    addLog(`[MOD] ç™¼å‡ºè§£ç¦æŒ‡ä»¤ï¼š${adminTarget.trim()}`);
     setTimeout(() => socket.emit('get_all_players'), 300);
   };
 
   const handleAdminDelete = () => {
     if (!socket || !adminTarget.trim()) return;
     socket.emit('mod_delete_message', { messageId: Date.now().toString(), targetUsername: adminTarget.trim() });
-    addLog(`[MOD] µo¥X§R°£°T®§«ü¥O¡G${adminTarget.trim()}`);
+    addLog(`[MOD] ç™¼å‡ºåˆªé™¤è¨Šæ¯æŒ‡ä»¤ï¼š${adminTarget.trim()}`);
   };
 
   const handleAdminBan = () => {
     if (!socket || !adminTarget.trim()) return;
     const duration = parseInt(banDurationRef.current?.value || '1440', 10);
     socket.emit('mod_ban_user', { targetUsername: adminTarget.trim(), duration });
-    addLog(`[MOD] µo¥X«ÊÂê«ü¥O¡G${adminTarget.trim()} ${duration} ¤ÀÄÁ`);
+    addLog(`[MOD] ç™¼å‡ºå°é–æŒ‡ä»¤ï¼š${adminTarget.trim()} ${duration} åˆ†é˜`);
     setTimeout(() => socket.emit('get_all_players'), 300);
   };
 
   const handleAdminUnban = () => {
     if (!socket || !adminTarget.trim()) return;
     socket.emit('mod_unban_user', { targetUsername: adminTarget.trim() });
-    addLog(`[MOD] µo¥X¸Ñ°£«ÊÂê«ü¥O¡G${adminTarget.trim()}`);
+    addLog(`[MOD] ç™¼å‡ºè§£é™¤å°é–æŒ‡ä»¤ï¼š${adminTarget.trim()}`);
     setTimeout(() => socket.emit('get_all_players'), 300);
   };
 
@@ -774,7 +773,7 @@ function Dashboard({ token, onLogout, region }) {
   const handleAdminAddPts = () => {
     if (!socket || !adminTarget.trim() || adminPtsAmount <= 0) return;
     socket.emit('mod_add_pts', { targetUsername: adminTarget.trim(), amount: adminPtsAmount });
-    addLog(`[MOD] µ¹¤© ${adminTarget.trim()} ${adminPtsAmount} PT`);
+    addLog(`[MOD] çµ¦äºˆ ${adminTarget.trim()} ${adminPtsAmount} PT`);
     setTimeout(() => socket.emit('get_all_players'), 300);
     setAdminPtsAmount(0);
   };
@@ -785,7 +784,7 @@ function Dashboard({ token, onLogout, region }) {
     targets.forEach(username => {
       socket.emit('mod_add_pts', { targetUsername: username, amount: adminPtsAmount });
     });
-    addLog(`[MOD] §å¶qµ¹¤© ${targets.length} ¦ì¦¨­û¦U ${adminPtsAmount} PT (${targets.join(', ')})`);
+    addLog(`[MOD] æ‰¹é‡çµ¦äºˆ ${targets.length} ä½æˆå“¡å„ ${adminPtsAmount} PT (${targets.join(', ')})`);
     setTimeout(() => socket.emit('get_all_players'), 500);
     setSelectedPlayers(new Set());
     setAdminPtsAmount(0);
@@ -800,7 +799,7 @@ function Dashboard({ token, onLogout, region }) {
     setAdCountdown(15);
     let sloganIdx = 0;
 
-    // #11: ²M°£ÂÂ­p®É¾¹¡]¨¾¤î­«½Æ±Ò°Ê¡^
+    // #11: æ¸…é™¤èˆŠè¨ˆæ™‚å™¨ï¼ˆé˜²æ­¢é‡è¤‡å•Ÿå‹•ï¼‰
     if (adTimerRef.current) clearInterval(adTimerRef.current);
     if (adSloganTimerRef.current) clearInterval(adSloganTimerRef.current);
 
@@ -828,7 +827,7 @@ function Dashboard({ token, onLogout, region }) {
     if (!terminalInput.trim()) return;
     
     const cmd = terminalInput.trim();
-    // #1: Áä¤J«ü¥O®É¤]­­¨î¤W­­
+    // #1: éµå…¥æŒ‡ä»¤æ™‚ä¹Ÿé™åˆ¶ä¸Šé™
     setTerminalHistory(prev => [...prev, `> ${cmd}`].slice(-100));
     setTerminalInput('');
 
@@ -857,7 +856,7 @@ function Dashboard({ token, onLogout, region }) {
     <>
       <audio ref={audioRef} src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3" loop preload="auto" />
       {!myNode ? (
-        <FourPetalSpiral text={t('¥¿¦b³s½u¦Ü¥ş²y¸`ÂIºô¸ô...')} />
+        <FourPetalSpiral text={t('æ­£åœ¨é€£ç·šè‡³å…¨çƒç¯€é»ç¶²è·¯...')} />
       ) : (
     <div className="app-container" style={{
       position: 'relative',
@@ -870,8 +869,8 @@ function Dashboard({ token, onLogout, region }) {
       <GameBackground />
       {show100Celebration && (
         <div className="celebration-overlay">
-          <div className="celebration-emoji">??</div>
-          <div className="celebration-text">{t('¦øªA¾¹¹F¦¨ 100 ¤H¨½µ{¸O¡I')}</div>
+          <div className="celebration-emoji">ğŸ‰</div>
+          <div className="celebration-text">{t('ä¼ºæœå™¨é”æˆ 100 äººé‡Œç¨‹ç¢‘ï¼')}</div>
         </div>
       )}
       {/* Terminal Overlay */}
@@ -911,28 +910,28 @@ function Dashboard({ token, onLogout, region }) {
       <header className="system-header">
         <div className="system-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Globe2 color="#f59e0b" size={24} /> 
-          <PixelWordArt text={t('¦a²y¦b½u')} size={20} color="#f59e0b" depth={2} />
-          <span style={{color: '#64748b', fontSize: '0.9rem', marginLeft: '10px'}}>{t('¦øªA¾¹')}: {region.toUpperCase()} | {t('§Aªº¦ì¸m')}: {myNode?.country || t('³s½u¤¤..')}</span>
+          <PixelWordArt text={t('åœ°çƒåœ¨ç·š')} size={20} color="#f59e0b" depth={2} />
+          <span style={{color: '#64748b', fontSize: '0.9rem', marginLeft: '10px'}}>{t('ä¼ºæœå™¨')}: {region.toUpperCase()} | {t('ä½ çš„ä½ç½®')}: {myNode?.country || t('é€£ç·šä¸­..')}</span>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {!window.electronAPI && (
             <a href="https://drive.google.com/uc?export=download&id=1Xji_z7dB5Q16FfSyRvnm2mXqn3n0cAQ2" target="_blank" rel="noopener noreferrer" style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', background: 'var(--success-color)', color: 'white', border: 'none', borderRadius: '6px', textDecoration: 'none', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)', fontSize: '0.9rem'}}>
-              <Monitor size={16} /> {t('¤U¸ü±MÄİ¹q¸£ª©')}
+              <Monitor size={16} /> {t('ä¸‹è¼‰å°ˆå±¬é›»è…¦ç‰ˆ')}
             </a>
           )}
           <div className="system-stats" style={{display: 'flex', alignItems: 'center', gap: '15px', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px', fontSize: '0.85rem'}}>
             <div style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
-              <span style={{color: '#64748b'}}>{t('¤W½u¤H¼Æ')}:</span> <strong style={{color: 'var(--success-color)'}}>{globalStats.activeUsers}</strong>
+              <span style={{color: '#64748b'}}>{t('ä¸Šç·šäººæ•¸')}:</span> <strong style={{color: 'var(--success-color)'}}>{globalStats.activeUsers}</strong>
             </div>
             <div style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
-              <span style={{color: 'var(--text-dim)'}}>{t('Á`¤H¤f')}:</span> <strong style={{color: 'var(--text-color)'}}>{globalStats.totalPopulation}</strong>
+              <span style={{color: 'var(--text-dim)'}}>{t('ç¸½äººå£')}:</span> <strong style={{color: 'var(--text-color)'}}>{globalStats.totalPopulation}</strong>
             </div>
             {!isConnected && isOfflineMode && (
               <span style={{color: 'var(--warning-color)', fontWeight: 'bold', background: 'rgba(245,158,11,0.15)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem'}}>
-                ? {t('Â÷½u¼Ò¦¡')}
+                âš¡ {t('é›¢ç·šæ¨¡å¼')}
               </span>
             )}
-            {!isConnected && !engineReady && <span style={{color: 'var(--danger-color)', fontWeight: 'bold'}}>[{t('¤wÂ_½u')}]</span>}
+            {!isConnected && !engineReady && <span style={{color: 'var(--danger-color)', fontWeight: 'bold'}}>[{t('å·²æ–·ç·š')}]</span>}
           </div>
 
           <div className={`header-dropdown${dropdownOpen ? ' open' : ''}`} ref={dropdownRef}>
@@ -945,53 +944,53 @@ function Dashboard({ token, onLogout, region }) {
                 cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s', fontFamily: 'var(--font-sans)'
               }}
             >
-              {t('¿ï³æ (Menu)')} <ChevronDown size={16} style={{ transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+              {t('é¸å–® (Menu)')} <ChevronDown size={16} style={{ transition: 'transform 0.2s', transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
             </button>
             <div className="header-dropdown-content">
 
               <div style={{width: '100%', height: '1px', background: 'rgba(255,255,255,0.1)', margin: '5px 0'}}></div>
               <button onClick={() => { setShowSocialModal(true); setDropdownOpen(false); }} className="dropdown-item">
-                <Users size={16} /> {t('ªÀ¥æºô¸ô (Social)')}
+                <Users size={16} /> {t('ç¤¾äº¤ç¶²è·¯ (Social)')}
               </button>
               <button onClick={() => { setShowShopModal(true); setDropdownOpen(false); }} className="dropdown-item" style={{color: '#38bdf8'}}>
-                <ShoppingCart size={16} /> {t('¶Â¥«°Ó«° (Shop)')}
+                <ShoppingCart size={16} /> {t('é»‘å¸‚å•†åŸ (Shop)')}
               </button>
               <button onClick={() => { setShowBackpack(true); setDropdownOpen(false); }} className="dropdown-item" style={{color: '#22c55e'}}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><polyline points="8 8 8 5 16 5 16 8"/><line x1="12" y1="14" x2="12" y2="17"/><line x1="9" y1="14" x2="9" y2="17"/><line x1="15" y1="14" x2="15" y2="17"/></svg>
-                {t('¸Ë³Æ­I¥] (Backpack)')}
+                {t('è£å‚™èƒŒåŒ… (Backpack)')}
               </button>
               <button className="dropdown-item" onClick={() => { setShowThemeMenu(!showThemeMenu); setDropdownOpen(false); }}>
-                <Palette size={16} /> {t('¥DÃD°t¦â (Themes)')}
+                <Palette size={16} /> {t('ä¸»é¡Œé…è‰² (Themes)')}
               </button>
               <button className="dropdown-item" style={{color: '#f59e0b'}} onClick={() => { setShowLottery(true); setDropdownOpen(false); if (socket?.connected) socket.emit('lottery_inventory'); }}>
-                ?? {t('¯µÄ_©â¼ú')}
+                ğŸ² {t('ç§˜å¯¶æŠ½ç')}
               </button>
               <button className="dropdown-item" onClick={() => { setShowSettings(true); setDropdownOpen(false); }}>
-                <Settings size={16} /> {t('³]©w (Settings)')}
+                <Settings size={16} /> {t('è¨­å®š (Settings)')}
               </button>
               {(myRole === 'admin' || myRole === 'moderator') && (
                 <button className="dropdown-item" style={{color: 'var(--danger-color)'}} onClick={() => { setShowAdminPanel(true); setDropdownOpen(false); }}>
-                  <Shield size={16} /> {t('ºŞ²z­û¥\¯à (Admin)')}
+                  <Shield size={16} /> {t('ç®¡ç†å“¡åŠŸèƒ½ (Admin)')}
                 </button>
               )}
               <a href="https://discord.gg/6P6NG49Mus" target="_blank" rel="noreferrer" className="dropdown-item" style={{color: 'var(--info-color)'}} onClick={() => setDropdownOpen(false)}>
                 <svg width="16" height="16" viewBox="0 0 127.14 96.36" fill="currentColor"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a67.58,67.58,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
-                {t('©x¤è Discord')}
+                {t('å®˜æ–¹ Discord')}
               </a>
               <a href="https://buymeacoffee.com/lucas1126" target="_blank" rel="noreferrer" className="dropdown-item" style={{color: '#FFDD00'}} onClick={() => setDropdownOpen(false)}>
-                <Coffee size={16} /> {t('ÃÙ§U¤ä«ù (Donate)')}
+                <Coffee size={16} /> {t('è´ŠåŠ©æ”¯æŒ (Donate)')}
               </a>
             </div>
           </div>
 
           <button onClick={() => setShowWorldMap(true)} style={{padding: '5px 12px', borderRadius: '8px', background: 'rgba(0,255,136,0.08)', border: '1px solid rgba(0,255,136,0.2)', color: '#4ade80', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'monospace'}}>
-            ?? {t('¥@¬É¦a¹Ï')}
+            ğŸŒ {t('ä¸–ç•Œåœ°åœ–')}
           </button>
-          <button onClick={toggleBgm} style={{padding: '5px 12px', borderRadius: '8px', background: bgmEnabled ? 'rgba(0,255,136,0.1)' : 'rgba(255,50,50,0.1)', border: bgmEnabled ? '1px solid rgba(0,255,136,0.3)' : '1px solid rgba(255,50,50,0.3)', color: bgmEnabled ? 'var(--success-color)' : 'var(--danger-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'monospace'}} title={bgmEnabled ? t('Ãö³¬­I´º­µ¼Ö') : t('¶}±Ò­I´º­µ¼Ö')}>
+          <button onClick={toggleBgm} style={{padding: '5px 12px', borderRadius: '8px', background: bgmEnabled ? 'rgba(0,255,136,0.1)' : 'rgba(255,50,50,0.1)', border: bgmEnabled ? '1px solid rgba(0,255,136,0.3)' : '1px solid rgba(255,50,50,0.3)', color: bgmEnabled ? 'var(--success-color)' : 'var(--danger-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'monospace'}} title={bgmEnabled ? t('é—œé–‰èƒŒæ™¯éŸ³æ¨‚') : t('é–‹å•ŸèƒŒæ™¯éŸ³æ¨‚')}>
 {bgmEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
 {bgmEnabled ? 'BGM ON' : 'BGM OFF'}
 </button>
-          <button onClick={onLogout} className="logout-btn" style={{padding: '5px 15px', borderRadius: '8px', background: 'rgba(255,50,50,0.1)', border: '1px solid rgba(255,50,50,0.3)', color: 'var(--danger-color)', cursor: 'pointer'}}>{t('µn¥X / ¤Á´«±b¸¹')}</button>
+          <button onClick={onLogout} className="logout-btn" style={{padding: '5px 15px', borderRadius: '8px', background: 'rgba(255,50,50,0.1)', border: '1px solid rgba(255,50,50,0.3)', color: 'var(--danger-color)', cursor: 'pointer'}}>{t('ç™»å‡º / åˆ‡æ›å¸³è™Ÿ')}</button>
         </div>
       </header>
 
@@ -1073,11 +1072,11 @@ function Dashboard({ token, onLogout, region }) {
                 {boundDiscord ? (
                   <div style={{color: 'var(--text-secondary)', fontSize: '0.8rem'}}>
                     <LinkIcon size={12} color="var(--accent-color)" style={{marginRight: '4px'}}/>
-                    {t('¤w³sµ² Discord')}
+                    {t('å·²é€£çµ Discord')}
                   </div>
                 ) : (
 <a href="#" onClick={(e) => { e.preventDefault(); setShowDiscordModal(true); }} style={{fontSize: '0.8rem', color: 'var(--info-color)'}}>
-                     {t('³sµ² Discord')}
+                     {t('é€£çµ Discord')}
                    </a>
                 )}
               </div>
@@ -1091,17 +1090,17 @@ function Dashboard({ token, onLogout, region }) {
 
           <div style={{display: 'flex', gap: '10px', marginBottom: '8px'}}>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
-              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('¤W½u¤H¼Æ')}</div>
+              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('ä¸Šç·šäººæ•¸')}</div>
               <div style={{fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--success-color)'}}>{globalStats.activeUsers}</div>
             </div>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
-              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('­¿²v')}</div>
+              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('å€ç‡')}</div>
               {(() => {
                 const isOverclock = myNode?.activeBuffs?.overclock > Date.now();
                 const baseMult = globalStats.multiplier || 1.0;
                 const effMult = isOverclock ? baseMult * 2 : baseMult;
                 const color = effMult > 1.0 ? 'var(--accent-color)' : 'var(--text-main)';
-                const personal = isOverclock ? '?' : '';
+                const personal = isOverclock ? 'âš¡' : '';
                 return (
                   <div style={{fontSize: '1.3rem', fontWeight: 'bold', color}}>
                     {personal}{effMult.toFixed(1)}x
@@ -1110,14 +1109,14 @@ function Dashboard({ token, onLogout, region }) {
               })()}
             </div>
             <div className="metric-group" style={{flex: 1, padding: '10px 12px'}}>
-              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('¥Í©R')}</div>
+              <div style={{fontSize: '0.75rem', color: '#888', marginBottom: '4px'}}>{t('ç”Ÿå‘½')}</div>
               <div style={{fontSize: '1.3rem', fontWeight: 'bold', color: calculateHealthPercentage(lifespan) > 30 ? 'var(--accent-color)' : 'var(--danger-color)'}}>{Math.floor(calculateHealthPercentage(lifespan))}%</div>
             </div>
           </div>
 
           <div className="metric-group" style={{padding: '10px 12px', marginBottom: '8px'}}>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px'}}>
-              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('¸`ÂIµ¥¯Å')}</span>
+              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('ç¯€é»ç­‰ç´š')}</span>
               <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-color)'}}>
                 Lv.{myNode?.level || 1}
                 {myNode?.levelProgress?.nextSec && <span style={{fontSize:'0.75rem', color:'#888', marginLeft:'5px'}}>(+{(myNode.levelProgress.progress * 100).toFixed(0)}%)</span>}
@@ -1129,13 +1128,13 @@ function Dashboard({ token, onLogout, region }) {
               </div>
             )}
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px'}}>
-              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('Á`¥Í¦s®É¶¡')}</span>
+              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('ç¸½ç”Ÿå­˜æ™‚é–“')}</span>
               <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent-color)'}}>
                 {isOfflineMode && offlineState ? formatTime(offlineState.accumulatedTime) : formatTime(lifespan)}
               </span>
             </div>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('²Ö¿nÂI¼Æ')}</span>
+              <span style={{fontSize: '0.8rem', color: '#888'}}>{t('ç´¯ç©é»æ•¸')}</span>
               <span style={{fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)'}}>
                 {isOfflineMode && offlineState ? Math.floor(offlineState.accumulatedBonusPoints).toLocaleString() : (myNode?.accumulatedBonusPoints || 0).toLocaleString()}
               </span>
@@ -1143,29 +1142,29 @@ function Dashboard({ token, onLogout, region }) {
           </div>
 
           <div style={{display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px'}}>
-            <div style={{fontSize: '0.8rem', color: '#888', marginBottom: '4px'}}>{t('¦øªA¾¹¡G')}{region === 'asia' ? t('¨È¬w') : region === 'us' ? t('¬ü¬w') : t('¼Ú¬w')} | node: {myNode?.userId} | {myNode?.country || '--'}</div>
+            <div style={{fontSize: '0.8rem', color: '#888', marginBottom: '4px'}}>{t('ä¼ºæœå™¨ï¼š')}{region === 'asia' ? t('äºæ´²') : region === 'us' ? t('ç¾æ´²') : t('æ­æ´²')} | node: {myNode?.userId} | {myNode?.country || '--'}</div>
             {globalStats.multiplier > 1.0 && (
-              <div style={{fontSize: '0.8rem', color: 'var(--accent-color)'}}>{t('¶W¸ü¤¤¡G')}{globalStats.activeUsers} / 5 {t('¤H')}</div>
+              <div style={{fontSize: '0.8rem', color: 'var(--accent-color)'}}>{t('è¶…è¼‰ä¸­ï¼š')}{globalStats.activeUsers} / 5 {t('äºº')}</div>
             )}
           </div>
 
           <div style={{ marginTop: 'auto', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(255,215,0,0.1)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)'}} onClick={() => setShowLeaderboard(true)}>
-              <Activity size={14} /> {t('±Æ¦æº]')}
+              <Activity size={14} /> {t('æ’è¡Œæ¦œ')}
             </button>
             <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(255,215,0,0.05)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.2)'}} onClick={() => setShowAchievements(true)}>
-              <Trophy size={14} /> {t('¦¨´N')}
+              <Trophy size={14} /> {t('æˆå°±')}
             </button>
             {(myNode?.level || 1) >= 10 && (
               <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(147,51,234,0.1)', color: '#9333EA', border: '1px solid rgba(147,51,234,0.3)'}} onClick={() => { setShowTalentModal(true); if (socket?.connected) socket.emit('get_talent_data'); }}>
-                <Zap size={14} /> {t('¤Ñ½á')}
+                <Zap size={14} /> {t('å¤©è³¦')}
               </button>
             )}
             <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)'}} onClick={() => { setShowWarPanel(true); if (socket?.connected) socket.emit('get_war_stats'); }}>
-              <Globe2 size={14} /> {t('°Ï°ì¹ï§Ü')}
+              <Globe2 size={14} /> {t('å€åŸŸå°æŠ—')}
             </button>
             <button className="terminal-btn" style={{padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}} onClick={() => setShowAboutModal(true)}>
-              <Info size={14} /> {t('¨t²Î¸ê°T')}
+              <Info size={14} /> {t('ç³»çµ±è³‡è¨Š')}
             </button>
           </div>
         </aside>
@@ -1176,7 +1175,7 @@ function Dashboard({ token, onLogout, region }) {
             <div className="floating-panel" style={{padding: '15px 25px'}}>
               <div className="overlay-item">
                 <div className="overlay-title" style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-                  <Globe2 size={16} /> {t('¥ş²yÁ`±¾¾÷®É¶¡')}
+                  <Globe2 size={16} /> {t('å…¨çƒç¸½æ›æ©Ÿæ™‚é–“')}
                 </div>
                 <div className="overlay-value">{formatTime(globalStats.globalProduction)}</div>
               </div>
@@ -1212,37 +1211,37 @@ function Dashboard({ token, onLogout, region }) {
         <div className="modal-overlay">
           <div className="modal-content" style={{maxWidth: '500px'}}>
             <h3 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--info-color)'}}>
-              <LinkIcon /> {t('³sµ² Discord ±b¸¹')}
+              <LinkIcon /> {t('é€£çµ Discord å¸³è™Ÿ')}
             </h3>
             
             {!showManualBind ? (
               <>
                 <p style={{color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '25px', lineHeight: '1.6'}}>
-                  {t('³z¹L©x¤èÅçÃÒ¦w¥şµn¤J¡A³sµ²«á±N§Y®É¦P¨B±z³Ì·sªº Discord ¤jÀY¶K»P¼ÊºÙ¡C')}<br/>
-                  <span style={{color: 'var(--accent-color)'}}>{t('¡° §Ú­Ì¶È·|Àò¨ú±zªº¤½¶}°ò¥»¸ê®Æ¡Aµ´¹ï¦w¥ş¡C')}</span>
+                  {t('é€éå®˜æ–¹é©—è­‰å®‰å…¨ç™»å…¥ï¼Œé€£çµå¾Œå°‡å³æ™‚åŒæ­¥æ‚¨æœ€æ–°çš„ Discord å¤§é ­è²¼èˆ‡æš±ç¨±ã€‚')}<br/>
+                  <span style={{color: 'var(--accent-color)'}}>{t('â€» æˆ‘å€‘åƒ…æœƒç²å–æ‚¨çš„å…¬é–‹åŸºæœ¬è³‡æ–™ï¼Œçµ•å°å®‰å…¨ã€‚')}</span>
                 </p>
                 <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center'}}>
-                  <a href="#" onClick={(e) => { e.preventDefault(); setShowManualBind(true); }} style={{color: '#888', fontSize: '0.85rem', marginRight: 'auto', textDecoration: 'underline'}}>{t('µLªk¨Ï¥Î±ÂÅv¡HÂI¦¹¤â°Ê¸j©w')}</a>
-                  <button type="button" onClick={() => setShowDiscordModal(false)} className="terminal-btn" style={{padding: '10px 15px', background: 'rgba(255,255,255,0.1)'}}>{t('¨ú®ø')}</button>
+                  <a href="#" onClick={(e) => { e.preventDefault(); setShowManualBind(true); }} style={{color: '#888', fontSize: '0.85rem', marginRight: 'auto', textDecoration: 'underline'}}>{t('ç„¡æ³•ä½¿ç”¨æˆæ¬Šï¼Ÿé»æ­¤æ‰‹å‹•ç¶å®š')}</a>
+                  <button type="button" onClick={() => setShowDiscordModal(false)} className="terminal-btn" style={{padding: '10px 15px', background: 'rgba(255,255,255,0.1)'}}>{t('å–æ¶ˆ')}</button>
                   <button onClick={handleBindDiscord} className="terminal-btn" style={{padding: '10px 20px', background: 'var(--info-color)', color: '#fff', border: 'none', fontWeight: 'bold'}}>
-                    {t('?? «e©¹ Discord ©x¤è±ÂÅv')}
+                    {t('ğŸ”— å‰å¾€ Discord å®˜æ–¹æˆæ¬Š')}
                   </button>
                 </div>
               </>
             ) : (
               <form onSubmit={handleBindDiscordManual}>
                 <p style={{color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '15px', lineHeight: '1.6'}}>
-                  {t('¤â°Ê¿é¤J»İ¶}±Ò¶}µoªÌ¼Ò¦¡¡A½Ğ¨Ì·Ó¤U¤è¹Ï¥Ü«ü¥Ü¡A¹ïµÛ±zªºÀY¹³ÂIÀ»¥kÁä½Æ»s¡C')}
+                  {t('æ‰‹å‹•è¼¸å…¥éœ€é–‹å•Ÿé–‹ç™¼è€…æ¨¡å¼ï¼Œè«‹ä¾ç…§ä¸‹æ–¹åœ–ç¤ºæŒ‡ç¤ºï¼Œå°è‘—æ‚¨çš„é ­åƒé»æ“Šå³éµè¤‡è£½ã€‚')}
                 </p>
                 <div className="discord-mock-menu">
-                  <div className="discord-mock-item">{t('½s¿è­Ó¤H¸ê®Æ')}</div>
-                  <div className="discord-mock-item" style={{color: '#ed4245'}}>{t('½Ğ¤Å¥´ÂZ')}</div>
-                  <div className="discord-mock-item">{t('¤Á´«±b¸¹')}</div>
-                  <div className="discord-mock-item discord-mock-highlight">{t('½Æ»s¨Ï¥ÎªÌ ID')}</div>
+                  <div className="discord-mock-item">{t('ç·¨è¼¯å€‹äººè³‡æ–™')}</div>
+                  <div className="discord-mock-item" style={{color: '#ed4245'}}>{t('è«‹å‹¿æ‰“æ“¾')}</div>
+                  <div className="discord-mock-item">{t('åˆ‡æ›å¸³è™Ÿ')}</div>
+                  <div className="discord-mock-item discord-mock-highlight">{t('è¤‡è£½ä½¿ç”¨è€… ID')}</div>
                 </div>
                 <input 
                   type="text" 
-                  placeholder={t('¦b¦¹¶K¤W±z½Æ»sªº ID (¨Ò¦p: 123456789012345678)')} 
+                  placeholder={t('åœ¨æ­¤è²¼ä¸Šæ‚¨è¤‡è£½çš„ ID (ä¾‹å¦‚: 123456789012345678)')} 
                   value={discordId}
                   onChange={e => setDiscordId(e.target.value)}
                   className="terminal-input"
@@ -1250,8 +1249,8 @@ function Dashboard({ token, onLogout, region }) {
                   required
                 />
                 <div style={{display: 'flex', gap: '10px'}}>
-                  <button type="button" className="terminal-btn" style={{flex: 1, background: 'rgba(255,255,255,0.1)'}} onClick={() => setShowManualBind(false)}>{t('ªğ¦^')}</button>
-                  <button type="submit" className="terminal-btn" style={{flex: 1}}>{t('½T»{¤â°Ê¸j©w')}</button>
+                  <button type="button" className="terminal-btn" style={{flex: 1, background: 'rgba(255,255,255,0.1)'}} onClick={() => setShowManualBind(false)}>{t('è¿”å›')}</button>
+                  <button type="submit" className="terminal-btn" style={{flex: 1}}>{t('ç¢ºèªæ‰‹å‹•ç¶å®š')}</button>
                 </div>
               </form>
             )}
@@ -1262,7 +1261,7 @@ function Dashboard({ token, onLogout, region }) {
       {/* Full Page About Documentation */}
       {showAboutModal && <DocumentationOverlay onClose={() => setShowAboutModal(false)} />}
       {showSocialModal && <SocialModal onClose={() => setShowSocialModal(false)} socialTab={socialTab} setSocialTab={setSocialTab} socialData={socialData} socket={socket} myNode={myNode} onPmUser={(username) => { setPmTarget(username); setShowPm(true); setShowSocialModal(false); }} toast={toast} />}
-      {showShopModal && <ShopModal onClose={() => setShowShopModal(false)} pts={myNode?.accumulatedBonusPoints} onBuy={(id) => { if (socket?.connected) { socket.emit('buy_item', id); } else { alert('³s½u¥¼´Nºü¡AµLªkÁÊ¶R'); } }} onAdRevive={() => setShowAdRevive(true)} adReviveRemaining={adReviveRemaining} />}
+      {showShopModal && <ShopModal onClose={() => setShowShopModal(false)} pts={myNode?.accumulatedBonusPoints} onBuy={(id) => { if (socket?.connected) { socket.emit('buy_item', id); } else { alert('é€£ç·šæœªå°±ç·’ï¼Œç„¡æ³•è³¼è²·'); } }} onAdRevive={() => setShowAdRevive(true)} adReviveRemaining={adReviveRemaining} />}
       {showBackpack && <BackpackModal onClose={() => setShowBackpack(false)} inventory={myNode?.inventory} socket={socket} addLog={addLog} />}
 
       {showAchievements && <AchievementModal data={achievementData} onClose={() => setShowAchievements(false)} />}
@@ -1271,7 +1270,7 @@ function Dashboard({ token, onLogout, region }) {
 
       {showAccountInfo && <AccountInfoModal token={token} apiUrl={API_URL} onClose={() => setShowAccountInfo(false)} onLogout={onLogout} />}
 
-      {/* Admin Panel Modal ¡X Full Side Drawer */}
+      {/* Admin Panel Modal â€” Full Side Drawer */}
       {showAdminPanel && (() => {
         const filtered = allPlayersList.filter(p => {
           const matchSearch = p.username.toLowerCase().includes(playerSearch.toLowerCase());
@@ -1304,17 +1303,17 @@ function Dashboard({ token, onLogout, region }) {
               }}>
                 <Shield size={18} color="#ef4444" />
                 <span style={{ color: '#ef4444', fontWeight: '700', fontSize: '1rem', flex: 1 }}>
-                  {t('ºŞ²z­û­±ªO ¡P Admin Panel')}
+                  {t('ç®¡ç†å“¡é¢æ¿ Â· Admin Panel')}
                 </span>
                 <span style={{ color: '#64748b', fontSize: '0.8rem', marginRight: '12px' }}>
-                  {t('Á`ª±®a¼Æ:')} <strong style={{ color: '#e2e8f0' }}>{allPlayersList.length}</strong>¡@
-                  {t('¦b½u:')} <strong style={{ color: '#22c55e' }}>{allPlayersList.filter(p => p.online).length}</strong>
+                  {t('ç¸½ç©å®¶æ•¸:')} <strong style={{ color: '#e2e8f0' }}>{allPlayersList.length}</strong>ã€€
+                  {t('åœ¨ç·š:')} <strong style={{ color: '#22c55e' }}>{allPlayersList.filter(p => p.online).length}</strong>
                 </span>
                 <button onClick={() => setShowAdminPanel(false)} style={{
                   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                   color: '#94a3b8', cursor: 'pointer', borderRadius: '6px',
                   width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>?</button>
+                }}>âœ•</button>
               </div>
 
               <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -1327,7 +1326,7 @@ function Dashboard({ token, onLogout, region }) {
                   <div style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
                     <input
                       type="text"
-                      placeholder={t('?? ·j´Mª±®a¦WºÙ...')}
+                      placeholder={t('ğŸ” æœå°‹ç©å®¶åç¨±...')}
                       value={playerSearch}
                       onChange={e => setPlayerSearch(e.target.value)}
                       style={{
@@ -1340,9 +1339,9 @@ function Dashboard({ token, onLogout, region }) {
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#94a3b8', fontSize: '0.72rem', cursor: 'pointer', marginRight: '4px' }}>
                         <input type="checkbox" checked={filtered.length > 0 && selectedPlayers.size === filtered.length} onChange={e => { if (e.target.checked) { setSelectedPlayers(new Set(filtered.map(p => p.username))); } else { setSelectedPlayers(new Set()); } }} style={{ accentColor: '#ef4444' }} />
-                        {t('¥ş¿ï')}
+                        {t('å…¨é¸')}
                       </label>
-                      {[['all',t('¥ş³¡')],['online',t('¦b½u')],['muted',t('¸T¨¥')],['banned',t('«ÊÂê')]].map(([val, label]) => (
+                      {[['all',t('å…¨éƒ¨')],['online',t('åœ¨ç·š')],['muted',t('ç¦è¨€')],['banned',t('å°é–')]].map(([val, label]) => (
                         <button key={val} onClick={() => setAdminPlayerFilter(val)} style={{
                           padding: '3px 9px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer',
                           border: adminPlayerFilter === val ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.1)',
@@ -1355,7 +1354,7 @@ function Dashboard({ token, onLogout, region }) {
                         padding: '3px 9px', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer',
                         border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
                         color: '#64748b', marginLeft: 'auto',
-                      }}>{t('? ¨ê·s')}</button>
+                      }}>{t('â†º åˆ·æ–°')}</button>
             </div>
           </div>
 
@@ -1363,7 +1362,7 @@ function Dashboard({ token, onLogout, region }) {
                   <div style={{ flex: 1, overflowY: 'auto' }}>
                     {filtered.length === 0 && (
                       <div style={{ color: '#475569', fontSize: '0.8rem', textAlign: 'center', padding: '24px 12px' }}>
-                        {allPlayersList.length === 0 ? t('ÂIÀ»¡u¨ê·s¡v¸ü¤Jª±®a¦W³æ') : t('µL²Å¦Xµ²ªG')}
+                        {allPlayersList.length === 0 ? t('é»æ“Šã€Œåˆ·æ–°ã€è¼‰å…¥ç©å®¶åå–®') : t('ç„¡ç¬¦åˆçµæœ')}
                       </div>
                     )}
                     {filtered.map(p => (
@@ -1399,8 +1398,8 @@ function Dashboard({ token, onLogout, region }) {
                           </div>
                           <div style={{ display: 'flex', gap: '6px', marginTop: '2px', alignItems: 'center' }}>
                             <span style={{ color: '#475569', fontSize: '0.68rem' }}>{p.country}</span>
-                            {p.isMuted && <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.62rem', padding: '1px 4px', borderRadius: '3px' }}>{t('¸T¨¥')}</span>}
-                            {p.isBanned && <span style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: '0.62rem', padding: '1px 4px', borderRadius: '3px' }}>{t('«ÊÂê')}</span>}
+                            {p.isMuted && <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.62rem', padding: '1px 4px', borderRadius: '3px' }}>{t('ç¦è¨€')}</span>}
+                            {p.isBanned && <span style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: '0.62rem', padding: '1px 4px', borderRadius: '3px' }}>{t('å°é–')}</span>}
                           </div>
                         </div>
                         <span style={{ color: '#334155', fontSize: '0.68rem', flexShrink: 0 }}>
@@ -1416,7 +1415,7 @@ function Dashboard({ token, onLogout, region }) {
                   {!adminTarget && selectedPlayers.size === 0 ? (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#334155', gap: '8px' }}>
                       <Shield size={40} color="#1e293b" />
-                      <span style={{ fontSize: '0.9rem' }}>{t('¡ö ±q¥ª°¼¿ï¨úª±®a')}</span>
+                      <span style={{ fontSize: '0.9rem' }}>{t('â† å¾å·¦å´é¸å–ç©å®¶')}</span>
                     </div>
                   ) : selectedPlayers.size > 0 ? (
                     <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
@@ -1428,7 +1427,7 @@ function Dashboard({ token, onLogout, region }) {
                       }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ color: '#4ade80', fontWeight: '700', fontSize: '1.1rem' }}>
-                            {t('¤w¿ï¨ú')} {selectedPlayers.size} {t('¦ì¦¨­û')}
+                            {t('å·²é¸å–')} {selectedPlayers.size} {t('ä½æˆå“¡')}
                           </div>
                           <div style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '4px' }}>
                             {[...selectedPlayers].join(', ')}
@@ -1436,26 +1435,26 @@ function Dashboard({ token, onLogout, region }) {
                         </div>
                         <button onClick={() => setSelectedPlayers(new Set())} style={{
                           background: 'transparent', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '0.8rem',
-                        }}>{t('²M°£¿ï¨ú')}</button>
+                        }}>{t('æ¸…é™¤é¸å–')}</button>
                       </div>
 
                       {/* Mass Give PT */}
                       <div style={{ marginBottom: '14px' }}>
-                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('§å¶qµo¥¬ÂI¼Æ MASS GIVE PT')}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('æ‰¹é‡ç™¼å¸ƒé»æ•¸ MASS GIVE PT')}</div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <input type="number" value={adminPtsAmount} onChange={e => setAdminPtsAmount(Math.max(0, parseInt(e.target.value) || 0))} min="1" max="100000" placeholder={t('¼Æ¶q')} style={{ width: '100px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', outline: 'none', fontSize: '0.82rem' }} />
-                          <span style={{ color: '#64748b', fontSize: '0.78rem' }}>{t('¡Ñ')} {selectedPlayers.size} {t('¤H')} = {(adminPtsAmount * selectedPlayers.size).toLocaleString()} PT</span>
+                          <input type="number" value={adminPtsAmount} onChange={e => setAdminPtsAmount(Math.max(0, parseInt(e.target.value) || 0))} min="1" max="100000" placeholder={t('æ•¸é‡')} style={{ width: '100px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', outline: 'none', fontSize: '0.82rem' }} />
+                          <span style={{ color: '#64748b', fontSize: '0.78rem' }}>{t('Ã—')} {selectedPlayers.size} {t('äºº')} = {(adminPtsAmount * selectedPlayers.size).toLocaleString()} PT</span>
                           <button onClick={handleAdminMassAddPts} disabled={adminPtsAmount <= 0} style={{
                             background: adminPtsAmount > 0 ? '#22c55e' : '#334155',
                             color: adminPtsAmount > 0 ? '#000' : '#64748b',
                             border: 'none', padding: '6px 20px', borderRadius: '6px', cursor: adminPtsAmount > 0 ? 'pointer' : 'not-allowed',
                             fontSize: '0.82rem', fontWeight: '600', marginLeft: 'auto',
-                          }}>{t('§å¶qµo°e')}</button>
+                          }}>{t('æ‰¹é‡ç™¼é€')}</button>
                         </div>
                       </div>
 
                       <div style={{ marginTop: '24px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', color: '#475569', fontSize: '0.75rem', lineHeight: 1.6 }}>
-                        ? {t('±N¹ï¥ş³¡')} {selectedPlayers.size} {t('¦ì¤w¿ï¨ú¦¨­û¦Uµo°e')} {adminPtsAmount} {t('PT¡A½Ğ½T»{«á¦A¾Ş§@¡C')}
+                        âš  {t('å°‡å°å…¨éƒ¨')} {selectedPlayers.size} {t('ä½å·²é¸å–æˆå“¡å„ç™¼é€')} {adminPtsAmount} {t('PTï¼Œè«‹ç¢ºèªå¾Œå†æ“ä½œã€‚')}
                       </div>
                     </div>
                   ) : (
@@ -1475,74 +1474,74 @@ function Dashboard({ token, onLogout, region }) {
                         <div style={{ flex: 1 }}>
                           <div style={{ color: '#f87171', fontWeight: '700', fontSize: '1.1rem' }}>{adminTarget}</div>
                           <div style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '2px' }}>
-                            {selected?.country} ¡P
-                            {selected?.online ? <span style={{ color: '#22c55e' }}> {t('¦b½u')}</span> : ` ${t('Â÷½u')}`} ¡P
+                            {selected?.country} Â·
+                            {selected?.online ? <span style={{ color: '#22c55e' }}> {t('åœ¨ç·š')}</span> : ` ${t('é›¢ç·š')}`} Â·
                             {' '}{(selected?.pts || 0).toLocaleString()} PT
-                            {selected?.isMuted && <span style={{ color: '#fbbf24', marginLeft: '8px' }}>{t('? ¸T¨¥¤¤')}{selected?.mutedUntil ? ` (${Math.ceil((selected.mutedUntil - Date.now()) / 60000)}${t('¤À')})` : ''}</span>}
-                            {selected?.isBanned && <span style={{ color: '#ef4444', marginLeft: '8px' }}>{t('?? «ÊÂê¤¤')}{selected?.bannedUntil ? ` (${Math.ceil((selected.bannedUntil - Date.now()) / 60000)}${t('¤À')})` : ''}</span>}
+                            {selected?.isMuted && <span style={{ color: '#fbbf24', marginLeft: '8px' }}>{t('âš  ç¦è¨€ä¸­')}{selected?.mutedUntil ? ` (${Math.ceil((selected.mutedUntil - Date.now()) / 60000)}${t('åˆ†')})` : ''}</span>}
+                            {selected?.isBanned && <span style={{ color: '#ef4444', marginLeft: '8px' }}>{t('ğŸš« å°é–ä¸­')}{selected?.bannedUntil ? ` (${Math.ceil((selected.bannedUntil - Date.now()) / 60000)}${t('åˆ†')})` : ''}</span>}
                           </div>
                         </div>
                         <button onClick={() => setAdminTarget('')} style={{
                           background: 'transparent', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '0.8rem',
-                        }}>{t('¨ú®ø¿ï¨ú')}</button>
+                        }}>{t('å–æ¶ˆé¸å–')}</button>
                       </div>
 
                       {/* Mute */}
                       <div style={{ marginBottom: '14px' }}>
-                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('¸T¨¥ MUTE')}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('ç¦è¨€ MUTE')}</div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                           <select ref={muteDurationRef} defaultValue="5" style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.82rem', outline: 'none' }}>
-                            <option value="1">{t('1 ¤ÀÄÁ')}</option>
-                            <option value="5">{t('5 ¤ÀÄÁ')}</option>
-                            <option value="10">{t('10 ¤ÀÄÁ')}</option>
-                            <option value="30">{t('30 ¤ÀÄÁ')}</option>
-                            <option value="60">{t('1 ¤p®É')}</option>
-                            <option value="360">{t('6 ¤p®É')}</option>
-                            <option value="1440">{t('24 ¤p®É')}</option>
+                            <option value="1">{t('1 åˆ†é˜')}</option>
+                            <option value="5">{t('5 åˆ†é˜')}</option>
+                            <option value="10">{t('10 åˆ†é˜')}</option>
+                            <option value="30">{t('30 åˆ†é˜')}</option>
+                            <option value="60">{t('1 å°æ™‚')}</option>
+                            <option value="360">{t('6 å°æ™‚')}</option>
+                            <option value="1440">{t('24 å°æ™‚')}</option>
                           </select>
-                          <button onClick={handleAdminMute} style={{ background: '#b45309', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('¸T¨¥')}</button>
-                          <button onClick={handleAdminUnmute} style={{ background: '#15803d', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('¸Ñ°£¸T¨¥')}</button>
+                          <button onClick={handleAdminMute} style={{ background: '#b45309', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('ç¦è¨€')}</button>
+                          <button onClick={handleAdminUnmute} style={{ background: '#15803d', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('è§£é™¤ç¦è¨€')}</button>
                         </div>
                       </div>
 
                       {/* Ban */}
                       <div style={{ marginBottom: '14px' }}>
-                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('«ÊÂê BAN')}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('å°é– BAN')}</div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                           <select ref={banDurationRef} defaultValue="1440" style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', fontSize: '0.82rem', outline: 'none' }}>
-                            <option value="60">{t('1 ¤p®É')}</option>
-                            <option value="360">{t('6 ¤p®É')}</option>
-                            <option value="1440">{t('24 ¤p®É')}</option>
-                            <option value="4320">{t('3 ¤Ñ')}</option>
-                            <option value="10080">{t('7 ¤Ñ')}</option>
-                            <option value="43200">{t('30 ¤Ñ')}</option>
+                            <option value="60">{t('1 å°æ™‚')}</option>
+                            <option value="360">{t('6 å°æ™‚')}</option>
+                            <option value="1440">{t('24 å°æ™‚')}</option>
+                            <option value="4320">{t('3 å¤©')}</option>
+                            <option value="10080">{t('7 å¤©')}</option>
+                            <option value="43200">{t('30 å¤©')}</option>
                           </select>
-                          <button onClick={handleAdminBan} style={{ background: '#991b1b', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('«ÊÂê')}</button>
-                          <button onClick={handleAdminUnban} style={{ background: '#15803d', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('¸Ñ°£«ÊÂê')}</button>
+                          <button onClick={handleAdminBan} style={{ background: '#991b1b', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('å°é–')}</button>
+                          <button onClick={handleAdminUnban} style={{ background: '#15803d', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('è§£é™¤å°é–')}</button>
                         </div>
                       </div>
 
                       {/* Delete message */}
                       <div style={{ marginBottom: '14px' }}>
-                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('°T®§ºŞ²z MESSAGES')}</div>
-                        <button onClick={handleAdminDelete} style={{ background: '#92400e', border: 'none', color: '#fff', padding: '6px 18px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('§R°£¸Óª±®a©Ò¦³°T®§')}</button>
+                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('è¨Šæ¯ç®¡ç† MESSAGES')}</div>
+                        <button onClick={handleAdminDelete} style={{ background: '#92400e', border: 'none', color: '#fff', padding: '6px 18px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600' }}>{t('åˆªé™¤è©²ç©å®¶æ‰€æœ‰è¨Šæ¯')}</button>
                       </div>
 
                       <div style={{ marginTop: '24px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', color: '#475569', fontSize: '0.75rem', lineHeight: 1.6 }}>
-                        {t('? ºŞ²z­û¾Ş§@¤£¥i´_­ì¡A½ĞÂÔ·V¨Ï¥Î¡C©Ò¦³¾Ş§@§¡·|°O¿ı©ó¨t²Î¤é»x¡C')}
+                        {t('âš  ç®¡ç†å“¡æ“ä½œä¸å¯å¾©åŸï¼Œè«‹è¬¹æ…ä½¿ç”¨ã€‚æ‰€æœ‰æ“ä½œå‡æœƒè¨˜éŒ„æ–¼ç³»çµ±æ—¥èªŒã€‚')}
                       </div>
 
                       {/* Give PT */}
                       <div style={{ marginBottom: '14px' }}>
-                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('µ¹¤©ÂI¼Æ GIVE PT')}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '1px', marginBottom: '8px' }}>{t('çµ¦äºˆé»æ•¸ GIVE PT')}</div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <input type="number" value={adminPtsAmount} onChange={e => setAdminPtsAmount(Math.max(0, parseInt(e.target.value) || 0))} min="1" max="100000" placeholder={t('¼Æ¶q')} style={{ width: '100px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', outline: 'none', fontSize: '0.82rem' }} />
+                          <input type="number" value={adminPtsAmount} onChange={e => setAdminPtsAmount(Math.max(0, parseInt(e.target.value) || 0))} min="1" max="100000" placeholder={t('æ•¸é‡')} style={{ width: '100px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '6px 8px', borderRadius: '6px', outline: 'none', fontSize: '0.82rem' }} />
                           <button onClick={handleAdminAddPts} disabled={!adminTarget.trim() || adminPtsAmount <= 0} style={{
                             background: adminTarget.trim() && adminPtsAmount > 0 ? '#22c55e' : '#334155',
                             color: adminTarget.trim() && adminPtsAmount > 0 ? '#000' : '#64748b',
                             border: 'none', padding: '6px 16px', borderRadius: '6px', cursor: adminTarget.trim() && adminPtsAmount > 0 ? 'pointer' : 'not-allowed',
                             fontSize: '0.82rem', fontWeight: '600'
-                           }}>{t('µo°e PT')}</button>
+                           }}>{t('ç™¼é€ PT')}</button>
                         </div>
                       </div>
                     </div>
@@ -1582,18 +1581,18 @@ function Dashboard({ token, onLogout, region }) {
                   {adSlogan?.lines?.map((line, i) => <span key={i}>{line}</span>)}
                 </div>
                 <div style={{color: 'var(--accent-color)', fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '15px'}}>{adCountdown}s</div>
-                <div style={{color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: '10px'}}>{t('ÃÙ§U°Ó¡G¤lº³¥ÍºA¨t')}</div>
+                <div style={{color: 'var(--text-dim)', fontSize: '0.75rem', marginBottom: '10px'}}>{t('è´ŠåŠ©å•†ï¼šå­ç†™ç”Ÿæ…‹ç³»')}</div>
                 <div style={{width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden'}}>
                   <div style={{width: `${((15 - adCountdown) / 15) * 100}%`, height: '100%', background: 'var(--accent-color)', transition: 'width 1s linear'}} />
                 </div>
-                <div style={{color: 'var(--text-dim)', fontSize: '0.8rem', marginTop: '15px'}}>{t('Æ[¬İ§¹¾ã¼s§i§Y¥i§K¶O´_¬¡¦øªA¾¹')}</div>
+                <div style={{color: 'var(--text-dim)', fontSize: '0.8rem', marginTop: '15px'}}>{t('è§€çœ‹å®Œæ•´å»£å‘Šå³å¯å…è²»å¾©æ´»ä¼ºæœå™¨')}</div>
               </>
             ) : (
               <>
-                <div style={{fontSize: '3rem', marginBottom: '15px'}}>?</div>
-                <div style={{color: 'var(--text-color)', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '8px'}}>{t('¦øªA¾¹¤w¦º¾÷¡I')}</div>
-                <div style={{color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '20px'}}>{t('Æ[¬İ¼s§i§Y¥i§K¶O´_¬¡¡]«ì´_ 50% °·±d«×¡^')}</div>
-                <div style={{color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '20px'}}>{t('¤µ¤é³Ñ¾l¦¸¼Æ¡G')}{adReviveRemaining} / 3</div>
+                <div style={{fontSize: '3rem', marginBottom: '15px'}}>âš¡</div>
+                <div style={{color: 'var(--text-color)', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '8px'}}>{t('ä¼ºæœå™¨å·²æ­»æ©Ÿï¼')}</div>
+                <div style={{color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '20px'}}>{t('è§€çœ‹å»£å‘Šå³å¯å…è²»å¾©æ´»ï¼ˆæ¢å¾© 50% å¥åº·åº¦ï¼‰')}</div>
+                <div style={{color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '20px'}}>{t('ä»Šæ—¥å‰©é¤˜æ¬¡æ•¸ï¼š')}{adReviveRemaining} / 3</div>
                 <div style={{display: 'flex', gap: '10px', justifyContent: 'center'}}>
                   <button onClick={handleStartAdRevive} disabled={adReviveRemaining <= 0} style={{
                     background: adReviveRemaining > 0 ? 'var(--accent-color)' : 'var(--border-color)',
@@ -1602,13 +1601,13 @@ function Dashboard({ token, onLogout, region }) {
                     fontWeight: 'bold', cursor: adReviveRemaining > 0 ? 'pointer' : 'not-allowed',
                     fontSize: '1rem'
                   }}>
-                    {adReviveRemaining > 0 ? t('? Æ[¬İ¼s§i´_¬¡') : t('¤µ¤é¦¸¼Æ¤w¥Î§¹')}
+                    {adReviveRemaining > 0 ? t('â–¶ è§€çœ‹å»£å‘Šå¾©æ´»') : t('ä»Šæ—¥æ¬¡æ•¸å·²ç”¨å®Œ')}
                   </button>
                   <button onClick={() => setShowAdRevive(false)} style={{
                     background: 'transparent', border: '1px solid var(--border-color)',
                     color: 'var(--text-dim)', padding: '12px 20px', borderRadius: '8px',
                     cursor: 'pointer', fontSize: '0.9rem'
-                  }}>{t('Ãö³¬')}</button>
+                  }}>{t('é—œé–‰')}</button>
                 </div>
               </>
             )}
@@ -1629,7 +1628,7 @@ function Dashboard({ token, onLogout, region }) {
             color: 'var(--text-color, #e2e8f0)',
           }}>
             <h3 style={{ margin: '0 0 20px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Palette size={20} /> {t('¿ï¾Ü¥DÃD°t¦â')}
+              <Palette size={20} /> {t('é¸æ“‡ä¸»é¡Œé…è‰²')}
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {Object.entries(themes).map(([key, t]) => (
@@ -1663,13 +1662,13 @@ function Dashboard({ token, onLogout, region }) {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Settings size={20} /> {t('³]©w (Settings)')}
+                <Settings size={20} /> {t('è¨­å®š (Settings)')}
               </h3>
               <X size={20} style={{ cursor: 'pointer', color: 'var(--text-dim)' }} onClick={() => setShowSettings(false)} />
             </div>
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>
-                {t('¦rÅé¤j¤p (Font Size):')} {document.documentElement.style.fontSize || '16px'}
+                {t('å­—é«”å¤§å° (Font Size):')} {document.documentElement.style.fontSize || '16px'}
               </label>
               <input
                 type="range" min="12" max="24" step="1"
@@ -1686,7 +1685,7 @@ function Dashboard({ token, onLogout, region }) {
               </div>
             </div>
             <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('»y¨¥ (Language)')}</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('èªè¨€ (Language)')}</span>
               <button
                 onClick={() => setLanguage(language === 'zh' ? 'en' : 'zh')}
                 style={{
@@ -1695,11 +1694,11 @@ function Dashboard({ token, onLogout, region }) {
                   cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)'
                 }}
               >
-                {language === 'zh' ? 'English' : t('¤¤¤å')}
+                {language === 'zh' ? 'English' : t('ä¸­æ–‡')}
               </button>
             </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('³qª¾­µ®Ä (Sound Notifications)')}</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('é€šçŸ¥éŸ³æ•ˆ (Sound Notifications)')}</span>
               <input
                 type="checkbox"
                 checked={notificationEnabled}
@@ -1713,11 +1712,11 @@ function Dashboard({ token, onLogout, region }) {
             {window.electronAPI && (
               <>
                 <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('µLÃä®Øµøµ¡')}</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('ç„¡é‚Šæ¡†è¦–çª—')}</span>
                   <button
                     onClick={async () => {
                       const frameless = await window.electronAPI.toggleFrameless();
-                      addLog(`[SYS] µLÃä®Ø¼Ò¦¡: ${frameless ? '¶}±Ò' : 'Ãö³¬'}¡]¤U¦¸±Ò°Ê¥Í®Ä¡^`);
+                      addLog(`[SYS] ç„¡é‚Šæ¡†æ¨¡å¼: ${frameless ? 'é–‹å•Ÿ' : 'é—œé–‰'}ï¼ˆä¸‹æ¬¡å•Ÿå‹•ç”Ÿæ•ˆï¼‰`);
                     }}
                     style={{
                       background: 'var(--bg-light)', border: '1px solid var(--border-color)',
@@ -1726,27 +1725,27 @@ function Dashboard({ token, onLogout, region }) {
                       fontSize: '0.8rem'
                     }}
                   >
-                    {t('¤Á´« (­«±Ò¥Í®Ä)')}
+                    {t('åˆ‡æ› (é‡å•Ÿç”Ÿæ•ˆ)')}
                   </button>
                 </div>
                 <div style={{ marginTop: '10px', color: 'var(--text-dim)', fontSize: '0.75rem' }}>
-                  {t('µøµ¡¦ì¸m»P¤j¤p·|¦Û°Ê°O¾Ğ')}
+                  {t('è¦–çª—ä½ç½®èˆ‡å¤§å°æœƒè‡ªå‹•è¨˜æ†¶')}
                 </div>
               </>
             )}
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('­I´º­·®æ')}</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('èƒŒæ™¯é¢¨æ ¼')}</span>
               <select value={bgStyle} onChange={e => { setBgStyle(e.target.value); localStorage.setItem('eo_bg_style', e.target.value); }}
                 style={{ background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--accent-color)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)' }}>
-                <option value="globe">?? 3D ¦a²y</option>
-                <option value="server">??? ¦øªA¾¹¾÷©Ğ</option>
-                <option value="nebula">?? ¬P¶³</option>
-                <option value="radar">?? ¹p¹F²×ºİ</option>
-                <option value="cyber">??? ÁÉ³Õ«°¥«</option>
+                <option value="globe">ğŸŒ 3D åœ°çƒ</option>
+                <option value="server">ğŸ–¥ï¸ ä¼ºæœå™¨æ©Ÿæˆ¿</option>
+                <option value="nebula">ğŸŒŒ æ˜Ÿé›²</option>
+                <option value="radar">ğŸ“¡ é›·é”çµ‚ç«¯</option>
+                <option value="cyber">ğŸ™ï¸ è³½åšåŸå¸‚</option>
               </select>
             </div>
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('¤Á´«¦øªA¾¹')}</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('åˆ‡æ›ä¼ºæœå™¨')}</span>
               <select value={region} onChange={e => {
                 const newRegion = e.target.value;
                 if (newRegion !== region && socket?.connected) {
@@ -1762,9 +1761,9 @@ function Dashboard({ token, onLogout, region }) {
                   socket.emit('switch_region', { newRegion });
                 }
               }} style={{ background: 'var(--bg-light)', border: '1px solid var(--border-color)', color: 'var(--accent-color)', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-sans)' }}>
-                <option value="asia">{t('¨È¬w')}</option>
-                <option value="us">{t('¬ü¬w')}</option>
-                <option value="eu">{t('¼Ú¬w')}</option>
+                <option value="asia">{t('äºæ´²')}</option>
+                <option value="us">{t('ç¾æ´²')}</option>
+                <option value="eu">{t('æ­æ´²')}</option>
               </select>
             </div>
           </div>
@@ -1795,9 +1794,9 @@ function Dashboard({ token, onLogout, region }) {
                 if (socket?.connected) socket.emit('select_faction', faction);
                 setShowFactionSelect(false);
                 if (window.electronAPI) {
-                  window.electronAPI.updatePresence({ details: `°}Àç: ${faction}`, state: '±´¯Á¦a²y¦b½u' });
+                  window.electronAPI.updatePresence({ details: `é™£ç‡Ÿ: ${faction}`, state: 'æ¢ç´¢åœ°çƒåœ¨ç·š' });
                 }
-                showToast(`? ¤w¿ï¾Ü°}Àç¡G${faction}`, 'success');
+                showToast(`âœ… å·²é¸æ“‡é™£ç‡Ÿï¼š${faction}`, 'success');
               }}
               onSkip={() => setShowFactionSelect(false)}
             />
@@ -1816,7 +1815,7 @@ function Dashboard({ token, onLogout, region }) {
             position: 'relative', overflow: 'hidden',
           }}>
             <div style={{ position: 'absolute', top: 8, right: 12, zIndex: 10, cursor: 'pointer', color: '#64748b', fontSize: '1.2rem' }}
-              onClick={() => setShowWorldMap(false)}>?</div>
+              onClick={() => setShowWorldMap(false)}>âœ•</div>
             <WorldMap
               players={nodes || []}
               onCountryClick={(c) => setSelectedCountry(c)}
@@ -1840,7 +1839,7 @@ function Dashboard({ token, onLogout, region }) {
                   if (hasMineInCountry) setTimeout(() => {
                     if (socket?.connected) {
                       socket.emit('get_mine', { country: countryName });
-                      showToast('?? «e©¹Äq³õ', 'success');
+                      showToast('â›ï¸ å‰å¾€ç¤¦å ´', 'success');
                     }
                   }, 300);
                 }}
