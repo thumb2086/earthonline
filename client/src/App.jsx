@@ -31,14 +31,15 @@ import DispatchAnimation from './components/DispatchAnimation';
 import MobileLayout from './components/Mobile/MobileLayout';
 import './index.css';
 
-const VITE_API = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
+const PROD_API = 'https://earthonline-7odc.onrender.com';
+const VITE_API = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_API);
 
 
 
 
 function Dashboard({ token, onLogout, region }) {
   const { t, language, setLanguage } = useLanguage();
-  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+  const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_API;
   const API_URL = `${BASE_URL}/api/${region}`;
   const SOCKET_URL = BASE_URL;
   const game = useGame();
