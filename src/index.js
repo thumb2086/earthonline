@@ -1,5 +1,5 @@
 import { corsHeaders, json, authCheck, createJWT } from './utils.js';
-import { handleIncome } from './income.js';
+import { handleIncome, processIncomeTick } from './income.js';
 import { handleBank, processBankTick } from './bank.js';
 import { handleInvestment, processInvestmentTick } from './investment.js';
 import { handleEmployee, processEmployeeTick } from './employee.js';
@@ -171,6 +171,7 @@ export default {
   async scheduled(event, env, ctx) {
     try {
       const db = env.DB;
+      await processIncomeTick(db);
       await processBankTick(db);
       await processInvestmentTick(db);
       await processEmployeeTick(db);

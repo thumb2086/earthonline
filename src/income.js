@@ -51,3 +51,13 @@ export async function handleIncome(env, request, path, user) {
   }
   return null;
 }
+
+export async function processIncomeTick(db) {
+  const users = await db.prepare('SELECT id FROM users').all();
+  for (const user of users.results) {
+    const income = await getIncomePerMin(db, user.id);
+    if (income > 0) {
+      await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(income, income, user.id).run();
+    }
+  }
+}

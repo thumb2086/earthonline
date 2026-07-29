@@ -17,6 +17,10 @@ export async function handleInvestment(env, request, path, user) {
     }));
   }
 
+  if (path === '/api/investment/list') {
+    return (await db.prepare('SELECT * FROM investments WHERE user_id = ?').bind(user.id).all()).results;
+  }
+
   if (path === '/api/investment/invest') {
     const { type, amount } = await request.json();
     const info = INVEST_TYPES[type];
@@ -32,6 +36,24 @@ export async function handleInvestment(env, request, path, user) {
     }
     await db.prepare('INSERT INTO investments (user_id, type, amount, started_at) VALUES (?, ?, ?, ?)').bind(user.id, type, amount, Date.now()).run();
     return { success: true };
+  }
+
+  if (path === '/api/investment/withdraw') {
+    const { investmentId } = await request.json();
+    const inv = await db.prepare('SELECT id, type, amount FROM investments WHERE id = ? AND user_id = ?').bind(investmentId, user.id).first();
+    if (!inv) return { error: '投資不存在' };
+
+    if (inv.type === 'deposit') {
+      const wallet = await db.prepare('SELECT bank FROM wallets WHERE user_id = ?').bind(user.id).first();
+      if (!wallet || wallet.bank < inv.amount) return { error: '定存不足' };
+      await db.prepare('UPDATE wallets SET bank = bank - ?, cash = cash + ? WHERE user_id = ?').bind(inv.amount, inv.amount, user.id).run();
+    } else {
+      const penalty = Math.floor(inv.amount * 0.1);
+      const refund = inv.amount - penalty;
+      await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(refund, user.id).run();
+    }
+    await db.prepare('DELETE FROM investments WHERE id = ?').bind(inv.id).run();
+    return { success: true, refund: inv.type === 'deposit' ? inv.amount : Math.floor(inv.amount * 0.9) };
   }
   return null;
 }

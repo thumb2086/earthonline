@@ -207,22 +207,47 @@ function Bank({ api }) {
 
 function Invest({ api }) {
   const [types, setTypes] = useState([])
-  useEffect(() => { api('/api/investment/types').then(setTypes) }, [])
-  const inv = async (type) => { const a = prompt('金額:'); if (!a) return; const r = await api('/api/investment/invest', { type, amount: parseInt(a) }); alert(r.success ? 'success' : r.error) }
+  const [investments, setInvestments] = useState([])
+  const [amounts, setAmounts] = useState({})
+  useEffect(() => { api('/api/investment/types').then(setTypes); api('/api/investment/list').then(d => setInvestments(Array.isArray(d)?d:[])) }, [])
+  const inv = async (type) => {
+    const a = parseInt(amounts[type]); if (!a || a <= 0) return
+    const r = await api('/api/investment/invest', { type, amount: a })
+    if (r.success) { setAmounts(p => ({...p, [type]: ''})); api('/api/investment/types').then(setTypes); api('/api/investment/list').then(d => setInvestments(Array.isArray(d)?d:[])) }
+    else alert(r.error)
+  }
+  const withdraw = async (id) => {
+    const r = await api('/api/investment/withdraw', { investmentId: id })
+    if (r.success) { api('/api/investment/list').then(d => setInvestments(Array.isArray(d)?d:[])); alert(`已贖回 $${r.refund}`) }
+    else alert(r.error)
+  }
   return (
-    <div className="grid-2">
-      {(types || []).map(t => (
-        <div className="card card-accent flex justify-between items-center" key={t.type}>
-          <div>
-            <div className="text-accent font-bold">{t.label}</div>
-            <div className="text-dim text-sm" style={{marginTop:4}}>{t.rateMin*100}~{t.rateMax*100}% / 分</div>
+    <>
+      <div className="grid-2 mb-12">
+        {(types || []).map(t => (
+          <div className="card card-accent" key={t.type}>
+            <div className="flex justify-between items-center">
+              <div><div className="text-accent font-bold">{t.label}</div>
+              <div className="text-dim text-sm" style={{marginTop:4}}>{t.rateMin*100}~{t.rateMax*100}% / 分</div></div>
+              {t.unlocked
+                ? <div className="flex gap-8 items-center">
+                    <input type="number" placeholder="金額" value={amounts[t.type] || ''} onChange={e => setAmounts(p => ({...p, [t.type]: e.target.value}))} style={{width:100}} />
+                    <button className="btn btn-primary btn-sm" onClick={() => inv(t.type)}>投資</button>
+                  </div>
+                : <span className="text-dim text-sm">需賺 ${(t.unlockEarned || 0).toLocaleString()}</span>}
+            </div>
           </div>
-          {t.unlocked
-            ? <button className="btn btn-primary btn-sm" onClick={() => inv(t.type)}>投資</button>
-            : <span className="text-dim text-sm">需 ${(t.unlockEarned || 0).toLocaleString()}</span>}
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+      {investments.length > 0 && <div className="card"><div className="card-title">我的投資</div>
+        {(investments || []).map(inv => (
+          <div className="stat" key={inv.id}>
+            <span><span className="text-accent">{inv.type}</span> · ${(inv.amount||0).toLocaleString()}</span>
+            <button className="btn btn-sm" onClick={() => withdraw(inv.id)}>贖回</button>
+          </div>
+        ))}
+      </div>}
+    </>
   )
 }
 
