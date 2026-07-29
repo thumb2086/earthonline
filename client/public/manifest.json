@@ -1,0 +1,12 @@
+{
+  "name": "Earth Online",
+  "short_name": "EarthOnline",
+  "description": "全球節點觀測與管理中心",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e17",
+  "theme_color": "#00ff41",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" }
+  ]
+}

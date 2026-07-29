@@ -23,7 +23,10 @@ export function json(data, headers = {}, status = 200) {
 }
 
 function b64url(s) {
-  return btoa(s).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const bytes = new TextEncoder().encode(s);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
 function b64urlDecode(s) {

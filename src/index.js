@@ -36,6 +36,7 @@ async function isAdmin(discordId, env) {
 const CALLBACK_PATH = '/api/auth/cb';
 
 async function handleDiscordLogin(request, env, headers, url) {
+  try {
   const code = url.searchParams.get('code');
   if (!code) return json({ error: 'Missing code' }, headers, 400);
 
@@ -52,12 +53,14 @@ async function handleDiscordLogin(request, env, headers, url) {
     body: bodyParams.toString(),
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   });
+  if (!tokenRes.ok) return json({ error: 'Discord token exchange failed' }, headers, 400);
   const tokenData = await tokenRes.json();
   if (!tokenData.access_token) return json({ error: 'Discord OAuth failed' }, headers, 400);
 
   const userRes = await fetch('https://discord.com/api/users/@me', {
     headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` },
   });
+  if (!userRes.ok) return json({ error: 'Discord user fetch failed' }, headers, 400);
   const discordUser = await userRes.json();
 
   const admin = await isAdmin(discordUser.id, env);
@@ -82,8 +85,11 @@ async function handleDiscordLogin(request, env, headers, url) {
   }
 
   const token = await createJWT({ id: account.id, username: account.username, role: account.role }, env.JWT_SECRET);
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>localStorage.setItem('eo_token','${token}');window.location.href='/'</script></body></html>`;
-  return new Response(html, { headers: { ...headers, 'content-type': 'text/html;charset=utf-8' } });
+  const frontendUrl = env.FRONTEND_URL || `${url.origin}`;
+  return Response.redirect(`${frontendUrl}/?token=${token}`, 302);
+  } catch (err) {
+    return json({ error: 'callback error: ' + err.message }, headers, 500);
+  }
 }
 
 export default {
@@ -106,6 +112,15 @@ export default {
 
       if (path === CALLBACK_PATH && request.method === 'GET') {
         return await handleDiscordLogin(request, env, headers, url);
+      }
+
+      // Static assets — no auth required
+      if (!path.startsWith('/api/')) {
+        const res = await env.ASSETS.fetch(request);
+        if (res.status === 404 && path !== '/') {
+          return env.ASSETS.fetch(new URL('/index.html', url.origin));
+        }
+        return res;
       }
 
       const user = await authCheck(request, env);
@@ -136,7 +151,6 @@ export default {
         }
       }
 
-      if (!path.startsWith('/api/')) return env.ASSETS.fetch(request);
       return json({ error: 'Not found' }, headers, 404);
     } catch (err) {
       return json({ error: err.message, stack: err.stack }, headers, 500);
