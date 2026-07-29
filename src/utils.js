@@ -22,25 +22,31 @@ export function json(data, headers = {}, status = 200) {
   });
 }
 
-function b64url(s) {
-  const bytes = new TextEncoder().encode(s);
+function b64urlFromBytes(bytes) {
   let binary = '';
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
+function b64urlFromString(s) {
+  return b64urlFromBytes(new TextEncoder().encode(s));
+}
+
 function b64urlDecode(s) {
   s = s.replace(/-/g, '+').replace(/_/g, '/');
   while (s.length % 4) s += '=';
-  return atob(s);
+  const latin1 = atob(s);
+  const bytes = new Uint8Array(latin1.length);
+  for (let i = 0; i < latin1.length; i++) bytes[i] = latin1.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
 }
 
 export async function createJWT(payload, secret) {
-  const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = b64url(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 86400 * 30 }));
+  const header = b64urlFromString(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = b64urlFromString(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 86400 * 30 }));
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(header + '.' + body));
-  const sigB64 = b64url(String.fromCharCode(...new Uint8Array(sig)));
+  const sigB64 = b64urlFromBytes(new Uint8Array(sig));
   return header + '.' + body + '.' + sigB64;
 }
 

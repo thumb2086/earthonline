@@ -20,6 +20,9 @@
       "database_id": "168d5cd6-06af-42fb-b0bd-862449771580"
     }
   ],
+  "triggers": {
+    "crons": ["*/1 * * * *"]
+  },
   "vars": {
     "JWT_SECRET": "eo_secret_change_in_prod",
     "DISCORD_CLIENT_ID": "1513563333985304596",

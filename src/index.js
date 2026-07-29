@@ -114,6 +114,17 @@ export default {
         return await handleDiscordLogin(request, env, headers, url);
       }
 
+      // Public leaderboard
+      if (path === '/api/leaderboard') {
+        const lb = await env.DB.prepare(`
+          SELECT u.username, w.total_earned, w.cash,
+            (SELECT COALESCE(SUM(quantity), 0) FROM stock_holdings WHERE user_id = u.id) as stocks
+          FROM users u JOIN wallets w ON w.user_id = u.id
+          ORDER BY w.total_earned DESC LIMIT 50
+        `).all();
+        return json(lb.results, headers);
+      }
+
       // Static assets — no auth required
       if (!path.startsWith('/api/')) {
         const res = await env.ASSETS.fetch(request);
@@ -158,12 +169,16 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    const db = env.DB;
-    await processBankTick(db);
-    await processInvestmentTick(db);
-    await processEmployeeTick(db);
-    await processMarginTick(db);
-    await processStockTick(db);
+    try {
+      const db = env.DB;
+      await processBankTick(db);
+      await processInvestmentTick(db);
+      await processEmployeeTick(db);
+      await processMarginTick(db);
+      await processStockTick(db);
+    } catch (err) {
+      console.error('Scheduled tick error:', err.message);
+    }
   },
 };
 
