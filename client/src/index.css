@@ -1764,3 +1764,15 @@ body {
   .dispatch-pickaxe { font-size: 36px; }
   .dispatch-title { font-size: 0.9rem; }
 }
+
+.text-sm { font-size: 0.8rem; }
+.font-bold { font-weight: 700; }
+.w-full { width: 100%; }
+.p-16 { padding: 16px; }
+.value-lg { font-size: 1.5rem; color: var(--accent-color); font-weight: 600; }
+.gap-8 { gap: 8px; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.mt-8 { margin-top: 8px; }
+.mb-8 { margin-bottom: 8px; }
