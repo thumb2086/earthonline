@@ -33,17 +33,19 @@ async function isAdmin(discordId, env) {
   }
 }
 
+const CALLBACK_PATH = '/api/auth/cb';
+
 async function handleDiscordLogin(request, env, headers, url) {
   const code = url.searchParams.get('code');
   if (!code) return json({ error: 'Missing code' }, headers, 400);
 
-  const redirectUri = env.FRONTEND_URL || `${url.origin}`;
+  const redirectUri = (env.FRONTEND_URL || `${url.origin}`) + CALLBACK_PATH;
   const bodyParams = new URLSearchParams();
   bodyParams.append('client_id', env.DISCORD_CLIENT_ID);
   bodyParams.append('client_secret', env.DISCORD_CLIENT_SECRET);
   bodyParams.append('code', code);
   bodyParams.append('grant_type', 'authorization_code');
-  bodyParams.append('redirect_uri', redirectUri + '/');
+  bodyParams.append('redirect_uri', redirectUri);
 
   const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
     method: 'POST',
@@ -97,12 +99,12 @@ export default {
 
       if (path === '/api/auth/discord' && request.method === 'GET') {
         const state = url.searchParams.get('state') || 'discord_login';
-        const redirectUri = env.FRONTEND_URL || `${url.origin}`;
-        const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${env.DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri + '/')}&response_type=code&scope=identify&state=${state}`;
+        const redirectUri = (env.FRONTEND_URL || `${url.origin}`) + CALLBACK_PATH;
+        const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${env.DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=${state}`;
         return Response.redirect(discordAuthUrl, 302);
       }
 
-      if (path === '/api/auth/discord/callback' && request.method === 'GET') {
+      if (path === CALLBACK_PATH && request.method === 'GET') {
         return await handleDiscordLogin(request, env, headers, url);
       }
 
