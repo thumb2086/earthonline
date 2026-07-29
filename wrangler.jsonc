@@ -1,0 +1,29 @@
+{
+  "name": "earthonline",
+  "compatibility_date": "2026-07-29",
+  "main": "src/index.js",
+  "assets": {
+    "directory": "client/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "twonline.dpdns.org",
+      "custom_domain": true
+    }
+  ],
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "earthonline-db",
+      "database_id": "168d5cd6-06af-42fb-b0bd-862449771580"
+    }
+  ],
+  "vars": {
+    "JWT_SECRET": "eo_secret_change_in_prod",
+    "DISCORD_CLIENT_ID": "1513563333985304596",
+    "FRONTEND_URL": "https://twonline.dpdns.org"
+  }
+}
