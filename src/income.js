@@ -27,7 +27,19 @@ export async function handleIncome(env, request, path, user) {
   if (path === '/api/income/info') {
     const income = await getIncomePerMin(db, user.id);
     const levels = await db.prepare('SELECT computer, server, ai_assistant FROM income_levels WHERE user_id = ?').bind(user.id).first();
-    return { income, levels };
+    const upgrades = {};
+    for (const item of ['computer', 'server', 'ai_assistant']) {
+      const currentLevel = levels?.[item] || 1;
+      const nextLevel = currentLevel + 1;
+      if (nextLevel < UPGRADE_COSTS[item].length) {
+        const currentIncome = UPGRADE_INCOME[item][currentLevel] || 0;
+        const nextIncome = UPGRADE_INCOME[item][nextLevel] || 0;
+        upgrades[item] = { cost: UPGRADE_COSTS[item][nextLevel], nextLevel, gain: nextIncome - currentIncome };
+      } else {
+        upgrades[item] = null;
+      }
+    }
+    return { income, levels, upgrades };
   }
   if (path === '/api/income/upgrade') {
     const body = await request.json();

@@ -27,8 +27,8 @@ export async function handleStock(env, request, path, user) {
     const company = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
     return {
       price,
-      buyPrice: Math.floor(price * (1 + SPREAD_BASE / 2)),
-      sellPrice: Math.floor(price * (1 - SPREAD_BASE / 2)),
+      buyPrice: Math.round(price * (1 + SPREAD_BASE / 2)),
+      sellPrice: Math.round(price * (1 - SPREAD_BASE / 2)),
       spread: SPREAD_BASE * 100,
       systemCash: reserve?.cash || 0,
       systemInventory: reserve?.stock_inventory || 0,
@@ -37,7 +37,7 @@ export async function handleStock(env, request, path, user) {
   }
 
   if (path === '/api/stock/holdings') {
-    const holdings = await db.prepare('SELECT company_id, quantity FROM stock_holdings WHERE user_id = ?').bind(user.id).all();
+    const holdings = await db.prepare('SELECT sh.company_id, sh.quantity, c.name as company_name FROM stock_holdings sh JOIN companies c ON c.id = sh.company_id WHERE user_id = ?').bind(user.id).all();
     return holdings.results;
   }
 
@@ -64,14 +64,15 @@ export async function handleStock(env, request, path, user) {
     if (!wallet) return { error: '錢包不存在' };
 
     const price = await getCurrentPrice(db, companyId);
-    const buyPrice = Math.floor(price * (1 + SPREAD_BASE / 2));
+    const buyPrice = Math.round(price * (1 + SPREAD_BASE / 2));
     const totalCost = buyPrice * quantity;
     const fee = Math.floor(totalCost * FEE_RATE);
     if (wallet.cash < totalCost + fee) return { error: `餘額不足` };
-
-    const circulating = Math.max(reserve.stock_inventory, 1);
+    const company = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
+    const circulating = Math.max(company.total_shares - reserve.stock_inventory, 1);
     const impact = getPriceImpact(quantity, circulating);
-    const newPrice = Math.floor(price * (1 + impact / 100));
+    const newPrice = Math.round(price * (1 + impact / 100));
+
     const now = Date.now();
 
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost + fee, user.id).run();
@@ -98,14 +99,16 @@ export async function handleStock(env, request, path, user) {
     if (!reserve) return { error: 'System error' };
 
     const price = await getCurrentPrice(db, companyId);
-    const sellPrice = Math.floor(price * (1 - SPREAD_BASE / 2));
+    const sellPrice = Math.round(price * (1 - SPREAD_BASE / 2));
+
     const totalRevenue = sellPrice * quantity;
     const fee = Math.floor(totalRevenue * FEE_RATE);
     const netRevenue = totalRevenue - fee;
 
-    const circulating = Math.max(reserve.stock_inventory, 1);
-    const impact = getPriceImpact(quantity, circulating);
-    const newPrice = Math.max(1, Math.floor(price * (1 - impact / 100)));
+    const companyS = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
+    const circulatingS = Math.max(companyS.total_shares - reserve.stock_inventory, 1);
+    const impact = getPriceImpact(quantity, circulatingS);
+    const newPrice = Math.max(1, Math.round(price * (1 - impact / 100)));
     const now = Date.now();
 
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(netRevenue, user.id).run();
@@ -125,7 +128,9 @@ export async function handleStock(env, request, path, user) {
   if (path === '/api/stock/ipo/info') {
     const ipo = await db.prepare('SELECT * FROM ipo_state WHERE company_id = 1').first();
     const subs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = 1').first();
-    return { phase: ipo?.phase, subscribed: subs?.total || 0, maxSubscribed: 300000 };
+    const mySubs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = 1 AND user_id = ?').bind(user.id).first();
+    const myHoldings = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = 1').bind(user.id).first();
+    return { phase: ipo?.phase, subscribed: subs?.total || 0, maxSubscribed: 30000, myShares: mySubs?.total || 0, myHoldings: myHoldings?.quantity || 0 };
   }
 
   if (path === '/api/stock/ipo/subscribe') {
@@ -141,7 +146,7 @@ export async function handleStock(env, request, path, user) {
     if ((userSubs?.total || 0) + shares > 1000) return { error: '每人上限 1,000 股' };
 
     const totalSubs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = 1').first();
-    if ((totalSubs?.total || 0) + shares > 300000) return { error: 'IPO 額度已滿' };
+    if ((totalSubs?.total || 0) + shares > 30000) return { error: 'IPO 額度已滿' };
 
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost, user.id).run();
     await db.prepare('INSERT INTO ipo_subscriptions (user_id, company_id, shares, total_cost, subscribed_at) VALUES (?, ?, ?, ?, ?)').bind(user.id, 1, shares, totalCost, Date.now()).run();
@@ -234,4 +239,22 @@ export async function processMarginTick(db) {
       if (effectiveRate < LIQUIDATION_RATE) await closePosition(db, pos);
     }
   }
+}
+
+export async function finalizeIPO(db) {
+  const ipo = await db.prepare("SELECT company_id, phase, started_at FROM ipo_state WHERE phase = 'ipo'").first();
+  if (!ipo) return;
+  if (Date.now() - ipo.started_at < 3600000) return; // 1 hour IPO period
+
+  const subs = await db.prepare('SELECT user_id, shares FROM ipo_subscriptions WHERE company_id = ?').bind(ipo.company_id).all();
+  for (const sub of subs.results) {
+    const existing = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(sub.user_id, ipo.company_id).first();
+    if (existing) {
+      await db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(sub.shares, sub.user_id, ipo.company_id).run();
+    } else {
+      await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(sub.user_id, ipo.company_id, sub.shares).run();
+    }
+    await db.prepare('UPDATE system_reserve SET stock_inventory = stock_inventory - ? WHERE id = 1').bind(sub.shares).run();
+  }
+  await db.prepare("UPDATE ipo_state SET phase = 'trading' WHERE company_id = ?").bind(ipo.company_id).run();
 }

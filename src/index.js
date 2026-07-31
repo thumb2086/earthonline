@@ -1,10 +1,10 @@
 import { corsHeaders, json, authCheck, createJWT } from './utils.js';
-import { handleIncome, processIncomeTick } from './income.js';
+import { handleIncome, processIncomeTick, getIncomePerMin } from './income.js';
 import { handleBank, processBankTick } from './bank.js';
 import { handleInvestment, processInvestmentTick } from './investment.js';
 import { handleEmployee, processEmployeeTick } from './employee.js';
 import { handleCompany } from './company.js';
-import { handleStock, processMarginTick } from './stock.js';
+import { handleStock, processMarginTick, finalizeIPO } from './stock.js';
 import { handleContract } from './contract.js';
 import { handleAdmin } from './admin.js';
 
@@ -117,12 +117,13 @@ export default {
       // Public leaderboard
       if (path === '/api/leaderboard') {
         const lb = await env.DB.prepare(`
-          SELECT u.username, w.total_earned, w.cash,
+          SELECT u.username, u.last_active, w.total_earned, w.cash,
             (SELECT COALESCE(SUM(quantity), 0) FROM stock_holdings WHERE user_id = u.id) as stocks
           FROM users u JOIN wallets w ON w.user_id = u.id
           ORDER BY w.total_earned DESC LIMIT 50
         `).all();
-        return json(lb.results, headers);
+        const now = Date.now();
+        return json(lb.results.map(u => ({ ...u, online: u.last_active && now - u.last_active < 300000 })), headers);
       }
 
       // Static assets — no auth required
@@ -136,12 +137,32 @@ export default {
 
       const user = await authCheck(request, env);
       if (!user) return json({ error: 'Unauthorized' }, headers, 401);
+      // Track last active
+      await env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(Date.now(), user.id).run();
 
       if (path === '/api/me') {
         const wallet = await env.DB.prepare('SELECT cash, savings, bank, total_earned FROM wallets WHERE user_id = ?').bind(user.id).first();
         const levels = await env.DB.prepare('SELECT computer, server, ai_assistant FROM income_levels WHERE user_id = ?').bind(user.id).first();
-        const dbUser = await env.DB.prepare('SELECT username, role, discord_username, discord_avatar FROM users WHERE id = ?').bind(user.id).first();
-        return json({ id: user.id, username: user.username, role: dbUser?.role || 'user', discord: dbUser?.discord_username, ...wallet, levels: levels || {} }, headers);
+        const dbUser = await env.DB.prepare('SELECT username, role, discord_username, discord_avatar, last_active FROM users WHERE id = ?').bind(user.id).first();
+        const investPending = await env.DB.prepare("SELECT COALESCE(SUM(pending_interest), 0) as p FROM investments WHERE user_id = ?").bind(user.id).first();
+
+        // Offline earnings
+        const now = Date.now();
+        let offlineEarnings = 0;
+        if (dbUser?.last_active) {
+          const minutesAway = Math.floor((now - dbUser.last_active) / 60000);
+          if (minutesAway > 2) {
+            const income = await getIncomePerMin(env.DB, user.id);
+            const halfRate = Math.floor(income * 0.5);
+            offlineEarnings = halfRate * Math.min(minutesAway, 1440);
+            if (offlineEarnings > 0) {
+              await env.DB.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(offlineEarnings, offlineEarnings, user.id).run();
+            }
+          }
+        }
+        await env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(now, user.id).run();
+
+        return json({ id: user.id, username: user.username, role: dbUser?.role || 'user', discord: dbUser?.discord_username, ...wallet, levels: levels || {}, pendingInterest: investPending?.p || 0, offlineEarnings }, headers);
       }
 
       const routes = [
@@ -175,6 +196,7 @@ export default {
       await processBankTick(db);
       await processInvestmentTick(db);
       await processEmployeeTick(db);
+      await finalizeIPO(db);
       await processMarginTick(db);
       await processStockTick(db);
     } catch (err) {

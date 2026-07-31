@@ -320,16 +320,20 @@ body {
 
 /* ─── Forms / Inputs ─── */
 input, select {
-  background: var(--bg2); border: 1px solid var(--border);
+  background: var(--surface2); border: 1px solid var(--border);
   color: var(--text); padding: 8px 14px; border-radius: var(--radius-sm);
   font-size: 13px; outline: none; width: 100%;
   transition: all var(--transition);
+  font-family: inherit;
 }
 input:focus, select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0,255,65,0.08);
+  box-shadow: 0 0 0 3px rgba(0,255,65,0.08), inset 0 0 0 1px rgba(0,255,65,0.05);
 }
 input::placeholder { color: var(--text3); }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
 
 /* ─── Typography helpers ─── */
 .text-accent { color: var(--accent); }
