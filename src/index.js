@@ -203,15 +203,22 @@ export default {
   async scheduled(event, env, ctx) {
     try {
       const db = env.DB;
-      await processIncomeTick(db);
-      await processBankTick(db);
-      await processInvestmentTick(db);
-      await processEmployeeTick(db);
-      await processCompanyTick(db);
-      await processSubscriptionTick(db);
+      const secondHalf = (Date.now() % 60000) >= 30000;
+
+      // 每 30 秒: 股票價格/K線/槓桿/IPO
       await finalizeIPO(db);
       await processMarginTick(db);
       await processStockTick(db);
+
+      // 每分鐘(擇一): 經濟收支
+      if (!secondHalf) {
+        await processIncomeTick(db);
+        await processBankTick(db);
+        await processInvestmentTick(db);
+        await processEmployeeTick(db);
+        await processCompanyTick(db);
+        await processSubscriptionTick(db);
+      }
     } catch (err) {
       console.error('Scheduled tick error:', err.message);
     }

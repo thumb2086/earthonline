@@ -21,10 +21,10 @@ function getPriceImpact(quantity, circulating, totalShares) {
 }
 
 async function getCurrentPrice(db, companyId) {
-  const last = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? ORDER BY traded_at DESC LIMIT 1').bind(companyId).first();
-  if (last) return last.price;
   const company = await db.prepare('SELECT share_price FROM companies WHERE id = ?').bind(companyId).first();
-  return company?.share_price || 100;
+  if (company?.share_price) return company.share_price;
+  const last = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? ORDER BY traded_at DESC LIMIT 1').bind(companyId).first();
+  return last?.price || 100;
 }
 
 async function updateKline(db, companyId, price, quantity, timestamp) {
@@ -41,6 +41,18 @@ async function updateKline(db, companyId, price, quantity, timestamp) {
 export async function handleStock(env, request, path, user) {
   const db = env.DB;
   const method = request.method;
+
+  // 惰性價格更新: 查看股票頁時, 距上次更新>30秒就觸發自然波動
+  if (path === '/api/stock/quote' || path === '/api/stock/klines' || path === '/api/stock/trades' || path === '/api/stock/ipo/info') {
+    try {
+      const url0 = new URL(request.url);
+      const cid = parseInt(url0.searchParams.get('companyId') || '1');
+      const lastKline = await db.prepare('SELECT minute FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 1').bind(cid).first();
+      if (!lastKline || Date.now() - lastKline.minute >= 30000) {
+        await lazyPriceMove(db, cid);
+      }
+    } catch (e) {}
+  }
 
   if (path === '/api/stock/quote') {
     const reqUrl = new URL(request.url);
@@ -447,4 +459,18 @@ export async function finalizeIPO(db) {
     }
     await db.prepare("UPDATE ipo_state SET phase = 'trading' WHERE company_id = ?").bind(ipo.company_id).run();
   }
+}
+
+// 惰性價格波動: 每次查看時若距上次>30秒, 價格自然微幅波動 (±1.5%)
+async function lazyPriceMove(db, companyId) {
+  const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
+  if (!ipo || ipo.phase !== 'trading') return;
+
+  const price = await getCurrentPrice(db, companyId);
+  const drift = (Math.random() * 2 - 1) * 0.015;
+  const newPrice = Math.max(1, Math.round(price * (1 + drift)));
+
+  const now = Date.now();
+  await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
+  await updateKline(db, companyId, newPrice, 0, now);
 }
