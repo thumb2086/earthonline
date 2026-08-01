@@ -843,8 +843,14 @@ function AdminPanel({ api }) {
     api('/api/admin/ipo').then(d => setIpoList(Array.isArray(d) ? d : []));
   }, [])
 
-  const holdingsData = stockDist.filter(s => s.held > 0).map(s => s.held)
-  const holdingsLabels = stockDist.filter(s => s.held > 0).map(s => s.name)
+  const stocksWithHolders = (stockDist || []).filter(s => s.held > 0)
+  const holdingsByCompany = stocksWithHolders.map(s => ({
+    name: s.name,
+    data: (s.holders || []).map(h => h.quantity),
+    labels: (s.holders || []).map(h => h.username),
+    total: s.held,
+    system: s.system_inventory || 0,
+  }))
   const cashData = users.filter(u => u.cash > 0).map(u => u.cash)
   const cashLabels = users.filter(u => u.cash > 0).map(u => u.username)
   const earnedData = users.filter(u => u.total_earned > 0).map(u => u.total_earned)
@@ -888,13 +894,18 @@ function AdminPanel({ api }) {
           <div className="card-title">💰 現金分布</div>
           <PieChart data={cashData} labels={cashLabels} colors={CHART_COLORS} size={200} />
         </div>}
-        {holdingsData.length > 0 && <div className="card">
-          <div className="card-title">📊 持股分布</div>
-          <PieChart data={holdingsData} labels={holdingsLabels} colors={CHART_COLORS} size={200} />
-        </div>}
         {earnedData.length > 0 && <div className="card">
           <div className="card-title">📈 累計賺取</div>
           <PieChart data={earnedData} labels={earnedLabels} colors={CHART_COLORS} size={200} />
+        </div>}
+        {holdingsByCompany.length > 0 && <div className="card">
+          <div className="card-title">📊 持股分布</div>
+          {holdingsByCompany.map(s => (
+            <div key={s.name} style={{marginBottom: 12}}>
+              <div className="text-dim text-sm" style={{fontWeight:600, marginBottom:6}}>{s.name}（流通 {s.total.toLocaleString()} 股 · 庫存 {s.system.toLocaleString()}）</div>
+              <PieChart data={s.data} labels={s.labels} colors={CHART_COLORS} size={170} />
+            </div>
+          ))}
         </div>}
         {Object.keys(ipoByCompany).length > 0 && <div className="card">
           <div className="card-title">🚀 IPO 認購分布</div>

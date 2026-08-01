@@ -96,16 +96,24 @@ export async function handleAdmin(env, request, path, user) {
   }
 
   if (path === '/api/admin/stocks') {
-    const holdings = await db.prepare(`
-      SELECT c.id, c.name, COALESCE(SUM(h.quantity), 0) as held,
-             c.total_shares, COALESCE(inv.stock_quantity, 0) as system_inventory
+    const companies = await db.prepare(`
+      SELECT c.id, c.name, c.total_shares, COALESCE(inv.stock_quantity, 0) as system_inventory
       FROM companies c
-      LEFT JOIN stock_holdings h ON h.company_id = c.id
       LEFT JOIN stock_inventory inv ON inv.company_id = c.id
-      GROUP BY c.id
       ORDER BY c.id
     `).all();
-    return holdings.results;
+    const result = [];
+    for (const c of companies.results) {
+      const holders = await db.prepare(`
+        SELECT u.username, h.quantity
+        FROM stock_holdings h
+        JOIN users u ON u.id = h.user_id
+        WHERE h.company_id = ?
+        ORDER BY h.quantity DESC
+      `).bind(c.id).all();
+      result.push({ ...c, holders: holders.results, held: holders.results.reduce((s, x) => s + x.quantity, 0) });
+    }
+    return result;
   }
 
   if (path === '/api/admin/ipo') {
