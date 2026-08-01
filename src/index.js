@@ -237,9 +237,13 @@ async function processStockTick(db) {
       const volume = trades.results.reduce((s, t) => s + t.quantity, 0);
       try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, block).run(); } catch (e) {}
     } else {
+      // 無交易時自然波動 ±0.5% (每分鐘cron觸發, 不依賴查看者)
       const prev = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 1').bind(company.id).first();
-      const prevClose = prev?.close || company.share_price;
-      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(company.id, prevClose, prevClose, prevClose, prevClose, block).run(); } catch (e) {}
+      const base = prev?.close || company.share_price || 100;
+      const drift = Math.random() * 2 - 1;
+      const newClose = Math.max(1, Math.round(base * (1 + drift * 0.005)));
+      await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newClose, company.id).run();
+      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(company.id, base, Math.max(base, newClose), Math.min(base, newClose), newClose, block).run(); } catch (e) {}
     }
 
     const baseIncome = company.base_income || 100;
