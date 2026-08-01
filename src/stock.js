@@ -145,7 +145,7 @@ export async function handleStock(env, request, path, user) {
     const fee = Math.floor(totalCost * FEE_RATE);
     if (wallet.cash < totalCost + fee) return { error: `餘額不足` };
 
-    const impact = getPriceImpact(quantity, circulating, company.total_shares);
+    const impact = getPriceImpact(quantity, circulating, companyData.total_shares);
     let newPrice = Math.round(price * (1 + impact));
 
     // Price change limit: ±10% per minute
