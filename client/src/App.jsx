@@ -575,6 +575,13 @@ function Stock({ api, toast, prompt }) {
 
   const stockNames = { 1: '地球互動科技 001', 10: '深海科技 002', 12: '銀河金融 003', 13: '星雲生技 004', 14: '黑洞能源 005', 15: '元界科技 006' }
 
+  const fmtRemain = (ms) => {
+    if (!ms || ms <= 0) return '已到期'
+    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000)
+    if (h > 0) return `${h}小時${m}分`
+    return `${m}分${Math.floor((ms % 60000) / 1000)}秒`
+  }
+
   useEffect(() => {
     api('/api/company/ipo/list').then(d => {
       if (!Array.isArray(d)) return
@@ -634,8 +641,11 @@ function Stock({ api, toast, prompt }) {
           <span className="text-accent">{(ipo.subscribed||0).toLocaleString()} / {(ipo.maxSubscribed||0).toLocaleString()} 股已認購</span>
           <span className="text-dim">{(((ipo.subscribed||0)/(ipo.maxSubscribed||1))*100).toFixed(1)}%</span>
         </div>
+        {ipo.isFull
+          ? <div className="text-sm mt-12" style={{color:'var(--accent)', fontWeight:600}}>✅ 認購已滿，即將上市</div>
+          : <div className="text-sm mt-12" style={{color:'var(--warn)'}}>剩餘時間：<span style={{fontWeight:600}}>{fmtRemain(ipo.remainMs)}</span>（滿了立即上市，未滿等期限）</div>}
         <div className="text-sm mt-12" style={{color:'var(--warn)'}}>你已認購 <span style={{fontWeight:600}}>{(ipo.myShares||0).toLocaleString()} 股</span>（花費 ${((ipo.myShares||0) * (ipo.price||100)).toLocaleString()}）</div>
-        <button className="btn btn-sm mt-12" onClick={subIpo}>認購</button>
+        <button className="btn btn-sm mt-12" onClick={subIpo} disabled={ipo.isFull} style={ipo.isFull ? {opacity:0.5, cursor:'not-allowed'} : {}}>{ipo.isFull ? '已滿' : '認購'}</button>
       </div>}
         {ipo?.phase !== 'ipo' && q && <><div className="grid-2 mt-12">
           <div><div className="stat"><span className="stat-label">價格</span><span className="stat-value" style={{fontSize:20}}>${q.price}</span></div>
@@ -800,6 +810,13 @@ function AdminPanel({ api }) {
   const cashLabels = users.filter(u => u.cash > 0).map(u => u.username)
   const earnedData = users.filter(u => u.total_earned > 0).map(u => u.total_earned)
   const earnedLabels = users.filter(u => u.total_earned > 0).map(u => u.username)
+  const ipoAgg = (ipoList || []).reduce((acc, s) => {
+    const key = s.company_name + ' · ' + s.username
+    acc[key] = (acc[key] || 0) + s.shares
+    return acc
+  }, {})
+  const ipoDistData = Object.values(ipoAgg)
+  const ipoDistLabels = Object.keys(ipoAgg)
 
   return (
     <>
@@ -826,6 +843,10 @@ function AdminPanel({ api }) {
         {earnedData.length > 0 && <div className="card">
           <div className="card-title">📈 累計賺取</div>
           <PieChart data={earnedData} labels={earnedLabels} colors={CHART_COLORS} size={200} />
+        </div>}
+        {ipoDistData.length > 0 && <div className="card">
+          <div className="card-title">🚀 IPO 認購分布</div>
+          <PieChart data={ipoDistData} labels={ipoDistLabels} colors={CHART_COLORS} size={200} />
         </div>}
       </div>
 

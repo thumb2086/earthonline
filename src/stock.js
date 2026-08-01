@@ -249,7 +249,9 @@ export async function handleStock(env, request, path, user) {
     const subs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = ?').bind(companyId).first();
     const mySubs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = ? AND user_id = ?').bind(companyId, user.id).first();
     const myHoldings = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).first();
-    return { phase: ipo?.phase, subscribed: subs?.total || 0, maxSubscribed: Math.floor((company?.total_shares || 100000) * 0.3), price: company?.share_price || 100, myShares: mySubs?.total || 0, myHoldings: myHoldings?.quantity || 0 };
+    const maxSub = Math.floor((company?.total_shares || 100000) * 0.3);
+    const remainMs = ipo?.started_at ? Math.max(0, ((ipo.duration_minutes || 60) * 60000) - (Date.now() - ipo.started_at)) : 0;
+    return { phase: ipo?.phase, subscribed: subs?.total || 0, maxSubscribed: maxSub, price: company?.share_price || 100, myShares: mySubs?.total || 0, myHoldings: myHoldings?.quantity || 0, remainMs, isFull: (subs?.total || 0) >= maxSub };
   }
 
   if (path === '/api/stock/ipo/subscribe') {
@@ -408,20 +410,28 @@ export async function processMarginTick(db) {
 }
 
 export async function finalizeIPO(db) {
-  const ipo = await db.prepare("SELECT company_id, phase, started_at, duration_minutes FROM ipo_state WHERE phase = 'ipo'").first();
-  if (!ipo) return;
-  const durationMs = (ipo.duration_minutes || 60) * 60000;
-  if (Date.now() - ipo.started_at < durationMs) return;
+  const ipos = await db.prepare("SELECT company_id, phase, started_at, duration_minutes FROM ipo_state WHERE phase = 'ipo'").all();
+  for (const ipo of ipos.results) {
+    const durationMs = (ipo.duration_minutes || 60) * 60000;
+    const timeUp = Date.now() - ipo.started_at >= durationMs;
 
-  const subs = await db.prepare('SELECT user_id, shares FROM ipo_subscriptions WHERE company_id = ?').bind(ipo.company_id).all();
-  for (const sub of subs.results) {
-    const existing = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(sub.user_id, ipo.company_id).first();
-    if (existing) {
-      await db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(sub.shares, sub.user_id, ipo.company_id).run();
-    } else {
-      await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(sub.user_id, ipo.company_id, sub.shares).run();
+    const company = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(ipo.company_id).first();
+    const maxSub = Math.floor((company?.total_shares || 100000) * 0.3);
+    const subTotal = await db.prepare('SELECT COALESCE(SUM(shares), 0) as t FROM ipo_subscriptions WHERE company_id = ?').bind(ipo.company_id).first();
+    const isFull = (subTotal?.t || 0) >= maxSub;
+
+    if (!timeUp && !isFull) continue;
+
+    const subs = await db.prepare('SELECT user_id, shares FROM ipo_subscriptions WHERE company_id = ?').bind(ipo.company_id).all();
+    for (const sub of subs.results) {
+      const existing = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(sub.user_id, ipo.company_id).first();
+      if (existing) {
+        await db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(sub.shares, sub.user_id, ipo.company_id).run();
+      } else {
+        await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(sub.user_id, ipo.company_id, sub.shares).run();
+      }
+      await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(sub.shares, ipo.company_id).run();
     }
-    await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(sub.shares, ipo.company_id).run();
+    await db.prepare("UPDATE ipo_state SET phase = 'trading' WHERE company_id = ?").bind(ipo.company_id).run();
   }
-  await db.prepare("UPDATE ipo_state SET phase = 'trading' WHERE company_id = ?").bind(ipo.company_id).run();
 }
