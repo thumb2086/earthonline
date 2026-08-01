@@ -809,6 +809,7 @@ function AdminPanel({ api }) {
   const [users, setUsers] = useState([]); const [stats, setStats] = useState(null); const [expanded, setExpanded] = useState(null)
   const [stockDist, setStockDist] = useState([])
   const [ipoList, setIpoList] = useState([])
+  const [ipoCollapsed, setIpoCollapsed] = useState(false)
   useEffect(() => {
     api('/api/admin/users').then(d => setUsers(Array.isArray(d) ? d : []));
     api('/api/admin/stats').then(setStats);
@@ -880,14 +881,20 @@ function AdminPanel({ api }) {
         </div>}
       </div>
 
-      <div className="card mb-12"><div className="card-title">🚀 IPO 認購紀錄（進行中）({activeIpoList.length})</div>
-        {activeIpoList.length === 0 && <div className="text-dim">暫無進行中的認購</div>}
-        {activeIpoList.map(s => (
-          <div className="stat" key={s.id}>
-            <span><span className="text-accent" style={{fontWeight:600}}>{s.username}</span> 認購 <span style={{fontWeight:600}}>{s.shares.toLocaleString()} 股</span> {s.company_name} @ ${s.share_price}</span>
-            <span className="text-dim text-sm">${(s.total_cost || 0).toLocaleString()} · {new Date(s.subscribed_at).toLocaleString('zh-TW')}</span>
-          </div>
-        ))}
+      <div className="card mb-12">
+        <div className="flex justify-between items-center">
+          <div className="card-title" style={{margin:0}}>🚀 IPO 認購紀錄（進行中）({activeIpoList.length})</div>
+          <button className="btn btn-sm" onClick={() => setIpoCollapsed(!ipoCollapsed)}>{ipoCollapsed ? '展開' : '收合'}</button>
+        </div>
+        {!ipoCollapsed && <>
+          {activeIpoList.length === 0 && <div className="text-dim mt-12">暫無進行中的認購</div>}
+          {activeIpoList.map(s => (
+            <div className="stat" key={s.id}>
+              <span><span className="text-accent" style={{fontWeight:600}}>{s.username}</span> 認購 <span style={{fontWeight:600}}>{s.shares.toLocaleString()} 股</span> {s.company_name} @ ${s.share_price}</span>
+              <span className="text-dim text-sm">${(s.total_cost || 0).toLocaleString()} · {new Date(s.subscribed_at).toLocaleString('zh-TW')}</span>
+            </div>
+          ))}
+        </>}
       </div>
 
       <div className="card"><div className="card-title">使用者 ({users.length})</div>

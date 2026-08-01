@@ -241,10 +241,10 @@ export async function handleStock(env, request, path, user) {
     }
 
     await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
-    await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', sellPrice, quantity, now).run();
+    await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now);
-    await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${sellPrice}`);
-    return { success: true, price: newPrice, fillPrice: sellPrice, quantity, netRevenue };
+    await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${newPrice}`);
+    return { success: true, price: newPrice, fillPrice: newPrice, quantity, netRevenue };
   }
 
   if (path === '/api/stock/ipo/mine') {
@@ -328,6 +328,14 @@ export async function handleStock(env, request, path, user) {
 
     const impact = getPriceImpact(quantity, circulating, companyData.total_shares);
     const now = Date.now();
+    let newPrice = Math.round(price * (1 + (type === 'long' ? impact : -impact)));
+    const oneMinAgo = now - 60000;
+    const recentTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
+    if (recentTrade) {
+      const minP = Math.floor(recentTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
+      const maxP = Math.ceil(recentTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
+      newPrice = Math.max(minP, Math.min(maxP, newPrice));
+    }
 
     if (type === 'long') {
       if (!inv || inv.stock_quantity < quantity) return { error: '系統庫存不足' };
@@ -339,16 +347,8 @@ export async function handleStock(env, request, path, user) {
         await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(user.id, companyId, quantity).run();
       }
       const loanAmount = totalValue - marginAmount;
-      await db.prepare('INSERT INTO margin_positions (user_id, company_id, type, quantity, entry_price, loan_amount, margin_amount, leverage, opened_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(user.id, companyId, 'long', quantity, price, loanAmount, marginAmount, leverage, now).run();
+      await db.prepare('INSERT INTO margin_positions (user_id, company_id, type, quantity, entry_price, loan_amount, margin_amount, leverage, opened_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(user.id, companyId, 'long', quantity, newPrice, loanAmount, marginAmount, leverage, now).run();
 
-      let newPrice = Math.round(price * (1 + impact));
-      const oneMinAgo = now - 60000;
-      const recentTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
-      if (recentTrade) {
-        const minP = Math.floor(recentTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
-        const maxP = Math.ceil(recentTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-        newPrice = Math.max(minP, Math.min(maxP, newPrice));
-      }
       await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
       await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', newPrice, quantity, now).run();
       await updateKline(db, companyId, newPrice, quantity, now);
@@ -360,16 +360,8 @@ export async function handleStock(env, request, path, user) {
       if (!invShort || invShort.cash < totalValue * 0.1) return { error: '系統資金不足做空' };
       const sellRevenue = totalValue;
       await db.prepare('UPDATE stock_inventory SET cash = cash + ? WHERE company_id = ?').bind(sellRevenue, companyId).run();
-      await db.prepare('INSERT INTO margin_positions (user_id, company_id, type, quantity, entry_price, loan_amount, margin_amount, leverage, opened_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(user.id, companyId, 'short', quantity, price, sellRevenue, marginAmount, leverage, now).run();
+      await db.prepare('INSERT INTO margin_positions (user_id, company_id, type, quantity, entry_price, loan_amount, margin_amount, leverage, opened_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(user.id, companyId, 'short', quantity, newPrice, sellRevenue, marginAmount, leverage, now).run();
 
-      let newPrice = Math.max(1, Math.round(price * (1 - impact)));
-      const oneMinAgo = now - 60000;
-      const recentTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
-      if (recentTrade) {
-        const minP = Math.floor(recentTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
-        const maxP = Math.ceil(recentTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-        newPrice = Math.max(minP, Math.min(maxP, newPrice));
-      }
       await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
       await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
       await updateKline(db, companyId, newPrice, quantity, now);
@@ -395,8 +387,18 @@ export async function handleStock(env, request, path, user) {
 
 async function closePosition(db, pos) {
   const currentPrice = await getCurrentPrice(db, pos.company_id);
+  const companyData = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(pos.company_id).first();
+  const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(pos.company_id).first();
+  const circulating = (companyData?.total_shares || 0) - (inv?.stock_quantity || 0);
+  const impact = getPriceImpact(pos.quantity, circulating, companyData?.total_shares || 0);
+  // 平倉也承受市場影響: 做多平倉=賣出(跌價), 做空平倉=買回(漲價)
+  const closePrice = pos.type === 'long'
+    ? Math.max(1, Math.round(currentPrice * (1 - impact)))
+    : Math.round(currentPrice * (1 + impact));
+  await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(closePrice, pos.company_id).run();
+
   if (pos.type === 'long') {
-    const sellValue = currentPrice * pos.quantity;
+    const sellValue = closePrice * pos.quantity;
     const totalReturn = (sellValue - pos.loan_amount) + pos.margin_amount - pos.dividend_debt;
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(Math.max(totalReturn, 0), pos.user_id).run();
     const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(pos.user_id, pos.company_id).first();
@@ -406,13 +408,13 @@ async function closePosition(db, pos) {
       await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(pos.quantity, pos.user_id, pos.company_id).run();
     }
     await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(pos.quantity, pos.company_id).run();
-    await logTransaction(db, pos.user_id, 'stock_sell', Math.max(totalReturn, 0), `平倉做多 ${pos.quantity}股 @ $${currentPrice}`);
+    await logTransaction(db, pos.user_id, 'stock_sell', Math.max(totalReturn, 0), `平倉做多 ${pos.quantity}股 @ $${closePrice}`);
   } else {
-    const buyCost = currentPrice * pos.quantity;
+    const buyCost = closePrice * pos.quantity;
     const totalReturn = (pos.loan_amount - buyCost) + pos.margin_amount - pos.dividend_debt;
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(Math.max(totalReturn, 0), pos.user_id).run();
     await db.prepare('UPDATE stock_inventory SET cash = cash - ? WHERE company_id = ?').bind(buyCost, pos.company_id).run();
-    await logTransaction(db, pos.user_id, 'stock_buy', Math.max(totalReturn, 0), `平倉做空 ${pos.quantity}股 @ $${currentPrice}`);
+    await logTransaction(db, pos.user_id, 'stock_buy', Math.max(totalReturn, 0), `平倉做空 ${pos.quantity}股 @ $${closePrice}`);
   }
   await db.prepare('DELETE FROM margin_positions WHERE id = ?').bind(pos.id).run();
   return { success: true };
