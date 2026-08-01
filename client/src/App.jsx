@@ -823,7 +823,16 @@ function AdminPanel({ api }) {
       {stats && <div className="grid-3 mb-12">
         <div className="card"><div className="card-title">玩家</div><div className="text-lg">{stats.users}</div></div>
         <div className="card"><div className="card-title">總現金</div><div className="text-lg">${(stats.totalCash || 0).toLocaleString()}</div></div>
-        <div className="card"><div className="card-title">系統庫存</div><div className="text-lg">{(stats.systemReserve?.stock_inventory || 0).toLocaleString()} 股</div></div>
+        <div className="card"><div className="card-title">系統庫存</div><div className="text-lg">{(stockDist || []).reduce((s, x) => s + (x.system_inventory || 0), 0).toLocaleString()} 股</div>
+          <div className="text-dim text-sm" style={{marginTop:6}}>
+            {(stockDist || []).map(s => (
+              <div key={s.id} className="flex justify-between" style={{fontSize:12, marginTop:2}}>
+                <span>{s.name}</span>
+                <span>{(s.system_inventory || 0).toLocaleString()} 股</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>}
       {stats && <div className="grid-3 mb-12">
         <div className="card"><div className="card-title">總活存</div><div className="text-lg">${(stats.totalSavings || 0).toLocaleString()}</div></div>

@@ -65,10 +65,10 @@ export async function handleBank(env, request, path, user) {
 export async function processBankTick(db) {
   await db.prepare('UPDATE wallets SET cash = cash + CAST(savings * ? AS INTEGER)').bind(SAVINGS_RATE).run();
 
-  const users = await db.prepare('SELECT id, savings FROM wallets WHERE savings > 0').all();
+  const users = await db.prepare('SELECT user_id, savings FROM wallets WHERE savings > 0').all();
   for (const u of users.results) {
     const interest = Math.floor(u.savings * SAVINGS_RATE);
-    if (interest > 0) await logHourly(db, u.id, 'bank_interest', interest, '活存利息');
+    if (interest > 0) await logHourly(db, u.user_id, 'bank_interest', interest, '活存利息');
   }
 
   const loans = await db.prepare("SELECT id, user_id, remaining, interest_rate FROM loans WHERE status = 'active'").all();
