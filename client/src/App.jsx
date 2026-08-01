@@ -561,8 +561,24 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
     const last = pts[pts.length - 1]
     ctx.fillStyle = '#00ff41'
     ctx.beginPath(); ctx.arc(last.x, last.y, 4, 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'left'
-    ctx.fillText(`$${closes[closes.length - 1].toFixed(2)}`, last.x + 8, last.y + 4)
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px monospace'
+    const label = `$${closes[closes.length - 1].toFixed(2)}`
+    const labelW = ctx.measureText(label).width
+    if (last.x + 8 + labelW > w - padR) {
+      ctx.textAlign = 'right'
+      ctx.fillText(label, last.x - 8, last.y + 4)
+    } else {
+      ctx.textAlign = 'left'
+      ctx.fillText(label, last.x + 8, last.y + 4)
+    }
+    // 左上角現價徽章(有底色不被Y軸干擾)
+    ctx.textAlign = 'left'
+    ctx.font = 'bold 11px monospace'
+    const badgeW = labelW + 12
+    ctx.fillStyle = 'rgba(0,255,65,0.15)'
+    ctx.fillRect(padL, padT, badgeW, 18)
+    ctx.fillStyle = '#00ff41'
+    ctx.fillText(label, padL + 6, padT + 13)
   }, [klines])
 
   if (klines.length === 0) return <div className="text-dim">{loaded ? '尚無走勢資料' : '載入中...'}</div>
@@ -748,7 +764,18 @@ function Stock({ api, toast, prompt }) {
       </div>}
       {ipo?.phase !== 'ipo' && <div className="grid-2">
         <div className="card"><div className="card-title">持倉</div>
-          {(h || []).map(x => <div className="stat" key={x.company_id}><span className="stat-label">{x.company_name || '地球互動科技'}</span><span className="stat-value">{x.quantity} 股</span></div>)}
+          {(h || []).map(x => {
+            const pnl = ((q?.price || 0) - (x.avgCost || 0)) * x.quantity
+            return (
+              <div className="stat" key={x.company_id}>
+                <div>
+                  <span className="stat-label">{x.company_name || '地球互動科技'}</span>
+                  <span className="stat-value">{x.quantity} 股</span>
+                  <div className="text-dim text-sm">均價 ${(x.avgCost || 0).toLocaleString()} · 現價 ${q?.price || '?'} · <span style={{color: pnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{pnl >= 0 ? '+' : ''}{pnl.toLocaleString()}</span></div>
+                </div>
+              </div>
+            )
+          })}
           {(!h || h.length === 0) && <div className="text-dim">無持股</div>}</div>
         <div className="card"><div className="card-title">全部成交紀錄</div>
           {(t || []).slice(0,10).map(x => <div className="stat" key={x.id}>
@@ -996,7 +1023,7 @@ function AdminPanel({ api }) {
           {expanded === u.id && <div className="card" style={{padding:12, marginTop:4}}>
             <div className="grid-2 gap-8">
               <div className="stat"><span className="stat-label">活存</span><span className="stat-value">${(u.savings||0).toLocaleString()}</span></div>
-              <div className="stat"><span className="stat-label">定存</span><span className="stat-value">${(u.bank||0).toLocaleString()}</span></div>
+              <div className="stat"><span className="stat-label">定存</span><span className="stat-value">${(u.deposits||0).toLocaleString()}</span></div>
               <div className="stat"><span className="stat-label">持股</span><span className="stat-value">{u.stocks||0} 股</span></div>
               <div className="stat"><span className="stat-label">投資</span><span className="stat-value">${(u.investments||0).toLocaleString()}</span></div>
               <div className="stat"><span className="stat-label">貸款</span><span className="stat-value">${(u.loans||0).toLocaleString()}</span></div>

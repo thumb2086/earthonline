@@ -61,7 +61,7 @@ export async function handleStock(env, request, path, user) {
     const inv = await db.prepare('SELECT cash, stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
     const company = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
     const circulating = (company?.total_shares || 1000000) - (inv?.stock_quantity || 0);
-    const maxTrade = Math.max(1000, Math.floor(circulating * MAX_TRADE_RATIO));
+    const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
     return {
       price,
       buyPrice: Math.round(price),
@@ -76,7 +76,15 @@ export async function handleStock(env, request, path, user) {
 
   if (path === '/api/stock/holdings') {
     const holdings = await db.prepare('SELECT sh.company_id, sh.quantity, c.name as company_name FROM stock_holdings sh JOIN companies c ON c.id = sh.company_id WHERE user_id = ?').bind(user.id).all();
-    return holdings.results;
+    const results = [];
+    for (const h of holdings.results) {
+      const buys = await db.prepare("SELECT COALESCE(SUM(price * quantity), 0) as cost, COALESCE(SUM(quantity), 0) as qty FROM stock_trades WHERE user_id = ? AND company_id = ? AND type = 'buy'").bind(user.id, h.company_id).first();
+      const sells = await db.prepare("SELECT COALESCE(SUM(price * quantity), 0) as rev FROM stock_trades WHERE user_id = ? AND company_id = ? AND type = 'sell'").bind(user.id, h.company_id).first();
+      const netCost = (buys?.cost || 0) - (sells?.rev || 0);
+      const avgCost = h.quantity > 0 ? Math.max(0, Math.round(netCost / h.quantity)) : 0;
+      results.push({ ...h, avgCost });
+    }
+    return results;
   }
 
   if (path === '/api/stock/trades') {
@@ -149,7 +157,7 @@ export async function handleStock(env, request, path, user) {
     if ((myHolding.q || 0) + quantity > companyData.total_shares) return { error: `持有股數上限 ${companyData.total_shares.toLocaleString()}` };
 
     if (!force) {
-      const maxTrade = Math.max(1000, Math.floor(circulating * MAX_TRADE_RATIO));
+      const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
       if (quantity > maxTrade) return { error: `單筆上限 ${maxTrade.toLocaleString()} 股` };
     }
 
@@ -209,7 +217,7 @@ export async function handleStock(env, request, path, user) {
     const circulatingS = companyS.total_shares - inv.stock_quantity;
 
     if (!force) {
-      const maxTradeS = Math.max(1000, Math.floor(circulatingS * MAX_TRADE_RATIO));
+      const maxTradeS = Math.max(1, Math.floor(circulatingS * MAX_TRADE_RATIO));
       if (quantity > maxTradeS) return { error: `單筆上限 ${maxTradeS.toLocaleString()} 股` };
     }
 
