@@ -408,14 +408,17 @@ function Company({ api, toast, prompt, promptMulti }) {
   const startIpo = (c) => {
     promptMulti('設定IPO參數', [
       { label: 'IPO價格 ($)', placeholder: '100', default: '100' },
+      { label: '發行股數', placeholder: String(c.total_shares || 100000), default: String(c.total_shares || 100000) },
       { label: '認購時間 (分鐘)', placeholder: '60', default: '60' },
-    ], async ([priceStr, minStr]) => {
+    ], async ([priceStr, sharesStr, minStr]) => {
       const price = parseInt(priceStr) || 100
+      const totalShares = parseInt(sharesStr) || (c.total_shares || 100000)
       const minutes = parseInt(minStr) || 60
       if (price < 10) return toast('價格至少$10', 'error')
+      if (totalShares < 1000) return toast('發行股數至少1,000', 'error')
       if (minutes < 5 || minutes > 1440) return toast('時間5~1440分鐘', 'error')
-      const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: price, totalShares: c.total_shares || 100000, ipoMinutes: minutes })
-      if (r.success) { refresh(); toast('IPO啟動 $' + price + ' / ' + minutes + '分鐘', 'success') } else toast(r.error, 'error')
+      const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: price, totalShares, ipoMinutes: minutes })
+      if (r.success) { refresh(); toast(`IPO啟動 $${price} × ${totalShares.toLocaleString()}股 / ${minutes}分鐘`, 'success') } else toast(r.error, 'error')
     })
   }
   return (
@@ -564,7 +567,7 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
 }
 
 function Stock({ api, toast, prompt }) {
-  const [q, setQ] = useState(null); const [h, setH] = useState([]); const [t, setT] = useState([]); const [ipo, setIpo] = useState(null)
+  const [q, setQ] = useState(null); const [h, setH] = useState([]); const [t, setT] = useState([]); const [myTrades, setMyTrades] = useState([]); const [ipo, setIpo] = useState(null)
   const [positions, setPositions] = useState([])
   const [marginType, setMarginType] = useState('long')
   const [marginQty, setMarginQty] = useState('')
@@ -600,11 +603,12 @@ function Stock({ api, toast, prompt }) {
     api('/api/stock/quote?companyId=' + selectedStock).then(setQ);
     api('/api/stock/holdings').then(d => setH(Array.isArray(d)?d:[]));
     api('/api/stock/trades?companyId=' + selectedStock).then(d => setT(Array.isArray(d)?d:[]));
+    api('/api/stock/trades?companyId=' + selectedStock + '&mine=1').then(d => setMyTrades(Array.isArray(d)?d:[]));
     api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[]));
     api('/api/stock/ipo/info?companyId=' + selectedStock).then(setIpo);
   }
   useEffect(() => { refreshStock() }, [selectedStock])
-  useEffect(() => { api('/api/stock/quote').then(setQ); api('/api/stock/holdings').then(d => setH(Array.isArray(d)?d:[])); api('/api/stock/trades').then(d => setT(Array.isArray(d)?d:[])); api('/api/stock/ipo/info').then(setIpo); api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[])) }, [])
+  useEffect(() => { api('/api/stock/quote').then(setQ); api('/api/stock/holdings').then(d => setH(Array.isArray(d)?d:[])); api('/api/stock/trades').then(d => setT(Array.isArray(d)?d:[])); api('/api/stock/trades?mine=1').then(d => setMyTrades(Array.isArray(d)?d:[])); api('/api/stock/ipo/info').then(setIpo); api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[])) }, [])
   const buy = () => prompt('買入股數', async (n) => { const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: parseInt(n) }); if (r.success) { refreshStock(); toast(`買入 ${n} 股`, 'success') } else toast(r.error, 'error') })
   const sell = () => prompt('賣出股數', async (n) => { const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: parseInt(n) }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股`, 'success') } else toast(r.error, 'error') })
   const maxBuy = async () => { const n = q?.maxTrade || 0; if (n <= 0) return; const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`買入 ${n} 股`, 'success') } else toast(r.error, 'error') }
@@ -715,12 +719,18 @@ function Stock({ api, toast, prompt }) {
         <div className="card"><div className="card-title">持倉</div>
           {(h || []).map(x => <div className="stat" key={x.company_id}><span className="stat-label">{x.company_name || '地球互動科技'}</span><span className="stat-value">{x.quantity} 股</span></div>)}
           {(!h || h.length === 0) && <div className="text-dim">無持股</div>}</div>
-        <div className="card"><div className="card-title">成交紀錄</div>
+        <div className="card"><div className="card-title">全部成交紀錄</div>
           {(t || []).slice(0,10).map(x => <div className="stat" key={x.id}>
             <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲' : '▼'}</span> ${x.price}</span>
             <span className="stat-value">{x.quantity} 股</span></div>
           )}</div>
       </div>}
+      {ipo?.phase !== 'ipo' && <div className="card mt-12"><div className="card-title">我的成交紀錄</div>
+        {(myTrades || []).length === 0 && <div className="text-dim">暫無交易</div>}
+        {(myTrades || []).slice(0,20).map(x => <div className="stat" key={x.id}>
+          <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲買入' : '▼賣出'}</span> ${x.price} × {x.quantity}股</span>
+          <span className="text-dim text-sm">{new Date(x.traded_at).toLocaleTimeString('zh-TW')}</span></div>
+        )}</div>}
     </>
   )
 }

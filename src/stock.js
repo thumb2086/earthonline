@@ -16,7 +16,7 @@ function getPriceImpact(quantity, circulating, totalShares) {
   if (circulating <= 0) return 0;
   const effective = Math.max(circulating, totalShares * MIN_CIRCULATING_RATIO);
   const ratio = quantity / effective;
-  const rawImpact = Math.log(1 + ratio * 100) * 2;
+  const rawImpact = Math.sqrt(ratio) * 0.15;
   return Math.min(rawImpact, MAX_PRICE_IMPACT);
 }
 
@@ -70,6 +70,11 @@ export async function handleStock(env, request, path, user) {
   if (path === '/api/stock/trades') {
     const reqUrl = new URL(request.url);
     const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
+    const mine = reqUrl.searchParams.get('mine') === '1';
+    if (mine) {
+      const trades = await db.prepare('SELECT * FROM stock_trades WHERE company_id = ? AND user_id = ? ORDER BY traded_at DESC LIMIT 50').bind(companyId, user.id).all();
+      return trades.results;
+    }
     const trades = await db.prepare('SELECT * FROM stock_trades WHERE company_id = ? ORDER BY traded_at DESC LIMIT 50').bind(companyId).all();
     return trades.results;
   }
@@ -173,10 +178,10 @@ export async function handleStock(env, request, path, user) {
     }
 
     await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
-    await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', newPrice, quantity, now).run();
+    await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', buyPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now);
-    await logTransaction(db, user.id, 'stock_buy', -(totalCost + fee), `買入 ${quantity} 股 @ $${newPrice}`);
-    return { success: true, price: newPrice, quantity, totalCost: totalCost + fee };
+    await logTransaction(db, user.id, 'stock_buy', -(totalCost + fee), `買入 ${quantity} 股 @ $${buyPrice}`);
+    return { success: true, price: newPrice, fillPrice: buyPrice, quantity, totalCost: totalCost + fee };
   }
 
   if (path === '/api/stock/sell') {
@@ -224,10 +229,10 @@ export async function handleStock(env, request, path, user) {
     }
 
     await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
-    await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
+    await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', sellPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now);
-    await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${newPrice}`);
-    return { success: true, price: newPrice, quantity, netRevenue };
+    await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${sellPrice}`);
+    return { success: true, price: newPrice, fillPrice: sellPrice, quantity, netRevenue };
   }
 
   if (path === '/api/stock/ipo/mine') {

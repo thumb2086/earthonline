@@ -121,7 +121,7 @@ export async function handleCompany(env, request, path, user) {
     const existingIpo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
     if (existingIpo && existingIpo.phase !== null) return { error: '已有IPO記錄' };
     if (!ipoPrice || ipoPrice < 10) return { error: 'IPO價格至少$10' };
-    if (!totalShares || totalShares < 10000) return { error: '發行股數至少10,000' };
+    if (!totalShares || totalShares < 1000) return { error: '發行股數至少1,000' };
     const minutes = Math.max(5, Math.min(1440, parseInt(ipoMinutes) || 60));
 
     await db.prepare('UPDATE companies SET total_shares = ?, share_price = ? WHERE id = ?').bind(totalShares, ipoPrice, companyId).run();
