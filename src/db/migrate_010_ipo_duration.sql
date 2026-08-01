@@ -1,0 +1,1 @@
+ALTER TABLE ipo_state ADD COLUMN duration_minutes INTEGER NOT NULL DEFAULT 60;

@@ -390,9 +390,10 @@ export async function processMarginTick(db) {
 }
 
 export async function finalizeIPO(db) {
-  const ipo = await db.prepare("SELECT company_id, phase, started_at FROM ipo_state WHERE phase = 'ipo'").first();
+  const ipo = await db.prepare("SELECT company_id, phase, started_at, duration_minutes FROM ipo_state WHERE phase = 'ipo'").first();
   if (!ipo) return;
-  if (Date.now() - ipo.started_at < 3600000) return; // 1 hour IPO period
+  const durationMs = (ipo.duration_minutes || 60) * 60000;
+  if (Date.now() - ipo.started_at < durationMs) return;
 
   const subs = await db.prepare('SELECT user_id, shares FROM ipo_subscriptions WHERE company_id = ?').bind(ipo.company_id).all();
   for (const sub of subs.results) {

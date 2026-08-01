@@ -31,6 +31,10 @@ export async function handleEmployee(env, request, path, user) {
     if (!company) return { error: '公司不存在或非owner' };
     const info = POSITIONS[position];
     if (!info) return { error: '無效職位' };
+
+    const currentCount = await db.prepare('SELECT COUNT(*) as cnt FROM employees WHERE company_id = ?').bind(companyId).first();
+    if ((currentCount?.cnt || 0) + quantity > 50) return { error: '每公司最多50人' };
+
     const totalCost = info.hireCost * quantity;
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet || wallet.cash < totalCost) return { error: '餘額不足' };

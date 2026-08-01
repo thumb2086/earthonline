@@ -1,10 +1,18 @@
 const INVEST_TYPES = {
-  deposit: { label: '定存', rateMin: 0.001, rateMax: 0.001, unlockEarned: 0 },
-  bond: { label: '債券', rateMin: 0.003, rateMax: 0.003, unlockEarned: 1000 },
-  index_fund: { label: '指數基金', rateMin: 0.005, rateMax: 0.01, unlockEarned: 5000 },
-  real_estate: { label: '房地產', rateMin: 0.008, rateMax: 0.008, unlockEarned: 50000 },
-  startup: { label: '新創投資', rateMin: 0.02, rateMax: 0.05, unlockEarned: 200000 },
+  deposit: { label: '定存', rateMin: 0.001, rateMax: 0.001, unlockEarned: 0, maxPerUser: 5000000 },
+  bond: { label: '債券', rateMin: 0.003, rateMax: 0.003, unlockEarned: 1000, maxPerUser: 10000000 },
+  index_fund: { label: '指數基金', rateMin: 0.005, rateMax: 0.01, unlockEarned: 5000, maxPerUser: 20000000 },
+  real_estate: { label: '房地產', rateMin: 0.008, rateMax: 0.008, unlockEarned: 50000, maxPerUser: 50000000 },
+  startup: { label: '新創投資', rateMin: 0.02, rateMax: 0.05, unlockEarned: 200000, maxPerUser: 100000000 },
 };
+
+function getDiminishingRate(baseRate, totalInvested, maxPerUser) {
+  const ratio = totalInvested / maxPerUser;
+  if (ratio < 0.3) return baseRate;
+  if (ratio < 0.6) return baseRate * 0.7;
+  if (ratio < 0.8) return baseRate * 0.4;
+  return baseRate * 0.2;
+}
 
 export async function handleInvestment(env, request, path, user) {
   const db = env.DB;
@@ -38,6 +46,9 @@ export async function handleInvestment(env, request, path, user) {
     const wallet = await db.prepare('SELECT cash, total_earned FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet || wallet.cash < amount) return { error: '餘額不足' };
     if (wallet.total_earned < info.unlockEarned) return { error: '尚未解鎖' };
+
+    const existing = await db.prepare('SELECT COALESCE(SUM(amount),0) as total FROM investments WHERE user_id = ? AND type = ?').bind(user.id, type).first();
+    if ((existing?.total || 0) + amount > info.maxPerUser) return { error: `投資上限 $${info.maxPerUser.toLocaleString()}` };
 
     if (type === 'deposit') {
       await db.prepare('UPDATE wallets SET cash = cash - ?, bank = bank + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(amount, amount, amount, user.id).run();
@@ -73,8 +84,10 @@ export async function processInvestmentTick(db) {
   for (const inv of investments.results) {
     const info = INVEST_TYPES[inv.type];
     if (!info) continue;
-    const rate = info.rateMin + Math.random() * (info.rateMax - info.rateMin);
-    const earned = (inv.amount + (inv.pending_interest || 0)) * rate;
+    const totalInvested = inv.amount + (inv.pending_interest || 0);
+    const baseRate = info.rateMin + Math.random() * (info.rateMax - info.rateMin);
+    const rate = getDiminishingRate(baseRate, totalInvested, info.maxPerUser);
+    const earned = inv.amount * rate;
     const totalPending = (inv.pending_interest || 0) + earned;
     const payout = Math.floor(totalPending);
     if (payout > 0) {

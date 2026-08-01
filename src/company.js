@@ -49,7 +49,7 @@ export async function handleCompany(env, request, path, user) {
   }
 
   if (path === '/api/company/ipo/start') {
-    const { companyId, ipoPrice, totalShares } = await request.json();
+    const { companyId, ipoPrice, totalShares, ipoMinutes = 60 } = await request.json();
     if (!companyId) return { error: '請選擇公司' };
     const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
     if (!company) return { error: '公司不存在或非owner' };
@@ -57,11 +57,12 @@ export async function handleCompany(env, request, path, user) {
     if (existingIpo && existingIpo.phase !== null) return { error: '已有IPO記錄' };
     if (!ipoPrice || ipoPrice < 10) return { error: 'IPO價格至少$10' };
     if (!totalShares || totalShares < 10000) return { error: '發行股數至少10,000' };
+    const minutes = Math.max(5, Math.min(1440, parseInt(ipoMinutes) || 60));
 
     await db.prepare('UPDATE companies SET total_shares = ?, share_price = ? WHERE id = ?').bind(totalShares, ipoPrice, companyId).run();
-    await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at) VALUES (?, ?, ?)').bind(companyId, 'ipo', Date.now()).run();
+    await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'ipo', Date.now(), minutes).run();
     await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, 0, ?)').bind(companyId, totalShares).run();
-    return { success: true, message: 'IPO已啟動，1小時後自動上市' };
+    return { success: true, message: `IPO已啟動，${minutes}分鐘後自動上市` };
   }
 
   if (path === '/api/company/ipo/list') {

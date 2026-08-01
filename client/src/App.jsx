@@ -286,10 +286,14 @@ function Company({ api, toast, prompt }) {
   }
   const startIpo = (c) => {
     const defaultPrice = c.share_price >= 10 ? c.share_price : 100
-    prompt('設定IPO發行價 (每股$' + defaultPrice + ')', async (price) => {
-      if (!price || parseInt(price) < 10) return toast('價格至少$10', 'error')
-      const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: parseInt(price), totalShares: c.total_shares || 100000 })
-      if (r.success) { refresh(); toast('IPO已啟動，價格$' + price, 'success') } else toast(r.error, 'error')
+    prompt('設定IPO價格 ($' + defaultPrice + ')，輸入格式: 價格,分鐘數 (例: 100,30)', async (input) => {
+      const parts = (input || '').split(',')
+      const price = parseInt(parts[0]) || defaultPrice
+      const minutes = parseInt(parts[1]) || 60
+      if (price < 10) return toast('價格至少$10', 'error')
+      if (minutes < 5 || minutes > 1440) return toast('時間5~1440分鐘', 'error')
+      const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: price, totalShares: c.total_shares || 100000, ipoMinutes: minutes })
+      if (r.success) { refresh(); toast('IPO啟動 $' + price + ' / ' + minutes + '分鐘', 'success') } else toast(r.error, 'error')
     })
   }
   return (
