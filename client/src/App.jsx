@@ -810,13 +810,16 @@ function AdminPanel({ api }) {
   const cashLabels = users.filter(u => u.cash > 0).map(u => u.username)
   const earnedData = users.filter(u => u.total_earned > 0).map(u => u.total_earned)
   const earnedLabels = users.filter(u => u.total_earned > 0).map(u => u.username)
-  const ipoAgg = (ipoList || []).reduce((acc, s) => {
-    const key = s.company_name + ' · ' + s.username
-    acc[key] = (acc[key] || 0) + s.shares
+  const ipoByCompany = (ipoList || []).reduce((acc, s) => {
+    if (!acc[s.company_name]) acc[s.company_name] = { data: [], labels: [], detail: {} }
+    const g = acc[s.company_name]
+    g.detail[s.username] = (g.detail[s.username] || 0) + s.shares
     return acc
   }, {})
-  const ipoDistData = Object.values(ipoAgg)
-  const ipoDistLabels = Object.keys(ipoAgg)
+  Object.values(ipoByCompany).forEach(g => {
+    g.labels = Object.keys(g.detail)
+    g.data = Object.values(g.detail)
+  })
 
   return (
     <>
@@ -853,9 +856,14 @@ function AdminPanel({ api }) {
           <div className="card-title">📈 累計賺取</div>
           <PieChart data={earnedData} labels={earnedLabels} colors={CHART_COLORS} size={200} />
         </div>}
-        {ipoDistData.length > 0 && <div className="card">
+        {Object.keys(ipoByCompany).length > 0 && <div className="card">
           <div className="card-title">🚀 IPO 認購分布</div>
-          <PieChart data={ipoDistData} labels={ipoDistLabels} colors={CHART_COLORS} size={200} />
+          {Object.entries(ipoByCompany).map(([company, g]) => (
+            <div key={company} style={{marginBottom: 12}}>
+              <div className="text-dim text-sm" style={{fontWeight:600, marginBottom:6}}>{company}</div>
+              <PieChart data={g.data} labels={g.labels} colors={CHART_COLORS} size={170} />
+            </div>
+          ))}
         </div>}
       </div>
 
@@ -907,7 +915,7 @@ function AdminPanel({ api }) {
 function History({ api }) {
   const [txs, setTxs] = useState([])
   useEffect(() => { api('/api/transactions?limit=100').then(d => setTxs(Array.isArray(d) ? d : [])) }, [])
-  const typeLabels = { income: '⬆️ 基礎收入(本小時)', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', ipo_subscribe: '🚀 IPO認購', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', bank_interest: '🏦 活存利息(本小時)', loan: '🏦 借貸', loan_interest: '🏦 貸款利息(本小時)', employee_hire: '👥 僱用', employee_salary: '👥 薪資', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', investment_interest: '💼 投資利息(本小時)', investment_loss: '💼 投資虧損', company_profit: '🏢 公司利潤(本小時)', company_loss: '🏢 公司虧損(本小時)', dividend: '💰 股利(本小時)', living_cost: '🏠 生活費(本小時)', subscription: '📦 訂閱月費(本小時)' }
+  const typeLabels = { income: '⬆️ 基礎收入(本小時)', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', ipo_subscribe: '🚀 IPO認購', ipo_revenue: '🚀 IPO募集', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', bank_interest: '🏦 活存利息(本小時)', loan: '🏦 借貸', loan_interest: '🏦 貸款利息(本小時)', employee_hire: '👥 僱用', employee_salary: '👥 薪資', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', investment_interest: '💼 投資利息(本小時)', investment_loss: '💼 投資虧損', company_profit: '🏢 公司利潤(本小時)', company_loss: '🏢 公司虧損(本小時)', dividend: '💰 股利(本小時)', living_cost: '🏠 生活費(本小時)', subscription: '📦 訂閱月費(本小時)' }
   const typeColors = { income: 'var(--accent)', expense: 'var(--danger)', stock_buy: 'var(--danger)', stock_sell: 'var(--accent)', ipo_subscribe: 'var(--warn)', employee_hire: 'var(--danger)', company_create: 'var(--danger)', upgrade: 'var(--danger)' }
   return (
     <div className="card">
