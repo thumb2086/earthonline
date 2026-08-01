@@ -822,7 +822,8 @@ function AdminPanel({ api }) {
   const cashLabels = users.filter(u => u.cash > 0).map(u => u.username)
   const earnedData = users.filter(u => u.total_earned > 0).map(u => u.total_earned)
   const earnedLabels = users.filter(u => u.total_earned > 0).map(u => u.username)
-  const ipoByCompany = (ipoList || []).reduce((acc, s) => {
+  const activeIpoList = (ipoList || []).filter(s => s.phase === 'ipo')
+  const ipoByCompany = activeIpoList.reduce((acc, s) => {
     if (!acc[s.company_name]) acc[s.company_name] = { data: [], labels: [], detail: {} }
     const g = acc[s.company_name]
     g.detail[s.username] = (g.detail[s.username] || 0) + s.shares
@@ -879,9 +880,9 @@ function AdminPanel({ api }) {
         </div>}
       </div>
 
-      <div className="card mb-12"><div className="card-title">🚀 IPO 認購紀錄 ({ipoList.length})</div>
-        {(ipoList || []).length === 0 && <div className="text-dim">暫無認購</div>}
-        {(ipoList || []).map(s => (
+      <div className="card mb-12"><div className="card-title">🚀 IPO 認購紀錄（進行中）({activeIpoList.length})</div>
+        {activeIpoList.length === 0 && <div className="text-dim">暫無進行中的認購</div>}
+        {activeIpoList.map(s => (
           <div className="stat" key={s.id}>
             <span><span className="text-accent" style={{fontWeight:600}}>{s.username}</span> 認購 <span style={{fontWeight:600}}>{s.shares.toLocaleString()} 股</span> {s.company_name} @ ${s.share_price}</span>
             <span className="text-dim text-sm">${(s.total_cost || 0).toLocaleString()} · {new Date(s.subscribed_at).toLocaleString('zh-TW')}</span>
