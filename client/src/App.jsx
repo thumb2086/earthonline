@@ -246,6 +246,7 @@ function Bank({ act, api, toast }) {
       <div className="grid-2">
         <div className="card card-accent">
           <div className="card-title">活期存款 0.05%/分</div>
+          <div className="text-dim text-sm" style={{marginTop:4}}>利息 <span className="text-accent">${Math.floor((info?.savings || 0) * 0.0005).toLocaleString()}/分</span>（每天約 ${Math.floor((info?.savings || 0) * 0.0005 * 1440).toLocaleString()}）</div>
           <form onSubmit={e => { act(e, '/api/bank/deposit'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
             <input name="amount" type="number" placeholder="存入金額" /><button className="btn btn-primary btn-sm">存入</button></form>
           <form onSubmit={e => { act(e, '/api/bank/withdraw'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
@@ -271,7 +272,7 @@ function Bank({ act, api, toast }) {
               <div>
                 <span style={{fontWeight:600}}>${(d.amount || 0).toLocaleString()}</span>
                 <span className="text-dim text-sm"> · {d.termLabel} · 剩 {fmtRemain(d.matureIn)}</span>
-                <div className="text-dim text-sm">已領利息 ${(d.totalPaid || 0).toLocaleString()}</div>
+                <div className="text-dim text-sm">利息 <span className="text-accent">${Math.floor((d.amount || 0) * (d.rate || 0)).toLocaleString()}/分</span> · 已領 ${(d.totalPaid || 0).toLocaleString()}</div>
               </div>
               <button className="btn btn-sm" onClick={() => earlyWithdraw(d.id, d.amount)}>提前贖回</button>
             </div>
@@ -614,29 +615,31 @@ function Stock({ api, toast, prompt }) {
   const buy = async () => {
     const fresh = await api('/api/stock/quote?companyId=' + selectedStock)
     if (fresh?.price) setQ(fresh)
-    const cur = fresh?.price || q?.price || 0
-    prompt(`買入股數 (市價 $${cur} · 手續費1.5%另計)`, async (n) => {
+    prompt(`買入股數 (手續費1.5%另計)`, async (n) => {
       const qty = parseInt(n); if (!qty || qty <= 0) return
       const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: qty })
       if (r.success) { refreshStock(); toast(`買入 ${qty} 股 @ $${r.fillPrice} (含手續費 $${(r.totalCost - (r.fillPrice * qty)).toLocaleString()})`, 'success') } else toast(r.error, 'error')
-    }, (v) => {
+    }, async (v) => {
       const qty = parseInt(v) || 0
       if (qty <= 0) return ''
-      return `預估總額：$${(cur * qty).toLocaleString()} + 手續費 $${Math.round(cur * qty * 0.015).toLocaleString()} = $${Math.round(cur * qty * 1.015).toLocaleString()}`
+      const live = await api('/api/stock/quote?companyId=' + selectedStock).catch(() => null)
+      const cur = live?.price || q?.price || 0
+      return `市價 $${cur} → 預估總額：$${(cur * qty).toLocaleString()} + 手續費 $${Math.round(cur * qty * 0.015).toLocaleString()} = $${Math.round(cur * qty * 1.015).toLocaleString()}`
     })
   }
   const sell = async () => {
     const fresh = await api('/api/stock/quote?companyId=' + selectedStock)
     if (fresh?.price) setQ(fresh)
-    const cur = fresh?.price || q?.price || 0
-    prompt(`賣出股數 (市價 $${cur} · 手續費1.5%另計 · 大單滑點)`, async (n) => {
+    prompt(`賣出股數 (手續費1.5%另計 · 大單滑點)`, async (n) => {
       const qty = parseInt(n); if (!qty || qty <= 0) return
       const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: qty })
       if (r.success) { refreshStock(); toast(`賣出 ${qty} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})`, 'success') } else toast(r.error, 'error')
-    }, (v) => {
+    }, async (v) => {
       const qty = parseInt(v) || 0
       if (qty <= 0) return ''
-      return `預估實收：$${Math.round(cur * qty * 0.985).toLocaleString()}（扣手續費，大單另有滑點）`
+      const live = await api('/api/stock/quote?companyId=' + selectedStock).catch(() => null)
+      const cur = live?.price || q?.price || 0
+      return `市價 $${cur} → 預估實收：$${Math.round(cur * qty * 0.985).toLocaleString()}（扣手續費，大單另有滑點）`
     })
   }
   const maxBuy = async () => { const n = q?.maxTrade || 0; if (n <= 0) return; const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`買入 ${n} 股 @ $${r.fillPrice}`, 'success') } else toast(r.error, 'error') }
@@ -755,10 +758,20 @@ function Stock({ api, toast, prompt }) {
       </div>}
       {ipo?.phase !== 'ipo' && <div className="card mt-12"><div className="card-title">我的成交紀錄</div>
         {(myTrades || []).length === 0 && <div className="text-dim">暫無交易</div>}
-        {(myTrades || []).slice(0,20).map(x => <div className="stat" key={x.id}>
-          <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲買入' : '▼賣出'}</span> ${x.price} × {x.quantity}股</span>
-          <span className="text-dim text-sm">{new Date(x.traded_at).toLocaleTimeString('zh-TW')}</span></div>
-        )}</div>}
+        {(myTrades || []).slice(0,20).map(x => {
+          const gross = x.price * x.quantity
+          const fee = Math.floor(gross * 0.015)
+          const amount = x.type === 'buy' ? -(gross + fee) : (gross - fee)
+          return (
+            <div className="stat" key={x.id}>
+              <div>
+                <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲買入' : '▼賣出'}</span> ${x.price} × {x.quantity}股</span>
+                <div className="text-dim text-sm">{x.type === 'buy' ? `花費 $${(gross + fee).toLocaleString()}（含手續費 $${fee.toLocaleString()}）` : `實收 $${(gross - fee).toLocaleString()}（扣手續費 $${fee.toLocaleString()}）`}</div>
+              </div>
+              <span className="text-dim text-sm">{new Date(x.traded_at).toLocaleTimeString('zh-TW')}</span>
+            </div>
+          )
+        })}</div>}
     </>
   )
 }

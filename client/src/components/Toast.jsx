@@ -1,10 +1,25 @@
-import { useState, useCallback, createContext, useContext } from 'react'
+import { useState, useCallback, createContext, useContext, useEffect } from 'react'
 
 const ToastContext = createContext()
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
   const [modal, setModal] = useState(null)
+  const [tick, setTick] = useState(0)
+  const [previewText, setPreviewText] = useState('')
+
+  useEffect(() => {
+    if (!modal) return
+    const id = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [modal])
+
+  useEffect(() => {
+    if (!modal?.preview || !modal.value) { setPreviewText(''); return }
+    let cancelled = false
+    Promise.resolve(modal.preview(modal.value, tick)).then(txt => { if (!cancelled) setPreviewText(txt || '') })
+    return () => { cancelled = true }
+  }, [modal?.preview, modal?.value, tick])
 
   const toast = useCallback((msg, type = 'info') => {
     const id = Date.now()
@@ -56,8 +71,8 @@ export function ToastProvider({ children }) {
                   onKeyDown={e => { if (e.key === 'Enter' && modal.value) { modal.cb(modal.value); closeModal() } }}
                   placeholder="輸入..."
                   style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 14px', borderRadius: 6, fontSize: 13, width: '100%', outline: 'none' }} />
-                {modal.preview && modal.value && <div style={{ marginTop: 8, fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>
-                  {modal.preview(modal.value)}
+                {previewText && <div style={{ marginTop: 8, fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>
+                  {previewText}
                 </div>}
               </div>
             )}
