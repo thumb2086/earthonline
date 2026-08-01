@@ -108,6 +108,23 @@ export async function handleAdmin(env, request, path, user) {
     return holdings.results;
   }
 
+  if (path === '/api/admin/ipo') {
+    const url = new URL(request.url);
+    const companyId = url.searchParams.get('companyId');
+    let query = `
+      SELECT s.id, s.shares, s.total_cost, s.subscribed_at, c.name as company_name, c.share_price, i.phase, u.username
+      FROM ipo_subscriptions s
+      JOIN companies c ON c.id = s.company_id
+      LEFT JOIN ipo_state i ON i.company_id = s.company_id
+      JOIN users u ON u.id = s.user_id
+    `;
+    const params = [];
+    if (companyId) { query += ' WHERE s.company_id = ?'; params.push(parseInt(companyId)); }
+    query += ' ORDER BY s.subscribed_at DESC';
+    const rows = await db.prepare(query).bind(...params).all();
+    return rows.results;
+  }
+
   if (path.startsWith('/api/admin/user/')) {
     const targetId = parseInt(path.split('/').pop());
     if (!targetId) return { error: '無效用戶' };

@@ -103,6 +103,7 @@ function Dashboard({ user, api }) {
     api('/api/investment/list').then(d => setData(p => ({ ...p, inv: Array.isArray(d) ? d : [] }))).catch(()=>{})
     api('/api/subscription/list').then(d => setData(p => ({ ...p, subs: Array.isArray(d) ? d : [] }))).catch(()=>{})
     api('/api/company/list').then(d => setData(p => ({ ...p, companies: Array.isArray(d) ? d : [] }))).catch(()=>{})
+    api('/api/stock/ipo/mine').then(d => setData(p => ({ ...p, ipos: Array.isArray(d) ? d : [] }))).catch(()=>{})
   }, [])
   const sv = (data.h || []).reduce((s, h) => s + (data.q?.price || 100) * h.quantity, 0)
   const invTotal = (data.inv || []).filter(i => i.type !== 'deposit').reduce((s, i) => s + i.amount, 0)
@@ -137,6 +138,15 @@ function Dashboard({ user, api }) {
         <div className="card"><div className="card-title">📦 訂閱</div><div className="text-lg">{subActive} 項</div>
           {subCost > 0 && <div className="text-dim text-sm">${subCost.toLocaleString()}/分</div>}</div>
       </div>
+      {(data.ipos || []).length > 0 && <div className="card mb-12" style={{borderColor:'var(--warn)'}}>
+        <div className="card-title" style={{color:'var(--warn)'}}>🚀 IPO 認購中</div>
+        {(data.ipos || []).map(ipo => (
+          <div className="stat" key={ipo.company_id}>
+            <span>{ipo.name} · 認購 <span style={{fontWeight:600}}>{ipo.shares.toLocaleString()} 股</span></span>
+            <span className="text-dim text-sm">花費 ${(ipo.total_cost || 0).toLocaleString()} · 上市後入帳</span>
+          </div>
+        ))}
+      </div>}
       <div className="grid-2">
         <div className="card">
           <div className="card-title">資產分布</div>
@@ -624,6 +634,7 @@ function Stock({ api, toast, prompt }) {
           <span className="text-accent">{(ipo.subscribed||0).toLocaleString()} / {(ipo.maxSubscribed||0).toLocaleString()} 股已認購</span>
           <span className="text-dim">{(((ipo.subscribed||0)/(ipo.maxSubscribed||1))*100).toFixed(1)}%</span>
         </div>
+        <div className="text-sm mt-12" style={{color:'var(--warn)'}}>你已認購 <span style={{fontWeight:600}}>{(ipo.myShares||0).toLocaleString()} 股</span>（花費 ${((ipo.myShares||0) * (ipo.price||100)).toLocaleString()}）</div>
         <button className="btn btn-sm mt-12" onClick={subIpo}>認購</button>
       </div>}
         {ipo?.phase !== 'ipo' && q && <><div className="grid-2 mt-12">
@@ -775,10 +786,12 @@ const CHART_COLORS = ['#00ff41', '#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#0
 function AdminPanel({ api }) {
   const [users, setUsers] = useState([]); const [stats, setStats] = useState(null); const [expanded, setExpanded] = useState(null)
   const [stockDist, setStockDist] = useState([])
+  const [ipoList, setIpoList] = useState([])
   useEffect(() => {
     api('/api/admin/users').then(d => setUsers(Array.isArray(d) ? d : []));
     api('/api/admin/stats').then(setStats);
     api('/api/admin/stocks').then(d => setStockDist(Array.isArray(d) ? d : []));
+    api('/api/admin/ipo').then(d => setIpoList(Array.isArray(d) ? d : []));
   }, [])
 
   const holdingsData = stockDist.filter(s => s.held > 0).map(s => s.held)
@@ -814,6 +827,16 @@ function AdminPanel({ api }) {
           <div className="card-title">📈 累計賺取</div>
           <PieChart data={earnedData} labels={earnedLabels} colors={CHART_COLORS} size={200} />
         </div>}
+      </div>
+
+      <div className="card mb-12"><div className="card-title">🚀 IPO 認購紀錄 ({ipoList.length})</div>
+        {(ipoList || []).length === 0 && <div className="text-dim">暫無認購</div>}
+        {(ipoList || []).map(s => (
+          <div className="stat" key={s.id}>
+            <span><span className="text-accent" style={{fontWeight:600}}>{s.username}</span> 認購 <span style={{fontWeight:600}}>{s.shares.toLocaleString()} 股</span> {s.company_name} @ ${s.share_price}</span>
+            <span className="text-dim text-sm">${(s.total_cost || 0).toLocaleString()} · {new Date(s.subscribed_at).toLocaleString('zh-TW')}</span>
+          </div>
+        ))}
       </div>
 
       <div className="card"><div className="card-title">使用者 ({users.length})</div>

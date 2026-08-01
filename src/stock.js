@@ -230,6 +230,17 @@ export async function handleStock(env, request, path, user) {
     return { success: true, price: newPrice, quantity, netRevenue };
   }
 
+  if (path === '/api/stock/ipo/mine') {
+    const rows = await db.prepare(`
+      SELECT s.company_id, c.name, s.shares, s.total_cost, i.phase, c.share_price, i.duration_minutes, i.started_at
+      FROM ipo_subscriptions s
+      JOIN companies c ON c.id = s.company_id
+      LEFT JOIN ipo_state i ON i.company_id = s.company_id
+      WHERE s.user_id = ? AND i.phase = 'ipo'
+    `).bind(user.id).all();
+    return rows.results;
+  }
+
   if (path === '/api/stock/ipo/info') {
     const reqUrl = new URL(request.url);
     const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
