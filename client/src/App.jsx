@@ -45,6 +45,7 @@ export default function App() {
     { id: 'company', label: '🏢 公司' },
     { id: 'stock', label: '📈 股票' },
     { id: 'contract', label: '📋 合約' },
+    { id: 'history', label: '💰 明細' },
     { id: 'leaderboard', label: '🏆 排行' },
   ]
   if (user?.role === 'admin') tabs.push({ id: 'admin', label: '⭐ 管理' })
@@ -83,6 +84,7 @@ export default function App() {
           {view === 'company' && <Company api={api} toast={toast} prompt={prompt} />}
           {view === 'stock' && <Stock api={api} toast={toast} prompt={prompt} />}
           {view === 'contract' && <Contract api={api} toast={toast} />}
+          {view === 'history' && <History api={api} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}
           {view === 'admin' && <AdminPanel api={api} />}
         </div>
@@ -282,11 +284,14 @@ function Company({ api, toast, prompt }) {
     if (r.success) { api('/api/employee/list?companyId=' + selectedCompany).then(d => setEmployees(Array.isArray(d) ? d : [])); toast(`僱用 ${r.hired} 人`, 'success') }
     else toast(r.error, 'error')
   }
-  const startIpo = (c) => prompt('設定IPO發行價 ($' + (c.share_price||10) + ')', async (price) => {
-    if (!price || parseInt(price) < 10) return toast('價格至少$10', 'error')
-    const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: parseInt(price), totalShares: c.total_shares || 100000 })
-    if (r.success) { refresh(); toast('IPO已啟動', 'success') } else toast(r.error, 'error')
-  })
+  const startIpo = (c) => {
+    const defaultPrice = c.share_price >= 10 ? c.share_price : 100
+    prompt('設定IPO發行價 (每股$' + defaultPrice + ')', async (price) => {
+      if (!price || parseInt(price) < 10) return toast('價格至少$10', 'error')
+      const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: parseInt(price), totalShares: c.total_shares || 100000 })
+      if (r.success) { refresh(); toast('IPO已啟動，價格$' + price, 'success') } else toast(r.error, 'error')
+    })
+  }
   return (
     <>
       <div className="card mb-12">
@@ -694,5 +699,32 @@ function AdminPanel({ api }) {
         </div>)}
       </div>
     </>
+  )
+}
+
+function History({ api }) {
+  const [txs, setTxs] = useState([])
+  useEffect(() => { api('/api/transactions?limit=100').then(d => setTxs(Array.isArray(d) ? d : [])) }, [])
+  const typeLabels = { income: '⬆️ 收入', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', ipo_subscribe: '🚀 IPO認購', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', loan: '🏦 貸款', employee_hire: '👥 僱用', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', dividend: '💰 股利' }
+  const typeColors = { income: 'var(--accent)', expense: 'var(--danger)', stock_buy: 'var(--danger)', stock_sell: 'var(--accent)', ipo_subscribe: 'var(--warn)', employee_hire: 'var(--danger)', company_create: 'var(--danger)', upgrade: 'var(--danger)' }
+  return (
+    <div className="card">
+      <div className="card-title">💰 收支明細</div>
+      {txs.length === 0 && <div className="text-dim">暫無紀錄</div>}
+      {txs.map(tx => (
+        <div className="stat" key={tx.id} style={{borderBottom:'1px solid var(--border)', paddingBottom:8, marginBottom:8}}>
+          <div className="flex justify-between">
+            <span style={{fontSize:13}}>{typeLabels[tx.type] || tx.type}</span>
+            <span style={{fontSize:13, fontWeight:600, color: tx.amount >= 0 ? 'var(--accent)' : 'var(--danger)'}}>
+              {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString()}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-dim" style={{fontSize:12}}>{tx.description}</span>
+            <span className="text-dim" style={{fontSize:12}}>{new Date(tx.created_at).toLocaleString('zh-TW')}</span>
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }

@@ -90,3 +90,7 @@ export async function authCheck(request, env) {
   if (!header || !header.startsWith('Bearer ')) return null;
   return await verifyJWT(header.slice(7), env.JWT_SECRET);
 }
+
+export async function logTransaction(db, userId, type, amount, description) {
+  await db.prepare('INSERT INTO transaction_history (user_id, type, amount, description, created_at) VALUES (?, ?, ?, ?, ?)').bind(userId, type, amount, description || '', Date.now()).run();
+}

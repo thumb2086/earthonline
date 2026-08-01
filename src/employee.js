@@ -1,3 +1,5 @@
+import { logTransaction } from './utils.js';
+
 const POSITIONS = {
   intern: { label: '實習生', hireCost: 200, salary: 1, output: 3 },
   specialist: { label: '專員', hireCost: 1000, salary: 5, output: 20 },
@@ -36,6 +38,7 @@ export async function handleEmployee(env, request, path, user) {
     for (let i = 0; i < quantity; i++) {
       await db.prepare('INSERT INTO employees (user_id, company_id, position, salary, output, hired_at) VALUES (?, ?, ?, ?, ?, ?)').bind(user.id, companyId, position, info.salary, info.output, Date.now()).run();
     }
+    await logTransaction(db, user.id, 'employee_hire', -totalCost, `僱用${quantity}位${info.label}`);
     return { success: true, hired: quantity };
   }
 

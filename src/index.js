@@ -166,6 +166,13 @@ export default {
         return json({ id: user.id, username: user.username, role: dbUser?.role || 'user', discord: dbUser?.discord_username, ...wallet, levels: levels || {}, pendingInterest: investPending?.p || 0, offlineEarnings }, headers);
       }
 
+      if (path === '/api/transactions') {
+        const url = new URL(request.url);
+        const limit = parseInt(url.searchParams.get('limit') || '50');
+        const txs = await env.DB.prepare('SELECT * FROM transaction_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').bind(user.id, limit).all();
+        return json(txs.results, headers);
+      }
+
       const routes = [
         ['/api/income', handleIncome],
         ['/api/bank', handleBank],

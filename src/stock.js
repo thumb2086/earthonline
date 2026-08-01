@@ -1,3 +1,5 @@
+import { logTransaction } from './utils.js';
+
 const SPREAD_BASE = 0.03;
 const FEE_RATE = 0.015;
 const LEVERAGE_OPTIONS = [2, 3, 5];
@@ -172,6 +174,7 @@ export async function handleStock(env, request, path, user) {
     await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', newPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now);
+    await logTransaction(db, user.id, 'stock_buy', -(totalCost + fee), `買入 ${quantity} 股 @ $${newPrice}`);
     return { success: true, price: newPrice, quantity, totalCost: totalCost + fee };
   }
 
@@ -221,6 +224,7 @@ export async function handleStock(env, request, path, user) {
     await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now);
+    await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${newPrice}`);
     return { success: true, price: newPrice, quantity, netRevenue };
   }
 
@@ -255,6 +259,7 @@ export async function handleStock(env, request, path, user) {
 
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost, user.id).run();
     await db.prepare('INSERT INTO ipo_subscriptions (user_id, company_id, shares, total_cost, subscribed_at) VALUES (?, ?, ?, ?, ?)').bind(user.id, companyId, shares, totalCost, Date.now()).run();
+    await logTransaction(db, user.id, 'ipo_subscribe', -totalCost, `IPO認購 ${shares} 股 @ $${price}`);
     return { success: true, shares, totalCost };
   }
 

@@ -1,3 +1,5 @@
+import { logTransaction } from './utils.js';
+
 const INDUSTRY_MULT = { tech: 1.2, manufacturing: 1.0, finance: 1.3, service: 0.9 };
 const UPGRADE_COSTS = {
   office: [0, 5000, 20000, 80000, 300000],
@@ -16,6 +18,7 @@ export async function handleCompany(env, request, path, user) {
 
     await db.prepare('UPDATE wallets SET cash = cash - 50000 WHERE user_id = ?').bind(user.id).run();
     const info = await db.prepare('INSERT INTO companies (owner_id, name, industry, total_shares, share_price, base_income, created_at) VALUES (?, ?, ?, 100000, 10, ?, ?)').bind(user.id, name, industry, 100, Date.now()).run();
+    await logTransaction(db, user.id, 'company_create', -50000, `創建公司「${name}」`);
     return { success: true, id: info.meta.last_row_id };
   }
 
@@ -41,6 +44,7 @@ export async function handleCompany(env, request, path, user) {
 
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(cost, user.id).run();
     await db.prepare(`UPDATE companies SET ${levelKey} = ${levelKey} + 1 WHERE id = ?`).bind(companyId).run();
+    await logTransaction(db, user.id, 'upgrade', -cost, `升級${type === 'office' ? '辦公室' : type === 'equipment' ? '設備' : '品牌'}`);
     return { success: true };
   }
 
