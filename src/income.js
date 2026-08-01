@@ -76,10 +76,13 @@ export async function handleIncome(env, request, path, user) {
 }
 
 export async function processIncomeTick(db) {
+  // 語音掛機加成 (全服 1.2x)
+  const boostRow = await db.prepare("SELECT value FROM community_state WHERE key = 'voice_boost'").first();
+  const boost = boostRow?.value === '1' ? 1.2 : 1;
   const users = await db.prepare('SELECT id FROM users').all();
   for (const user of users.results) {
     const subs = await getUserSubscriptions(db, user.id);
-    const income = await getIncomePerMin(db, user.id, subs);
+    const income = Math.floor(await getIncomePerMin(db, user.id, subs) * boost);
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet) continue;
     if (income > 0) {

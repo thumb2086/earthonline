@@ -13,6 +13,7 @@ async function verifySignature(request, env) {
   try {
     const timestamp = request.headers.get('X-Signature-Ed25519-Timestamp') || '';
     const signature = request.headers.get('X-Signature-Ed25519-Signature') || '';
+    if (!timestamp || !signature) return false;
     const body = await request.clone().text();
     const key = await crypto.subtle.importKey(
       'raw',
@@ -46,6 +47,10 @@ function fmtRemain(ms) {
 
 export async function handleInteractions(request, env) {
   if (request.method !== 'POST') return new Response('ok', { status: 200 });
+
+  // 簽名驗證 (Discord 要求, 驗證失敗回 401)
+  const valid = await verifySignature(request, env);
+  if (!valid) return new Response('invalid signature', { status: 401 });
 
   if (request.headers.get('content-type')?.includes('application/json')) {
     const payload = await request.json().catch(() => null);
@@ -209,6 +214,69 @@ export async function handleInteractions(request, env) {
     }
   }
   return new Response('ok', { status: 200 });
+}
+
+// 踢除指定的 bot 成員 (需要管理成員權限)
+export async function kickGuildBot(env, botId) {
+  const token = env.DISCORD_BOT_TOKEN;
+  const guildId = env.DISCORD_GUILD_ID;
+  if (!token) return { error: '缺少 DISCORD_BOT_TOKEN' };
+  if (!guildId) return { error: '缺少 DISCORD_GUILD_ID' };
+  if (!botId) return { error: '缺少 botId' };
+
+  const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${botId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bot ${token}` },
+  });
+  if (res.ok) return { success: true, kicked: botId };
+  const err = await res.text();
+  return { error: `踢除失敗: ${res.status} ${err}` };
+}
+
+// 診斷: 檢查 WebCrypto Ed25519 支援
+export async function checkCryptoSupport(env) {
+  const results = {};
+  try {
+    const key = await crypto.subtle.importKey('raw', new Uint8Array(32), { name: 'Ed25519' }, false, ['verify']);
+    results.importKey = 'OK';
+    // 空簽名驗證應失敗但不拋錯
+    try {
+      const r = await crypto.subtle.verify('Ed25519', key, new Uint8Array(64), new TextEncoder().encode('test'));
+      results.verify = `OK (returns ${r})`;
+    } catch (e) {
+      results.verify = `ERROR: ${e.message}`;
+    }
+  } catch (e) {
+    results.importKey = `ERROR: ${e.message}`;
+  }
+  results.publicKeySet = !!env.DISCORD_PUBLIC_KEY;
+  return results;
+}
+
+// 列出伺服器中的所有機器人 (方便分辨新舊)
+export async function listGuildBots(env) {
+  const token = env.DISCORD_BOT_TOKEN;
+  const guildId = env.DISCORD_GUILD_ID;
+  if (!token) return { error: '缺少 DISCORD_BOT_TOKEN' };
+  if (!guildId) return { error: '缺少 DISCORD_GUILD_ID' };
+
+  const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members?limit=100`, {
+    headers: { Authorization: `Bot ${token}` },
+  });
+  if (!res.ok) return { error: `查詢失敗: ${res.status}` };
+  const members = await res.json();
+
+  const bots = members
+    .filter(m => m.user?.bot)
+    .map(m => ({ id: m.user.id, username: m.user.username, display: m.nick || m.user.username }));
+
+  // 我們的 bot 資訊
+  const appRes = await fetch('https://discord.com/api/v10/applications/@me', {
+    headers: { Authorization: `Bot ${token}` },
+  });
+  const app = appRes.ok ? await appRes.json() : null;
+
+  return { ourBotId: app?.id, ourBotName: app?.name, bots };
 }
 
 // 一次性設定: 查 Public Key + 註冊 Slash Commands (+可改名)

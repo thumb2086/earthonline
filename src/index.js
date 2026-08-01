@@ -8,7 +8,8 @@ import { handleStock, processMarginTick, finalizeIPO } from './stock.js';
 import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
-import { handleInteractions, setupDiscordBot } from './discord_bot.js';
+import { handleInteractions, setupDiscordBot, listGuildBots, kickGuildBot, checkCryptoSupport } from './discord_bot.js';
+import { checkVoiceBoost, weeklySettlement } from './community.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
 const ADMIN_ROLE_NAME = '地球管理團隊';
@@ -128,6 +129,24 @@ export default {
         return json(result, headers, result.error ? 400 : 200);
       }
 
+      // 列出伺服器中的 bots
+      if (path === '/api/bot/guild-bots' && request.method === 'GET') {
+        const result = await listGuildBots(env);
+        return json(result, headers, result.error ? 400 : 200);
+      }
+
+      // 踢除舊 bot
+      if (path === '/api/bot/kick' && request.method === 'GET') {
+        const botId = url.searchParams.get('botId');
+        const result = await kickGuildBot(env, botId);
+        return json(result, headers, result.error ? 400 : 200);
+      }
+
+      // 診斷 Ed25519 支援
+      if (path === '/api/bot/crypto' && request.method === 'GET') {
+        return json(await checkCryptoSupport(env), headers);
+      }
+
       // Public leaderboard
       if (path === '/api/leaderboard') {
         const lb = await env.DB.prepare(`
@@ -225,6 +244,13 @@ export default {
       await processEmployeeTick(db);
       await processCompanyTick(db);
       await processSubscriptionTick(db);
+
+      // 社群維運: 語音掛機監控(每分鐘) + 週日24:00階級清算
+      await checkVoiceBoost(db, env);
+      const now = new Date();
+      if (now.getDay() === 0 && now.getHours() === 0 && now.getMinutes() < 5) {
+        await weeklySettlement(db, env);
+      }
     } catch (err) {
       console.error('Scheduled tick error:', err.message);
     }

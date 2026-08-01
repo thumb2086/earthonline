@@ -26,6 +26,7 @@
   "vars": {
     "JWT_SECRET": "eo_secret_change_in_prod",
     "DISCORD_CLIENT_ID": "1513563333985304596",
-    "FRONTEND_URL": "https://twonline.dpdns.org"
+    "FRONTEND_URL": "https://twonline.dpdns.org",
+    "DISCORD_GUILD_ID": "1512345209005015101"
   }
 }
