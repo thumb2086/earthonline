@@ -7,7 +7,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [view, setView] = useState('dashboard')
   const [rev, setRev] = useState(0)
-  const { toast, prompt } = useToast()
+  const { toast, prompt, promptMulti } = useToast()
 
   useEffect(() => {
     if (!token) return
@@ -81,7 +81,7 @@ export default function App() {
           {view === 'income' && <Income api={api} toast={toast} />}
           {view === 'bank' && <Bank act={act} />}
           {view === 'invest' && <Invest api={api} toast={toast} prompt={prompt} />}
-          {view === 'company' && <Company api={api} toast={toast} prompt={prompt} />}
+          {view === 'company' && <Company api={api} toast={toast} prompt={prompt} promptMulti={promptMulti} />}
           {view === 'stock' && <Stock api={api} toast={toast} prompt={prompt} />}
           {view === 'contract' && <Contract api={api} toast={toast} />}
           {view === 'history' && <History api={api} />}
@@ -262,7 +262,7 @@ function Employee({ api, toast }) {
   )
 }
 
-function Company({ api, toast, prompt }) {
+function Company({ api, toast, prompt, promptMulti }) {
   const [cs, setCs] = useState([]); const [employees, setEmployees] = useState([]); const [ipoList, setIpoList] = useState([])
   const [positions, setPositions] = useState([]); const [selectedCompany, setSelectedCompany] = useState(null)
   const posLabels = { intern: '實習生', specialist: '專員', engineer: '工程師', manager: '經理', expert: '專家' }
@@ -285,11 +285,12 @@ function Company({ api, toast, prompt }) {
     else toast(r.error, 'error')
   }
   const startIpo = (c) => {
-    const defaultPrice = c.share_price >= 10 ? c.share_price : 100
-    prompt('設定IPO價格 ($' + defaultPrice + ')，輸入格式: 價格,分鐘數 (例: 100,30)', async (input) => {
-      const parts = (input || '').split(',')
-      const price = parseInt(parts[0]) || defaultPrice
-      const minutes = parseInt(parts[1]) || 60
+    promptMulti('設定IPO參數', [
+      { label: 'IPO價格 ($)', placeholder: '100', default: '100' },
+      { label: '認購時間 (分鐘)', placeholder: '60', default: '60' },
+    ], async ([priceStr, minStr]) => {
+      const price = parseInt(priceStr) || 100
+      const minutes = parseInt(minStr) || 60
       if (price < 10) return toast('價格至少$10', 'error')
       if (minutes < 5 || minutes > 1440) return toast('時間5~1440分鐘', 'error')
       const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: price, totalShares: c.total_shares || 100000, ipoMinutes: minutes })

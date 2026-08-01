@@ -26,7 +26,7 @@ DELETE FROM margin_positions;
 UPDATE stock_inventory SET stock_quantity = 1000000, cash = 0;
 UPDATE companies SET share_price = 100 WHERE id = 1;
 DELETE FROM ipo_state WHERE company_id = 1;
-INSERT INTO ipo_state (company_id, phase, started_at) VALUES (1, 'ipo', 0);
+INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (1, 'ipo', strftime('%s','now') * 1000, 60);
 
 -- Delete IPO subscriptions
 DELETE FROM ipo_subscriptions;
