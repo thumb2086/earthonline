@@ -52,9 +52,9 @@ export async function handleStock(env, request, path, user) {
     const maxTrade = Math.max(1000, Math.floor(circulating * MAX_TRADE_RATIO));
     return {
       price,
-      buyPrice: Math.round(price * (1 + SPREAD_BASE / 2)),
-      sellPrice: Math.round(price * (1 - SPREAD_BASE / 2)),
-      spread: SPREAD_BASE * 100,
+      buyPrice: Math.round(price),
+      sellPrice: Math.round(price),
+      spread: 0,
       systemCash: inv?.cash || 0,
       systemInventory: inv?.stock_quantity || 0,
       circulating,
@@ -148,7 +148,7 @@ export async function handleStock(env, request, path, user) {
     if (!wallet) return { error: '錢包不存在' };
 
     const price = await getCurrentPrice(db, companyId);
-    const buyPrice = Math.round(price * (1 + SPREAD_BASE / 2));
+    const buyPrice = Math.round(price);
     const totalCost = buyPrice * quantity;
     const fee = Math.floor(totalCost * FEE_RATE);
     if (wallet.cash < totalCost + fee) return { error: `餘額不足` };
@@ -202,7 +202,7 @@ export async function handleStock(env, request, path, user) {
     }
 
     const price = await getCurrentPrice(db, companyId);
-    const sellPrice = Math.round(price * (1 - SPREAD_BASE / 2));
+    const sellPrice = Math.round(price);
     const totalRevenue = sellPrice * quantity;
     const fee = Math.floor(totalRevenue * FEE_RATE);
     const netRevenue = totalRevenue - fee;

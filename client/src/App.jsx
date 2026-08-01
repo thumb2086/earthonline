@@ -47,6 +47,7 @@ export default function App() {
     { id: 'subscription', label: '📦 訂閱' },
     { id: 'history', label: '💰 明細' },
     { id: 'leaderboard', label: '🏆 排行' },
+    { id: 'help', label: '📖 說明' },
   ]
   if (user?.role === 'admin') tabs.push({ id: 'admin', label: '⭐ 管理' })
 
@@ -86,6 +87,7 @@ export default function App() {
           {view === 'history' && <History api={api} />}
           {view === 'subscription' && <Subscription api={api} toast={toast} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}
+          {view === 'help' && <Help />}
           {view === 'admin' && <AdminPanel api={api} />}
         </div>
       </div>
@@ -609,10 +611,10 @@ function Stock({ api, toast, prompt }) {
   }
   useEffect(() => { refreshStock() }, [selectedStock])
   useEffect(() => { api('/api/stock/quote').then(setQ); api('/api/stock/holdings').then(d => setH(Array.isArray(d)?d:[])); api('/api/stock/trades').then(d => setT(Array.isArray(d)?d:[])); api('/api/stock/trades?mine=1').then(d => setMyTrades(Array.isArray(d)?d:[])); api('/api/stock/ipo/info').then(setIpo); api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[])) }, [])
-  const buy = () => prompt('買入股數', async (n) => { const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: parseInt(n) }); if (r.success) { refreshStock(); toast(`買入 ${n} 股`, 'success') } else toast(r.error, 'error') })
-  const sell = () => prompt('賣出股數', async (n) => { const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: parseInt(n) }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股`, 'success') } else toast(r.error, 'error') })
-  const maxBuy = async () => { const n = q?.maxTrade || 0; if (n <= 0) return; const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`買入 ${n} 股`, 'success') } else toast(r.error, 'error') }
-  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股`, 'success') } else toast(r.error, 'error') }
+  const buy = () => prompt(`買入股數 (價格 $${q?.price || '?'} · 手續費1.5%另計)`, async (n) => { const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: parseInt(n) }); if (r.success) { refreshStock(); toast(`買入 ${n} 股 @ $${r.fillPrice} (含手續費 $${(r.totalCost - (r.fillPrice * n)).toLocaleString()})`, 'success') } else toast(r.error, 'error') })
+  const sell = () => prompt(`賣出股數 (價格 $${q?.price || '?'} · 手續費1.5%另計)`, async (n) => { const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: parseInt(n) }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})`, 'success') } else toast(r.error, 'error') })
+  const maxBuy = async () => { const n = q?.maxTrade || 0; if (n <= 0) return; const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`買入 ${n} 股 @ $${r.fillPrice}`, 'success') } else toast(r.error, 'error') }
+  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})`, 'success') } else toast(r.error, 'error') }
   const subIpo = () => prompt('認購股數', async (s) => { const r = await api('/api/stock/ipo/subscribe', { companyId: selectedStock, shares: parseInt(s) }); if (r.success) { toast(`認購 ${s} 股成功`, 'success'); refreshStock() } else toast(r.error, 'error') })
 
   const openMargin = async () => {
@@ -653,7 +655,7 @@ function Stock({ api, toast, prompt }) {
       </div>}
         {ipo?.phase !== 'ipo' && q && <><div className="grid-2 mt-12">
           <div><div className="stat"><span className="stat-label">價格</span><span className="stat-value" style={{fontSize:20}}>${q.price}</span></div>
-            <div className="stat"><span className="stat-label">買/賣</span><span className="stat-value">${q.buyPrice} / ${q.sellPrice}</span></div>
+            <div className="stat"><span className="stat-label">手續費</span><span className="stat-value">1.5%</span></div>
             <div className="stat"><span className="stat-label">單筆上限</span><span className="stat-value">{(q.maxTrade||0).toLocaleString()} 股</span></div></div>
           <div><div className="stat"><span className="stat-label">流通</span><span className="stat-value">{(q.circulating||0).toLocaleString()}</span></div>
             <div className="stat"><span className="stat-label">庫存</span><span className="stat-value">{(q.systemInventory||0).toLocaleString()}</span></div></div>
@@ -973,6 +975,72 @@ function Subscription({ api, toast }) {
               {s.enabled ? '停用' : '啟用'}
             </button>
           </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Help() {
+  const sections = [
+    { title: '⬆️ 升級', items: [
+      '基礎收入 $20/分，可升級電腦/伺服器/AI助手提升收入',
+      '離線時收入減半（訂閱雲端備份可提升到 80%）',
+    ]},
+    { title: '🏦 銀行', items: [
+      '活存：隨時存取，0.05%/分利息',
+      '定存：選擇期限（1hr/6hr/24hr/7天），利率更高（0.08~0.3%/分），到期自動贖回，提前贖回損失利息',
+      '貸款：可借總收入 50% 額度，0.15%/分利息（利息滾入欠款）',
+    ]},
+    { title: '💼 投資', items: [
+      '債券/指數基金/房地產/新創：依累計收入解鎖',
+      '投資利率會隨金額遞減（越大越慢）',
+      '新創投資有虧損風險（可能損失本金 5~20%）',
+      '贖回收 1% 手續費（定存免費）',
+    ]},
+    { title: '🏢 公司', items: [
+      '創建 $200,000，可選產業（tech/finance/manufacturing/service）',
+      '收入 = base × 產業倍率 × 員工產出 × 部門加成 × 光環',
+      '部門：開設成本遞增，升級提升該部門員工效率，不同部門加成不同職位',
+      '員工：同職位邊際效率遞減（第N人×0.8^N），經理/專家有光環加成',
+      '員工薪資計入公司成本，公司虧損會扣你的現金',
+      '設備有折舊成本（equipment_level × 2/分）',
+    ]},
+    { title: '📈 股票', items: [
+      '系統做市商：買入向系統買，賣出賣回系統',
+      '成交價 = 市場價（無價差），手續費 1.5% 另計',
+      '大單影響價格：買1股約影響 0.8%，大量買賣影響可達 10% 上限',
+      '單筆上限 = 流通量 5%（全部買入按鈕可突破）',
+      '槓桿：做多/做空 2x/3x/5x，維持率 130% 追繳，100% 強制平倉',
+      '股利：上市公司每分鐘配發股利給持股者',
+    ]},
+    { title: '🚀 IPO', items: [
+      '公司 owner 可設定 IPO 價格/發行股數/認購時間',
+      '玩家公司 IPO 募集資金歸 owner；系統公司 IPO 資金銷毀（回收經濟）',
+      '認購滿 30% 立即上市；未滿等期限到期自動上市',
+      '上市後認購的股票入帳到持股，剩餘留系統庫存',
+    ]},
+    { title: '🏠 生活費 & 📦 訂閱', items: [
+      '生活費：每分收入越高扣越多（10~25%），現金為 0 不懲罰',
+      '訂閱：高級住宅/雲端備份/資產保險/AI/財經資訊/企業顧問',
+      '訂閱每分鐘扣費，現金不足自動停用',
+      '資產保險：生活費扣款時現金最低保留 $200',
+    ]},
+    { title: '💰 收支明細', items: [
+      '交易類（買賣股/投資/僱用等）即時顯示',
+      '每分鐘收支（收入/生活費/利息/股利）按小時彙總顯示',
+      '頁面標示 (本小時) 的即為彙總值',
+    ]},
+  ]
+  return (
+    <div className="card">
+      <div className="card-title">📖 遊戲說明</div>
+      {sections.map(s => (
+        <div key={s.title} style={{marginBottom: 16}}>
+          <div className="text-accent" style={{fontWeight: 700, fontSize: 14, marginBottom: 6}}>{s.title}</div>
+          {s.items.map((item, i) => (
+            <div key={i} className="text-dim" style={{fontSize: 13, lineHeight: 1.6, marginBottom: 2}}>• {item}</div>
+          ))}
         </div>
       ))}
     </div>
