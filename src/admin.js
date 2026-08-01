@@ -95,6 +95,19 @@ export async function handleAdmin(env, request, path, user) {
     };
   }
 
+  if (path === '/api/admin/stocks') {
+    const holdings = await db.prepare(`
+      SELECT c.id, c.name, COALESCE(SUM(h.quantity), 0) as held,
+             c.total_shares, COALESCE(inv.stock_quantity, 0) as system_inventory
+      FROM companies c
+      LEFT JOIN stock_holdings h ON h.company_id = c.id
+      LEFT JOIN stock_inventory inv ON inv.company_id = c.id
+      GROUP BY c.id
+      ORDER BY c.id
+    `).all();
+    return holdings.results;
+  }
+
   if (path.startsWith('/api/admin/user/')) {
     const targetId = parseInt(path.split('/').pop());
     if (!targetId) return { error: '無效用戶' };

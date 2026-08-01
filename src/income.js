@@ -87,12 +87,12 @@ export async function processIncomeTick(db) {
       await logHourly(db, user.id, 'income', income, '基礎收入');
     }
 
-    // 生活費階梯（含保險保護：現金不低於30%）
+    // 生活費階梯（保險：現金最低保留 $200）
     const rate = getLivingCostRate(income);
     const livingCost = Math.floor(income * rate);
     if (livingCost > 0 && wallet.cash > 0) {
       let cash = wallet.cash;
-      const protectFloor = subs.insurance ? Math.floor((wallet.cash + income) * 0.3) : 0;
+      const protectFloor = subs.insurance ? 200 : 0;
       const deductable = Math.max(0, cash - protectFloor);
       const actual = Math.min(livingCost, deductable);
       if (actual > 0) {

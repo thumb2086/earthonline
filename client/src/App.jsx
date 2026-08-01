@@ -105,11 +105,12 @@ function Dashboard({ user, api }) {
     api('/api/company/list').then(d => setData(p => ({ ...p, companies: Array.isArray(d) ? d : [] }))).catch(()=>{})
   }, [])
   const sv = (data.h || []).reduce((s, h) => s + (data.q?.price || 100) * h.quantity, 0)
-  const invTotal = (data.inv || []).reduce((s, i) => s + i.amount, 0)
+  const invTotal = (data.inv || []).filter(i => i.type !== 'deposit').reduce((s, i) => s + i.amount, 0)
+  const depTotal = (data.inv || []).filter(i => i.type === 'deposit').reduce((s, i) => s + i.amount, 0)
   const subActive = (data.subs || []).filter(s => s.enabled).length
   const subCost = (data.subs || []).filter(s => s.enabled).reduce((s, x) => s + x.cost, 0)
   const debt = data.bank?.totalDebt || 0
-  const netWorth = (user?.cash || 0) + (user?.savings || 0) + (user?.bank || 0) + sv + invTotal - debt
+  const netWorth = (user?.cash || 0) + (user?.savings || 0) + depTotal + sv + invTotal - debt
   return (
     <>
       {(user?.offlineEarnings > 0 && showOffline) && <div className="card mb-12" style={{borderColor:'var(--accent)',background:'rgba(0,255,65,0.05)'}}>
@@ -126,7 +127,7 @@ function Dashboard({ user, api }) {
       </div>
       <div className="grid-3 mb-12">
         <div className="card"><div className="card-title">活存</div><div className="text-lg">${(user?.savings || 0).toLocaleString()}</div></div>
-        <div className="card"><div className="card-title">定存</div><div className="text-lg">${(user?.bank || 0).toLocaleString()}</div></div>
+        <div className="card"><div className="card-title">定存</div><div className="text-lg">${depTotal.toLocaleString()}</div></div>
         <div className="card"><div className="card-title">股票市值</div><div className="text-lg">${sv.toLocaleString()}</div></div>
       </div>
       <div className="grid-3 mb-12">
@@ -141,7 +142,7 @@ function Dashboard({ user, api }) {
           <div className="card-title">資產分布</div>
           <div className="stat"><span className="stat-label">現金</span><span className="stat-value">${(user?.cash || 0).toLocaleString()}</span></div>
           <div className="stat"><span className="stat-label">活存</span><span className="stat-value">${(user?.savings || 0).toLocaleString()}</span></div>
-          <div className="stat"><span className="stat-label">定存</span><span className="stat-value">${(user?.bank || 0).toLocaleString()}</span></div>
+          <div className="stat"><span className="stat-label">定存</span><span className="stat-value">${depTotal.toLocaleString()}</span></div>
           <div className="stat"><span className="stat-label">股票</span><span className="stat-value">${sv.toLocaleString()}</span></div>
           <div className="stat"><span className="stat-label">投資</span><span className="stat-value">${invTotal.toLocaleString()}</span></div>
           <div className="stat"><span className="stat-label">負債</span><span className="stat-value" style={{color:'var(--danger)'}}>-${debt.toLocaleString()}</span></div>
@@ -193,11 +194,34 @@ function Income({ api, toast }) {
 
 function Bank({ act, api, toast }) {
   const [info, setInfo] = useState(null)
-  const load = () => api('/api/bank/info').then(setInfo)
+  const [terms, setTerms] = useState([])
+  const [deposits, setDeposits] = useState([])
+  const [termMinutes, setTermMinutes] = useState(60)
+  const [depAmount, setDepAmount] = useState('')
+  const load = () => {
+    api('/api/bank/info').then(setInfo)
+    api('/api/investment/terms').then(d => setTerms(Array.isArray(d) ? d : []))
+    api('/api/investment/list').then(d => setDeposits(Array.isArray(d) ? d.filter(x => x.type === 'deposit') : []))
+  }
   useEffect(() => { load() }, [])
   const repay = async (id) => {
     const r = await api('/api/bank/repay/' + id)
     if (r.success) { load(); toast('已償還', 'success') } else toast(r.error, 'error')
+  }
+  const doDeposit = async () => {
+    const a = parseInt(depAmount); if (!a || a <= 0) return toast('輸入金額', 'error')
+    const r = await api('/api/investment/invest', { type: 'deposit', amount: a, termMinutes })
+    if (r.success) { setDepAmount(''); load(); toast('已存入定存', 'success') } else toast(r.error, 'error')
+  }
+  const earlyWithdraw = async (id, amount) => {
+    const r = await api('/api/investment/withdraw', { investmentId: id })
+    if (r.success) { load(); toast(`提前贖回 $${r.refund}（損失利息）`, 'success') } else toast(r.error, 'error')
+  }
+  const fmtRemain = (ms) => {
+    if (!ms || ms <= 0) return '已到期'
+    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000)
+    if (h > 0) return `${h}小時${m}分`
+    return `${m}分`
   }
   return (
     <>
@@ -216,11 +240,30 @@ function Bank({ act, api, toast }) {
             <input name="amount" type="number" placeholder="提取金額" /><button className="btn btn-sm">提取</button></form>
         </div>
         <div className="card card-accent">
-          <div className="card-title">定存 0.002%/分</div>
-          <div className="text-dim text-sm" style={{marginTop:4}}>定存餘額 ${(info?.bank || 0).toLocaleString()}</div>
-          <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.target); const a = parseInt(fd.get('amount')); if (!a) return; api('/api/investment/invest', { type: 'deposit', amount: a }).then(r => { toast(r.success ? '已存入定存' : r.error, r.success ? 'success' : 'error'); setTimeout(load, 600) }) }} className="flex gap-8 mt-12">
-            <input name="amount" type="number" placeholder="存入金額" /><button className="btn btn-primary btn-sm">存入</button></form>
-          <div className="text-dim text-sm mt-12">定存贖回請至 💼 投資頁面</div>
+          <div className="card-title">定存（到期自動贖回）</div>
+          <div className="text-dim text-sm mt-12">選擇期限，利率隨期限提高</div>
+          <div className="flex gap-8 flex-wrap mt-12">
+            {(terms || []).map(t => (
+              <button key={t.minutes} className={`btn btn-sm ${termMinutes === t.minutes ? 'btn-primary' : ''}`} onClick={() => setTermMinutes(t.minutes)}>
+                {t.label} ({(t.rate * 100).toFixed(2)}%/分)
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-8 items-center mt-12">
+            <input type="number" placeholder="定存金額" value={depAmount} onChange={e => setDepAmount(e.target.value)} style={{minWidth:120}} />
+            <button className="btn btn-primary btn-sm" onClick={doDeposit}>存入</button>
+          </div>
+          {(deposits || []).length > 0 && <div className="divider" />}
+          {(deposits || []).map(d => (
+            <div className="stat" key={d.id}>
+              <div>
+                <span style={{fontWeight:600}}>${(d.amount || 0).toLocaleString()}</span>
+                <span className="text-dim text-sm"> · {d.termLabel} · 剩 {fmtRemain(d.matureIn)}</span>
+                <div className="text-dim text-sm">已領利息 ${(d.totalPaid || 0).toLocaleString()}</div>
+              </div>
+              <button className="btn btn-sm" onClick={() => earlyWithdraw(d.id, d.amount)}>提前贖回</button>
+            </div>
+          ))}
         </div>
       </div>
       <div className="card card-warn mt-12">
@@ -274,8 +317,8 @@ function Invest({ api, toast, prompt }) {
           </div>
         ))}
       </div>
-      {investments.length > 0 && <div className="card"><div className="card-title">我的投資</div>
-        {(investments || []).map(inv => (
+      {investments.filter(i => i.type !== 'deposit').length > 0 && <div className="card"><div className="card-title">我的投資</div>
+        {(investments || []).filter(i => i.type !== 'deposit').map(inv => (
           <div className="stat" key={inv.id}>
             <span><span className="text-accent">{inv.label || labels[inv.type] || inv.type}</span> · ${(inv.amount||0).toLocaleString()}
               <div className="text-dim text-sm">每日約 <span className="text-accent">${(inv.dailyEarn||0).toLocaleString()}</span> · 累計已領 <span className="text-accent">${(inv.totalPaid||0).toLocaleString()}</span></div>
@@ -731,10 +774,15 @@ const CHART_COLORS = ['#00ff41', '#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#0
 
 function AdminPanel({ api }) {
   const [users, setUsers] = useState([]); const [stats, setStats] = useState(null); const [expanded, setExpanded] = useState(null)
-  useEffect(() => { api('/api/admin/users').then(d => setUsers(Array.isArray(d) ? d : [])); api('/api/admin/stats').then(setStats) }, [])
+  const [stockDist, setStockDist] = useState([])
+  useEffect(() => {
+    api('/api/admin/users').then(d => setUsers(Array.isArray(d) ? d : []));
+    api('/api/admin/stats').then(setStats);
+    api('/api/admin/stocks').then(d => setStockDist(Array.isArray(d) ? d : []));
+  }, [])
 
-  const holdingsData = users.filter(u => u.stocks > 0).map(u => u.stocks)
-  const holdingsLabels = users.filter(u => u.stocks > 0).map(u => u.username)
+  const holdingsData = stockDist.filter(s => s.held > 0).map(s => s.held)
+  const holdingsLabels = stockDist.filter(s => s.held > 0).map(s => s.name)
   const cashData = users.filter(u => u.cash > 0).map(u => u.cash)
   const cashLabels = users.filter(u => u.cash > 0).map(u => u.username)
   const earnedData = users.filter(u => u.total_earned > 0).map(u => u.total_earned)

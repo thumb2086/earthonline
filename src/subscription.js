@@ -3,7 +3,7 @@ import { logHourly } from './utils.js';
 export const SUBSCRIPTIONS = {
   home: { label: '🏠 高級住宅', cost: 2, desc: '基礎收入 +10%' },
   cloud: { label: '☁️ 雲端備份', cost: 5, desc: '離線收益 50%→80%' },
-  insurance: { label: '🛡️ 資產保險', cost: 10, desc: '現金低於30%即保護（不繼續扣）' },
+  insurance: { label: '🛡️ 資產保險', cost: 10, desc: '生活費扣款時現金最低保留 $200' },
   ai: { label: '🤖 AI 訂閱', cost: 20, desc: '員工效率 +10%' },
   finance: { label: '📈 財經資訊', cost: 50, desc: '投資利率 +15%' },
   consultant: { label: '🏢 企業顧問', cost: 100, desc: '公司收入 +10%' },
