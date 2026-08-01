@@ -63,12 +63,17 @@ export async function handleBank(env, request, path, user) {
 }
 
 export async function processBankTick(db) {
-  await db.prepare('UPDATE wallets SET cash = cash + CAST(savings * ? AS INTEGER)').bind(SAVINGS_RATE).run();
-
-  const users = await db.prepare('SELECT user_id, savings FROM wallets WHERE savings > 0').all();
+  // 活存利息: 小數累積到 savings_acc, 滿 $1 才發放
+  const users = await db.prepare('SELECT user_id, savings, COALESCE(savings_acc, 0) as acc FROM wallets WHERE savings > 0').all();
   for (const u of users.results) {
-    const interest = Math.floor(u.savings * SAVINGS_RATE);
-    if (interest > 0) await logHourly(db, u.user_id, 'bank_interest', interest, '活存利息');
+    const acc = (u.acc || 0) + u.savings * SAVINGS_RATE;
+    const payout = Math.floor(acc);
+    if (payout > 0) {
+      await db.prepare('UPDATE wallets SET cash = cash + ?, savings_acc = ? WHERE user_id = ?').bind(payout, acc - payout, u.user_id).run();
+      await logHourly(db, u.user_id, 'bank_interest', payout, '活存利息');
+    } else {
+      await db.prepare('UPDATE wallets SET savings_acc = ? WHERE user_id = ?').bind(acc, u.user_id).run();
+    }
   }
 
   const loans = await db.prepare("SELECT id, user_id, remaining, interest_rate FROM loans WHERE status = 'active'").all();

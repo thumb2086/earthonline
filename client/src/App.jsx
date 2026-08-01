@@ -246,7 +246,7 @@ function Bank({ act, api, toast }) {
       <div className="grid-2">
         <div className="card card-accent">
           <div className="card-title">活期存款 0.05%/分</div>
-          <div className="text-dim text-sm" style={{marginTop:4}}>利息 <span className="text-accent">${Math.floor((info?.savings || 0) * 0.0005).toLocaleString()}/分</span>（每天約 ${Math.floor((info?.savings || 0) * 0.0005 * 1440).toLocaleString()}）</div>
+          <div className="text-dim text-sm" style={{marginTop:4}}>利息 <span className="text-accent">${((info?.savings || 0) * 0.0005).toFixed(2)}/分</span>（每天約 ${Math.floor((info?.savings || 0) * 0.0005 * 1440).toLocaleString()}）</div>
           <form onSubmit={e => { act(e, '/api/bank/deposit'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
             <input name="amount" type="number" placeholder="存入金額" /><button className="btn btn-primary btn-sm">存入</button></form>
           <form onSubmit={e => { act(e, '/api/bank/withdraw'); setTimeout(load, 600) }} className="flex gap-8 mt-12">

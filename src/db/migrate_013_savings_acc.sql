@@ -1,0 +1,1 @@
+ALTER TABLE wallets ADD COLUMN savings_acc REAL DEFAULT 0;
