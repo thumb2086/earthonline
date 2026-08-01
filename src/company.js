@@ -43,11 +43,42 @@ export async function handleCompany(env, request, path, user) {
     await db.prepare(`UPDATE companies SET ${levelKey} = ${levelKey} + 1 WHERE id = ?`).bind(companyId).run();
     return { success: true };
   }
+
+  if (path === '/api/company/ipo/start') {
+    const { companyId, ipoPrice, totalShares } = await request.json();
+    if (!companyId) return { error: '請選擇公司' };
+    const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
+    if (!company) return { error: '公司不存在或非owner' };
+    const existingIpo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
+    if (existingIpo && existingIpo.phase !== null) return { error: '已有IPO記錄' };
+    if (!ipoPrice || ipoPrice < 10) return { error: 'IPO價格至少$10' };
+    if (!totalShares || totalShares < 10000) return { error: '發行股數至少10,000' };
+
+    await db.prepare('UPDATE companies SET total_shares = ?, share_price = ? WHERE id = ?').bind(totalShares, ipoPrice, companyId).run();
+    await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at) VALUES (?, ?, ?)').bind(companyId, 'ipo', Date.now()).run();
+    await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, 0, ?)').bind(companyId, totalShares).run();
+    return { success: true, message: 'IPO已啟動，1小時後自動上市' };
+  }
+
+  if (path === '/api/company/ipo/list') {
+    const url = new URL(request.url);
+    const myOnly = url.searchParams.get('my') === '1';
+    let query = `SELECT c.*, i.phase, COALESCE(inv.stock_quantity, 0) as inventory,
+      (SELECT COALESCE(SUM(shares),0) FROM ipo_subscriptions WHERE company_id=c.id) as subscribed
+      FROM companies c LEFT JOIN ipo_state i ON c.id=i.company_id LEFT JOIN stock_inventory inv ON c.id=inv.company_id`;
+    if (myOnly) { query += ' WHERE c.owner_id = ?'; }
+    else { query += ' WHERE c.owner_id = 0 OR c.owner_id = ?'; }
+    query += ' ORDER BY c.id';
+    const params = myOnly ? [user.id] : [user.id];
+    const result = await db.prepare(query).bind(...params).all();
+    return result.results;
+  }
+
   return null;
 }
 
 async function getCompanyProfit(db, company) {
-  const employees = await db.prepare('SELECT output, efficiency, morale FROM employees WHERE user_id = ?').bind(company.owner_id).all();
+  const employees = await db.prepare('SELECT output, efficiency, morale FROM employees WHERE user_id = ? AND company_id = ?').bind(company.owner_id, company.id).all();
   const totalOutput = employees.results.reduce((s, e) => s + Math.floor(e.output * e.efficiency * (e.morale / 100)), 0);
   const mult = INDUSTRY_MULT[company.industry] || 1.0;
   const equipBonus = 1 + 0.1 * (company.equipment_level - 1);
@@ -57,4 +88,15 @@ async function getCompanyProfit(db, company) {
   const rent = Math.floor(10 * Math.pow(0.95, company.office_level - 1));
   const costs = rent + 5 + 3;
   return { ...company, income, costs, profit: income - costs };
+}
+
+export async function processCompanyTick(db) {
+  const companies = await db.prepare('SELECT * FROM companies').all();
+  for (const c of companies.results) {
+    const data = await getCompanyProfit(db, c);
+    const profit = data.profit;
+    if (profit > 0) {
+      await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(profit, profit, c.owner_id).run();
+    }
+  }
 }

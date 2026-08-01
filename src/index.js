@@ -3,9 +3,10 @@ import { handleIncome, processIncomeTick, getIncomePerMin } from './income.js';
 import { handleBank, processBankTick } from './bank.js';
 import { handleInvestment, processInvestmentTick } from './investment.js';
 import { handleEmployee, processEmployeeTick } from './employee.js';
-import { handleCompany } from './company.js';
+import { handleCompany, processCompanyTick } from './company.js';
 import { handleStock, processMarginTick, finalizeIPO } from './stock.js';
 import { handleContract } from './contract.js';
+import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleAdmin } from './admin.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
@@ -196,6 +197,7 @@ export default {
       await processBankTick(db);
       await processInvestmentTick(db);
       await processEmployeeTick(db);
+      await processCompanyTick(db);
       await finalizeIPO(db);
       await processMarginTick(db);
       await processStockTick(db);
@@ -211,21 +213,22 @@ async function processStockTick(db) {
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(company.id).first();
     if (!ipo || ipo.phase !== 'trading') continue;
 
-    const minute = Math.floor(Date.now() / 60000);
-    const trades = await db.prepare('SELECT price, quantity FROM stock_trades WHERE company_id = ? AND traded_at >= ?').bind(company.id, minute * 60000).all();
-    const last = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? ORDER BY traded_at DESC LIMIT 1').bind(company.id).first();
-    const close = last?.price || company.share_price;
+    const interval = 5000;
+    const block = Math.floor(Date.now() / interval) * interval;
+    const trades = await db.prepare('SELECT price, quantity FROM stock_trades WHERE company_id = ? AND traded_at >= ?').bind(company.id, block).all();
+    const companyData = await db.prepare('SELECT share_price FROM companies WHERE id = ?').bind(company.id).first();
+    const close = companyData?.share_price || 100;
 
     if (trades.results.length > 0) {
       const open = trades.results[0].price;
       const high = Math.max(...trades.results.map(t => t.price));
       const low = Math.min(...trades.results.map(t => t.price));
       const volume = trades.results.reduce((s, t) => s + t.quantity, 0);
-      try { await db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, minute).run(); } catch (e) {}
+      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, block).run(); } catch (e) {}
     } else {
       const prev = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 1').bind(company.id).first();
       const prevClose = prev?.close || company.share_price;
-      try { await db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(company.id, prevClose, prevClose, prevClose, prevClose, minute).run(); } catch (e) {}
+      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(company.id, prevClose, prevClose, prevClose, prevClose, block).run(); } catch (e) {}
     }
 
     const baseIncome = company.base_income || 100;

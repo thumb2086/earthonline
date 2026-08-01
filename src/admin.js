@@ -1,3 +1,31 @@
+const UPGRADE_INCOME = {
+  computer: [0, 5, 12, 30, 75, 180, 450, 1200],
+  server: [0, 10, 25, 60, 150, 380, 950, 2400],
+  ai_assistant: [0, 20, 50, 120, 300, 750, 1900, 4800],
+};
+
+function getBaseIncomePerMin(levels) {
+  if (!levels) return 0;
+  return 20 + (UPGRADE_INCOME.computer[levels.computer] || 0) +
+    (UPGRADE_INCOME.server[levels.server] || 0) +
+    (UPGRADE_INCOME.ai_assistant[levels.ai_assistant] || 0);
+}
+
+async function getUserCompanyProfit(db, userId) {
+  const companies = await db.prepare('SELECT * FROM companies WHERE owner_id = ?').bind(userId).all();
+  let total = 0;
+  for (const c of companies.results) {
+    const employees = await db.prepare('SELECT output, efficiency, morale FROM employees WHERE user_id = ? AND company_id = ?').bind(userId, c.id).all();
+    const totalOutput = employees.results.reduce((s, e) => s + Math.floor(e.output * e.efficiency * (e.morale / 100)), 0);
+    const mult = { tech: 1.2, manufacturing: 1.0, finance: 1.3, service: 0.9 }[c.industry] || 1.0;
+    const equipBonus = 1 + 0.1 * (c.equipment_level - 1);
+    const brandBonus = 1 + 0.05 * (c.brand_level - 1);
+    const income = Math.floor(c.base_income * mult * (totalOutput || 1) * equipBonus * brandBonus);
+    total += Math.max(0, income - 18);
+  }
+  return total;
+}
+
 export async function handleAdmin(env, request, path, user) {
   if (user.role !== 'admin') return { error: '管理員專用' };
 
@@ -8,12 +36,21 @@ export async function handleAdmin(env, request, path, user) {
       SELECT u.id, u.username, u.role, u.discord_username, u.created_at,
              w.cash, w.savings, w.bank, w.total_earned,
              (SELECT COUNT(*) FROM employees WHERE user_id = u.id) as employees,
-             (SELECT COALESCE(SUM(quantity), 0) FROM stock_holdings WHERE user_id = u.id) as stocks
+             (SELECT COALESCE(SUM(quantity), 0) FROM stock_holdings WHERE user_id = u.id) as stocks,
+             (SELECT computer FROM income_levels WHERE user_id = u.id) as computer,
+             (SELECT server FROM income_levels WHERE user_id = u.id) as server,
+             (SELECT ai_assistant FROM income_levels WHERE user_id = u.id) as ai_assistant
       FROM users u
       LEFT JOIN wallets w ON w.user_id = u.id
       ORDER BY w.total_earned DESC
     `).all();
-    return users.results;
+    const results = [];
+    for (const u of users.results) {
+      const base = getBaseIncomePerMin({ computer: u.computer, server: u.server, ai_assistant: u.ai_assistant });
+      const companyProfit = await getUserCompanyProfit(db, u.id);
+      results.push({ ...u, incomePerMin: base + companyProfit });
+    }
+    return results;
   }
 
   if (path === '/api/admin/stats') {
@@ -26,7 +63,7 @@ export async function handleAdmin(env, request, path, user) {
     const totalTrades = await db.prepare('SELECT COUNT(*) as c FROM stock_trades').first();
     const totalMargin = await db.prepare('SELECT COUNT(*) as c FROM margin_positions').first();
 
-    const reserve = await db.prepare('SELECT * FROM system_reserve WHERE id = 1').first();
+    const reserve = await db.prepare('SELECT COALESCE(SUM(cash), 0) as cash, COALESCE(SUM(stock_quantity), 0) as stock_inventory FROM stock_inventory').first();
     const price = await db.prepare('SELECT share_price FROM companies WHERE id = 1').first();
 
     return {

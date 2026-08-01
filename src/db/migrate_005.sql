@@ -1,0 +1,1 @@
+ALTER TABLE investments ADD COLUMN total_paid INTEGER DEFAULT 0;

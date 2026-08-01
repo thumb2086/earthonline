@@ -13,19 +13,30 @@ export async function handleEmployee(env, request, path, user) {
   }
 
   if (path === '/api/employee/list') {
-    const employees = await db.prepare('SELECT * FROM employees WHERE user_id = ?').bind(user.id).all();
+    const url = new URL(request.url);
+    const companyId = parseInt(url.searchParams.get('companyId') || '0');
+    let query = 'SELECT * FROM employees WHERE user_id = ?';
+    const params = [user.id];
+    if (companyId > 0) { query += ' AND company_id = ?'; params.push(companyId); }
+    const employees = await db.prepare(query).bind(...params).all();
     return employees.results;
   }
 
   if (path === '/api/employee/hire') {
-    const { position } = await request.json();
+    const { position, companyId, quantity = 1 } = await request.json();
+    if (!companyId) return { error: '請選擇公司' };
+    const company = await db.prepare('SELECT id FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
+    if (!company) return { error: '公司不存在或非owner' };
     const info = POSITIONS[position];
     if (!info) return { error: '無效職位' };
+    const totalCost = info.hireCost * quantity;
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
-    if (!wallet || wallet.cash < info.hireCost) return { error: '餘額不足' };
-    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(info.hireCost, user.id).run();
-    await db.prepare('INSERT INTO employees (user_id, position, salary, output, hired_at) VALUES (?, ?, ?, ?, ?)').bind(user.id, position, info.salary, info.output, Date.now()).run();
-    return { success: true };
+    if (!wallet || wallet.cash < totalCost) return { error: '餘額不足' };
+    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost, user.id).run();
+    for (let i = 0; i < quantity; i++) {
+      await db.prepare('INSERT INTO employees (user_id, company_id, position, salary, output, hired_at) VALUES (?, ?, ?, ?, ?, ?)').bind(user.id, companyId, position, info.salary, info.output, Date.now()).run();
+    }
+    return { success: true, hired: quantity };
   }
 
   if (path.startsWith('/api/employee/train/')) {
@@ -56,8 +67,11 @@ export async function handleEmployee(env, request, path, user) {
 }
 
 export async function processEmployeeTick(db) {
-  const employees = await db.prepare('SELECT e.id, e.user_id, e.position, e.morale, e.salary, e.efficiency, e.output FROM employees e').all();
+  const employees = await db.prepare('SELECT e.id, e.user_id, e.company_id, e.position, e.morale, e.salary, e.efficiency, e.output FROM employees e WHERE e.company_id > 0').all();
   for (const emp of employees.results) {
+    const company = await db.prepare('SELECT id FROM companies WHERE id = ?').bind(emp.company_id).first();
+    if (!company) continue;
+
     const info = POSITIONS[emp.position];
     if (!info) continue;
     const moraleChange = emp.salary >= info.salary ? 0.1 : -0.5 * (1 - emp.salary / info.salary);

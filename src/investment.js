@@ -18,7 +18,17 @@ export async function handleInvestment(env, request, path, user) {
   }
 
   if (path === '/api/investment/list') {
-    return (await db.prepare('SELECT * FROM investments WHERE user_id = ?').bind(user.id).all()).results;
+    const investments = await db.prepare('SELECT * FROM investments WHERE user_id = ?').bind(user.id).all();
+    return Promise.all(investments.results.map(async (inv) => {
+      const info = INVEST_TYPES[inv.type];
+      const rate = info ? info.rateMin + (info.rateMax - info.rateMin) / 2 : 0;
+      return {
+        ...inv,
+        label: info?.label || inv.type,
+        dailyEarn: Math.floor((inv.amount + (inv.pending_interest || 0)) * rate * 1440),
+        totalPaid: inv.total_paid || 0,
+      };
+    }));
   }
 
   if (path === '/api/investment/invest') {
@@ -69,7 +79,7 @@ export async function processInvestmentTick(db) {
     const payout = Math.floor(totalPending);
     if (payout > 0) {
       await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, inv.user_id).run();
-      await db.prepare('UPDATE investments SET pending_interest = ? WHERE id = ?').bind(totalPending - payout, inv.id).run();
+      await db.prepare('UPDATE investments SET pending_interest = ?, total_paid = COALESCE(total_paid, 0) + ? WHERE id = ?').bind(totalPending - payout, payout, inv.id).run();
     } else {
       await db.prepare('UPDATE investments SET pending_interest = ? WHERE id = ?').bind(totalPending, inv.id).run();
     }
