@@ -8,6 +8,7 @@ import { handleStock, processMarginTick, finalizeIPO } from './stock.js';
 import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
+import { handleInteractions, setupDiscordBot } from './discord_bot.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
 const ADMIN_ROLE_NAME = '地球管理團隊';
@@ -113,6 +114,17 @@ export default {
 
       if (path === CALLBACK_PATH && request.method === 'GET') {
         return await handleDiscordLogin(request, env, headers, url);
+      }
+
+      // Discord Bot interactions (slash commands)
+      if (path === '/interactions') {
+        return await handleInteractions(request, env);
+      }
+
+      // 一次性 bot 設定 (註冊指令 + 查 public key)
+      if (path === '/api/bot/setup' && request.method === 'GET') {
+        const result = await setupDiscordBot(env);
+        return json(result, headers, result.error ? 400 : 200);
       }
 
       // Public leaderboard
