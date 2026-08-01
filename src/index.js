@@ -121,9 +121,10 @@ export default {
         return await handleInteractions(request, env);
       }
 
-      // 一次性 bot 設定 (註冊指令 + 查 public key)
+      // 一次性 bot 設定 (註冊指令 + 查 public key + 改名)
       if (path === '/api/bot/setup' && request.method === 'GET') {
-        const result = await setupDiscordBot(env);
+        const renameTo = url.searchParams.get('rename');
+        const result = await setupDiscordBot(env, renameTo);
         return json(result, headers, result.error ? 400 : 200);
       }
 

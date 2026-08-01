@@ -211,8 +211,8 @@ export async function handleInteractions(request, env) {
   return new Response('ok', { status: 200 });
 }
 
-// 一次性設定: 查 Public Key + 註冊 Slash Commands
-export async function setupDiscordBot(env) {
+// 一次性設定: 查 Public Key + 註冊 Slash Commands (+可改名)
+export async function setupDiscordBot(env, renameTo) {
   const botToken = env.DISCORD_BOT_TOKEN;
   if (!botToken) return { error: '缺少 DISCORD_BOT_TOKEN' };
 
@@ -221,6 +221,34 @@ export async function setupDiscordBot(env) {
   });
   if (!appRes.ok) return { error: `無法取得應用程式資訊: ${appRes.status}` };
   const app = await appRes.json();
+
+  let renamed = null;
+  if (renameTo) {
+    // 改 bot 帳號 username (顯示名稱)
+    const patchRes = await fetch('https://discord.com/api/v10/users/@me', {
+      method: 'PATCH',
+      headers: { Authorization: `Bot ${botToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: renameTo }),
+    });
+    if (patchRes.ok) {
+      const updated = await patchRes.json();
+      renamed = updated.username;
+    } else {
+      const errBody = await patchRes.text();
+      // 若 users/@me 被拒, 退回改 application name
+      const appPatch = await fetch('https://discord.com/api/v10/applications/@me', {
+        method: 'PATCH',
+        headers: { Authorization: `Bot ${botToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: renameTo }),
+      });
+      if (appPatch.ok) {
+        const updated = await appPatch.json();
+        renamed = updated.name;
+      } else {
+        return { error: `改名失敗: ${patchRes.status} ${errBody}` };
+      }
+    }
+  }
 
   const commands = [
     { name: 'ipo', description: '🚀 查看 IPO 認購狀態' },
@@ -248,6 +276,7 @@ export async function setupDiscordBot(env) {
     appId: app.id,
     publicKey: app.verify_key,
     commandsRegistered: commands.map(c => c.name),
+    renamed,
     note: '在 Discord Developer Portal 的 General Information 設定 Interactions Endpoint URL 為 https://twonline.dpdns.org/interactions，並把 Public Key 設為 env.DISCORD_PUBLIC_KEY',
   };
 }
