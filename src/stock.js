@@ -42,8 +42,8 @@ export async function handleStock(env, request, path, user) {
   const db = env.DB;
   const method = request.method;
 
-  // 惰性價格更新: 查看股票頁時, 距上次更新>5秒就觸發自然波動 (配合前端5秒刷新)
-  if (path === '/api/stock/quote' || path === '/api/stock/klines' || path === '/api/stock/trades' || path === '/api/stock/ipo/info') {
+  // 惰性價格更新: 走勢圖刷新時觸發自然波動 (quote不觸發, 避免報價跳動)
+  if (path === '/api/stock/klines' || path === '/api/stock/trades') {
     try {
       const url0 = new URL(request.url);
       const cid = parseInt(url0.searchParams.get('companyId') || '1');
