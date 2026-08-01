@@ -44,7 +44,6 @@ export default function App() {
     { id: 'invest', label: '💼 投資' },
     { id: 'company', label: '🏢 公司' },
     { id: 'stock', label: '📈 股票' },
-    { id: 'contract', label: '📋 合約' },
     { id: 'subscription', label: '📦 訂閱' },
     { id: 'history', label: '💰 明細' },
     { id: 'leaderboard', label: '🏆 排行' },
@@ -80,11 +79,10 @@ export default function App() {
         <div className="content">
           {view === 'dashboard' && <Dashboard user={user} api={api} />}
           {view === 'income' && <Income api={api} toast={toast} />}
-          {view === 'bank' && <Bank act={act} />}
+          {view === 'bank' && <Bank act={act} api={api} toast={toast} />}
           {view === 'invest' && <Invest api={api} toast={toast} prompt={prompt} />}
           {view === 'company' && <Company api={api} toast={toast} prompt={prompt} promptMulti={promptMulti} />}
           {view === 'stock' && <Stock api={api} toast={toast} prompt={prompt} />}
-          {view === 'contract' && <Contract api={api} toast={toast} />}
           {view === 'history' && <History api={api} />}
           {view === 'subscription' && <Subscription api={api} toast={toast} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}
@@ -101,9 +99,17 @@ function Dashboard({ user, api }) {
   useEffect(() => {
     api('/api/stock/quote').then(d => setData(p => ({ ...p, q: d }))).catch(()=>{})
     api('/api/stock/holdings').then(d => setData(p => ({ ...p, h: Array.isArray(d) ? d : [] }))).catch(()=>{})
+    api('/api/bank/info').then(d => setData(p => ({ ...p, bank: d }))).catch(()=>{})
+    api('/api/investment/list').then(d => setData(p => ({ ...p, inv: Array.isArray(d) ? d : [] }))).catch(()=>{})
+    api('/api/subscription/list').then(d => setData(p => ({ ...p, subs: Array.isArray(d) ? d : [] }))).catch(()=>{})
+    api('/api/company/list').then(d => setData(p => ({ ...p, companies: Array.isArray(d) ? d : [] }))).catch(()=>{})
   }, [])
   const sv = (data.h || []).reduce((s, h) => s + (data.q?.price || 100) * h.quantity, 0)
-  const total = (user?.cash || 0) + (user?.savings || 0) + (user?.bank || 0) + sv + (user?.pendingInterest || 0)
+  const invTotal = (data.inv || []).reduce((s, i) => s + i.amount, 0)
+  const subActive = (data.subs || []).filter(s => s.enabled).length
+  const subCost = (data.subs || []).filter(s => s.enabled).reduce((s, x) => s + x.cost, 0)
+  const debt = data.bank?.totalDebt || 0
+  const netWorth = (user?.cash || 0) + (user?.savings || 0) + (user?.bank || 0) + sv + invTotal - debt
   return (
     <>
       {(user?.offlineEarnings > 0 && showOffline) && <div className="card mb-12" style={{borderColor:'var(--accent)',background:'rgba(0,255,65,0.05)'}}>
@@ -115,15 +121,30 @@ function Dashboard({ user, api }) {
       </div>}
       <div className="grid-3 mb-12">
         <div className="card"><div className="card-title">可用現金</div><div className="text-lg">${(user?.cash || 0).toLocaleString()}</div></div>
-        <div className="card"><div className="card-title">總資產</div><div className="text-lg">${total.toLocaleString()}</div></div>
+        <div className="card"><div className="card-title">總資產</div><div className="text-lg">${netWorth.toLocaleString()}</div></div>
         <div className="card"><div className="card-title">累計賺取</div><div className="text-lg">${(user?.total_earned || 0).toLocaleString()}</div></div>
+      </div>
+      <div className="grid-3 mb-12">
+        <div className="card"><div className="card-title">活存</div><div className="text-lg">${(user?.savings || 0).toLocaleString()}</div></div>
+        <div className="card"><div className="card-title">定存</div><div className="text-lg">${(user?.bank || 0).toLocaleString()}</div></div>
+        <div className="card"><div className="card-title">股票市值</div><div className="text-lg">${sv.toLocaleString()}</div></div>
+      </div>
+      <div className="grid-3 mb-12">
+        <div className="card card-warn"><div className="card-title">💳 債務</div><div className="text-lg">${debt.toLocaleString()}</div>
+          {data.bank?.interestPerMin > 0 && <div className="text-dim text-sm">利息 ${data.bank.interestPerMin.toLocaleString()}/分</div>}</div>
+        <div className="card"><div className="card-title">💼 投資</div><div className="text-lg">${invTotal.toLocaleString()}</div></div>
+        <div className="card"><div className="card-title">📦 訂閱</div><div className="text-lg">{subActive} 項</div>
+          {subCost > 0 && <div className="text-dim text-sm">${subCost.toLocaleString()}/分</div>}</div>
       </div>
       <div className="grid-2">
         <div className="card">
           <div className="card-title">資產分布</div>
+          <div className="stat"><span className="stat-label">現金</span><span className="stat-value">${(user?.cash || 0).toLocaleString()}</span></div>
           <div className="stat"><span className="stat-label">活存</span><span className="stat-value">${(user?.savings || 0).toLocaleString()}</span></div>
           <div className="stat"><span className="stat-label">定存</span><span className="stat-value">${(user?.bank || 0).toLocaleString()}</span></div>
           <div className="stat"><span className="stat-label">股票</span><span className="stat-value">${sv.toLocaleString()}</span></div>
+          <div className="stat"><span className="stat-label">投資</span><span className="stat-value">${invTotal.toLocaleString()}</span></div>
+          <div className="stat"><span className="stat-label">負債</span><span className="stat-value" style={{color:'var(--danger)'}}>-${debt.toLocaleString()}</span></div>
           {data.q && <div className="stat"><span className="stat-label">001 股價</span><span className="stat-value">${data.q.price}</span></div>}
         </div>
         <div className="card">
@@ -170,22 +191,51 @@ function Income({ api, toast }) {
   )
 }
 
-function Bank({ act }) {
+function Bank({ act, api, toast }) {
+  const [info, setInfo] = useState(null)
+  const load = () => api('/api/bank/info').then(setInfo)
+  useEffect(() => { load() }, [])
+  const repay = async (id) => {
+    const r = await api('/api/bank/repay/' + id)
+    if (r.success) { load(); toast('已償還', 'success') } else toast(r.error, 'error')
+  }
   return (
-    <div className="grid-2">
-      <div className="card card-accent">
-        <div className="card-title">活期存款 0.05%/分</div>
-        <form onSubmit={e => act(e, '/api/bank/deposit')} className="flex gap-8 mt-12">
-          <input name="amount" type="number" placeholder="存入金額" /><button className="btn btn-primary btn-sm">存入</button></form>
-        <form onSubmit={e => act(e, '/api/bank/withdraw')} className="flex gap-8 mt-12">
-          <input name="amount" type="number" placeholder="提取金額" /><button className="btn btn-sm">提取</button></form>
+    <>
+      <div className="grid-3 mb-12">
+        <div className="card"><div className="card-title">可用現金</div><div className="text-lg">${(info?.cash || 0).toLocaleString()}</div></div>
+        <div className="card"><div className="card-title">活存餘額</div><div className="text-lg">${(info?.savings || 0).toLocaleString()}</div></div>
+        <div className="card card-warn"><div className="card-title">目前債務</div><div className="text-lg">${(info?.totalDebt || 0).toLocaleString()}</div>
+          {info?.interestPerMin > 0 && <div className="text-dim text-sm">利息 ${(info.interestPerMin).toLocaleString()}/分</div>}</div>
       </div>
-      <div className="card card-warn">
+      <div className="grid-2">
+        <div className="card card-accent">
+          <div className="card-title">活期存款 0.05%/分</div>
+          <form onSubmit={e => { act(e, '/api/bank/deposit'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
+            <input name="amount" type="number" placeholder="存入金額" /><button className="btn btn-primary btn-sm">存入</button></form>
+          <form onSubmit={e => { act(e, '/api/bank/withdraw'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
+            <input name="amount" type="number" placeholder="提取金額" /><button className="btn btn-sm">提取</button></form>
+        </div>
+        <div className="card card-accent">
+          <div className="card-title">定存 0.002%/分</div>
+          <div className="text-dim text-sm" style={{marginTop:4}}>定存餘額 ${(info?.bank || 0).toLocaleString()}</div>
+          <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.target); const a = parseInt(fd.get('amount')); if (!a) return; api('/api/investment/invest', { type: 'deposit', amount: a }).then(r => { toast(r.success ? '已存入定存' : r.error, r.success ? 'success' : 'error'); setTimeout(load, 600) }) }} className="flex gap-8 mt-12">
+            <input name="amount" type="number" placeholder="存入金額" /><button className="btn btn-primary btn-sm">存入</button></form>
+          <div className="text-dim text-sm mt-12">定存贖回請至 💼 投資頁面</div>
+        </div>
+      </div>
+      <div className="card card-warn mt-12">
         <div className="card-title">貸款 0.15%/分</div>
-        <form onSubmit={e => act(e, '/api/bank/borrow')} className="flex gap-8 mt-12">
+        <form onSubmit={e => { act(e, '/api/bank/borrow'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
           <input name="amount" type="number" placeholder="借款金額" /><button className="btn btn-sm">借款</button></form>
+        {(info?.loans || []).length > 0 && <div className="divider" />}
+        {(info?.loans || []).map(l => (
+          <div className="stat" key={l.id}>
+            <span>欠款 <span style={{fontWeight:600}}>${(l.remaining || 0).toLocaleString()}</span></span>
+            <button className="btn btn-sm" onClick={() => repay(l.id)}>還款</button>
+          </div>
+        ))}
       </div>
-    </div>
+    </>
   )
 }
 
@@ -209,7 +259,7 @@ function Invest({ api, toast, prompt }) {
   return (
     <>
       <div className="grid-2 mb-12">
-        {(types || []).map(t => (
+        {(types || []).filter(t => t.type !== 'deposit').map(t => (
           <div className="card card-accent" key={t.type}>
             <div className="flex justify-between items-center">
               <div><div className="text-accent font-bold">{t.label}</div>
@@ -611,25 +661,6 @@ function Stock({ api, toast, prompt }) {
   )
 }
 
-function Contract({ api, toast }) {
-  const [cs, setCs] = useState([]); const [mine, setMine] = useState([])
-  useEffect(() => { api('/api/contract/list').then(d => setCs(Array.isArray(d)?d:[])); api('/api/contract/mine').then(d => setMine(Array.isArray(d)?d:[])) }, [])
-  const accept = async (id) => { const r = await api('/api/contract/accept/' + id); if (r.success) { api('/api/contract/list').then(d => setCs(Array.isArray(d)?d:[])); api('/api/contract/mine').then(d => setMine(Array.isArray(d)?d:[])); toast('已接取合約', 'success') } else toast(r.error, 'error') }
-  return (
-    <>
-      <div className="card mb-12"><div className="card-title">合約</div>
-        {(cs || []).map(c => <div className="stat" key={c.id}>
-          <span><span className="text-accent" style={{fontWeight:600}}>{c.type}</span><span className="text-dim text-sm" style={{marginLeft:8}}>${c.reward}</span></span>
-          <button className="btn btn-sm" onClick={() => accept(c.id)}>接取</button></div>
-        )}
-      </div>
-      <div className="card"><div className="card-title">進行中</div>
-        {(mine || []).map(m => <div className="stat" key={m.contract_id}>{m.type}<span>{m.completed ? '✅' : '⏳'}</span></div>)}
-      </div>
-    </>
-  )
-}
-
 function Leaderboard({ api }) {
   const [data, setData] = useState([])
   useEffect(() => { api('/api/leaderboard').then(d => setData(Array.isArray(d) ? d : [])) }, [])
@@ -775,11 +806,12 @@ function AdminPanel({ api }) {
 function History({ api }) {
   const [txs, setTxs] = useState([])
   useEffect(() => { api('/api/transactions?limit=100').then(d => setTxs(Array.isArray(d) ? d : [])) }, [])
-  const typeLabels = { income: '⬆️ 基礎收入', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', ipo_subscribe: '🚀 IPO認購', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', bank_interest: '🏦 活存利息', loan: '🏦 借貸', employee_hire: '👥 僱用', employee_salary: '👥 薪資', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', investment_interest: '💼 投資利息', investment_loss: '💼 投資虧損', company_profit: '🏢 公司利潤', company_loss: '🏢 公司虧損', dividend: '💰 股利', living_cost: '🏠 生活費', subscription: '📦 訂閱月費' }
+  const typeLabels = { income: '⬆️ 基礎收入(本小時)', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', ipo_subscribe: '🚀 IPO認購', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', bank_interest: '🏦 活存利息(本小時)', loan: '🏦 借貸', loan_interest: '🏦 貸款利息(本小時)', employee_hire: '👥 僱用', employee_salary: '👥 薪資', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', investment_interest: '💼 投資利息(本小時)', investment_loss: '💼 投資虧損', company_profit: '🏢 公司利潤(本小時)', company_loss: '🏢 公司虧損(本小時)', dividend: '💰 股利(本小時)', living_cost: '🏠 生活費(本小時)', subscription: '📦 訂閱月費(本小時)' }
   const typeColors = { income: 'var(--accent)', expense: 'var(--danger)', stock_buy: 'var(--danger)', stock_sell: 'var(--accent)', ipo_subscribe: 'var(--warn)', employee_hire: 'var(--danger)', company_create: 'var(--danger)', upgrade: 'var(--danger)' }
   return (
     <div className="card">
       <div className="card-title">💰 收支明細</div>
+      <div className="text-dim text-sm mb-12">每分收入/支出會按小時彙總顯示 · 交易類即時顯示</div>
       {txs.length === 0 && <div className="text-dim">暫無紀錄</div>}
       {txs.map(tx => (
         <div className="stat" key={tx.id} style={{borderBottom:'1px solid var(--border)', paddingBottom:8, marginBottom:8}}>

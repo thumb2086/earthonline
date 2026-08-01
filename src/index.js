@@ -5,7 +5,6 @@ import { handleInvestment, processInvestmentTick } from './investment.js';
 import { handleEmployee, processEmployeeTick } from './employee.js';
 import { handleCompany, processCompanyTick } from './company.js';
 import { handleStock, processMarginTick, finalizeIPO } from './stock.js';
-import { handleContract } from './contract.js';
 import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
@@ -184,7 +183,6 @@ export default {
         ['/api/employee', handleEmployee],
         ['/api/company', handleCompany],
         ['/api/stock', handleStock],
-        ['/api/contract', handleContract],
         ['/api/subscription', handleSubscription],
         ['/api/admin', handleAdmin],
       ];

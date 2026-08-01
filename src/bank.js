@@ -5,6 +5,13 @@ const LOAN_BASE_RATE = 0.0015;
 
 export async function handleBank(env, request, path, user) {
   const db = env.DB;
+  if (path === '/api/bank/info') {
+    const wallet = await db.prepare('SELECT cash, savings, bank FROM wallets WHERE user_id = ?').bind(user.id).first();
+    const loans = await db.prepare("SELECT * FROM loans WHERE user_id = ? AND status = 'active'").bind(user.id).all();
+    const totalDebt = loans.results.reduce((s, l) => s + l.remaining, 0);
+    const totalInterest = loans.results.reduce((s, l) => s + Math.floor(l.remaining * l.interest_rate), 0);
+    return { ...wallet, loans: loans.results, totalDebt, interestPerMin: totalInterest };
+  }
   if (path === '/api/bank/deposit') {
     const { amount } = await request.json();
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
@@ -70,10 +77,13 @@ export async function processBankTick(db) {
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(loan.user_id).first();
     if (wallet && wallet.cash >= interest) {
       await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(interest, loan.user_id).run();
-      await db.prepare('UPDATE loans SET remaining = remaining - ? WHERE id = ?').bind(interest, loan.id).run();
-    } else if (wallet) {
+      await db.prepare('UPDATE loans SET remaining = remaining + ? WHERE id = ?').bind(interest, loan.id).run();
+      await logHourly(db, loan.user_id, 'loan_interest', -interest, '貸款利息');
+    } else if (wallet && wallet.cash > 0) {
+      const paid = wallet.cash;
       await db.prepare('UPDATE wallets SET cash = 0 WHERE user_id = ?').bind(loan.user_id).run();
-      await db.prepare('UPDATE loans SET remaining = remaining + ? WHERE id = ?').bind(interest - wallet.cash, loan.id).run();
+      await db.prepare('UPDATE loans SET remaining = remaining + ? WHERE id = ?').bind(interest, loan.id).run();
+      await logHourly(db, loan.user_id, 'loan_interest', -paid, '貸款利息(現金不足)');
     } else {
       await db.prepare('UPDATE loans SET remaining = remaining + ? WHERE id = ?').bind(interest, loan.id).run();
     }
