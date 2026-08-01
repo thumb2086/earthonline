@@ -12,8 +12,8 @@ export function ToastProvider({ children }) {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
   }, [])
 
-  const prompt = useCallback((title, cb) => {
-    setModal({ title, cb, value: '' })
+  const prompt = useCallback((title, cb, preview) => {
+    setModal({ title, cb, value: '', preview })
   }, [])
 
   const promptMulti = useCallback((title, fields, cb) => {
@@ -50,11 +50,16 @@ export function ToastProvider({ children }) {
                   placeholder={f.placeholder || ''}
                   style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 14px', borderRadius: 6, fontSize: 13, width: '100%', outline: 'none' }} />
               </div>
-            )) : (
-              <input autoFocus value={modal.value} onChange={e => setModal(prev => ({ ...prev, value: e.target.value }))}
-                onKeyDown={e => { if (e.key === 'Enter' && modal.value) { modal.cb(modal.value); closeModal() } }}
-                placeholder="輸入..."
-                style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 14px', borderRadius: 6, fontSize: 13, width: '100%', outline: 'none' }} />
+            )            ) : (
+              <div>
+                <input autoFocus value={modal.value} onChange={e => setModal(prev => ({ ...prev, value: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter' && modal.value) { modal.cb(modal.value); closeModal() } }}
+                  placeholder="輸入..."
+                  style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 14px', borderRadius: 6, fontSize: 13, width: '100%', outline: 'none' }} />
+                {modal.preview && modal.value && <div style={{ marginTop: 8, fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>
+                  {modal.preview(modal.value)}
+                </div>}
+              </div>
             )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
               <button className="btn btn-sm" onClick={closeModal}>取消</button>
