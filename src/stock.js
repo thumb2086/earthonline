@@ -16,7 +16,7 @@ function getPriceImpact(quantity, circulating, totalShares) {
   if (circulating <= 0) return 0;
   const effective = Math.max(circulating, totalShares * MIN_CIRCULATING_RATIO);
   const ratio = quantity / effective;
-  const rawImpact = Math.sqrt(ratio) * 0.15;
+  const rawImpact = Math.sqrt(ratio) * 0.05;
   return Math.min(rawImpact, MAX_PRICE_IMPACT);
 }
 

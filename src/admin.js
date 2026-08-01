@@ -15,12 +15,36 @@ function getBaseIncomePerMin(levels) {
     (UPGRADE_INCOME.ai_assistant[levels.ai_assistant] || 0);
 }
 
+// 解析 ?exclude=1,5,7 (用戶id) 或 ?exclude=名字1,名字2
+async function resolveExclude(db, request) {
+  const url = new URL(request.url);
+  const raw = url.searchParams.get('exclude');
+  if (!raw) return [];
+  const ids = [];
+  for (const part of raw.split(',').map(s => s.trim()).filter(Boolean)) {
+    if (/^\d+$/.test(part)) {
+      ids.push(parseInt(part));
+    } else {
+      const u = await db.prepare('SELECT id FROM users WHERE username = ?').bind(part).first();
+      if (u) ids.push(u.id);
+    }
+  }
+  return ids;
+}
+
+function inClause(ids, prefix) {
+  if (ids.length === 0) return '';
+  return ` AND ${prefix} NOT IN (${ids.join(',')})`;
+}
+
 export async function handleAdmin(env, request, path, user) {
   if (user.role !== 'admin') return { error: '管理員專用' };
 
   const db = env.DB;
 
   if (path === '/api/admin/users') {
+    const excludeIds = await resolveExclude(db, request);
+    const excl = inClause(excludeIds, 'u.id');
     const users = await db.prepare(`
       SELECT u.id, u.username, u.role, u.discord_username, u.created_at,
              w.cash, w.savings, w.bank, w.total_earned,
@@ -37,6 +61,7 @@ export async function handleAdmin(env, request, path, user) {
              (SELECT ai_assistant FROM income_levels WHERE user_id = u.id) as ai_assistant
       FROM users u
       LEFT JOIN wallets w ON w.user_id = u.id
+      WHERE 1=1${excl}
       ORDER BY w.total_earned DESC
     `).all();
     const results = [];
@@ -69,14 +94,16 @@ export async function handleAdmin(env, request, path, user) {
   }
 
   if (path === '/api/admin/stats') {
-    const totalUsers = await db.prepare('SELECT COUNT(*) as c FROM users').first();
-    const totalCash = await db.prepare('SELECT COALESCE(SUM(cash), 0) as c FROM wallets').first();
-    const totalSavings = await db.prepare('SELECT COALESCE(SUM(savings), 0) as c FROM wallets').first();
-    const totalEarned = await db.prepare('SELECT COALESCE(SUM(total_earned), 0) as c FROM wallets').first();
-    const totalEmployees = await db.prepare('SELECT COUNT(*) as c FROM employees').first();
-    const totalCompanies = await db.prepare('SELECT COUNT(*) as c FROM companies').first();
-    const totalTrades = await db.prepare('SELECT COUNT(*) as c FROM stock_trades').first();
-    const totalMargin = await db.prepare('SELECT COUNT(*) as c FROM margin_positions').first();
+    const excludeIds = await resolveExclude(db, request);
+    const excl = inClause(excludeIds, 'user_id');
+    const totalUsers = await db.prepare('SELECT COUNT(*) as c FROM users' + (excludeIds.length ? ` WHERE id NOT IN (${excludeIds.join(',')})` : '')).first();
+    const totalCash = await db.prepare('SELECT COALESCE(SUM(cash), 0) as c FROM wallets WHERE 1=1' + excl).first();
+    const totalSavings = await db.prepare('SELECT COALESCE(SUM(savings), 0) as c FROM wallets WHERE 1=1' + excl).first();
+    const totalEarned = await db.prepare('SELECT COALESCE(SUM(total_earned), 0) as c FROM wallets WHERE 1=1' + excl).first();
+    const totalEmployees = await db.prepare('SELECT COUNT(*) as c FROM employees WHERE 1=1' + excl).first();
+    const totalCompanies = await db.prepare('SELECT COUNT(*) as c FROM companies WHERE 1=1' + excl.replace('user_id', 'owner_id')).first();
+    const totalTrades = await db.prepare('SELECT COUNT(*) as c FROM stock_trades WHERE 1=1' + excl).first();
+    const totalMargin = await db.prepare('SELECT COUNT(*) as c FROM margin_positions WHERE 1=1' + excl).first();
 
     const reserve = await db.prepare('SELECT COALESCE(SUM(cash), 0) as cash, COALESCE(SUM(stock_quantity), 0) as stock_inventory FROM stock_inventory').first();
     const price = await db.prepare('SELECT share_price FROM companies WHERE id = 1').first();
@@ -96,6 +123,8 @@ export async function handleAdmin(env, request, path, user) {
   }
 
   if (path === '/api/admin/stocks') {
+    const excludeIds = await resolveExclude(db, request);
+    const excl = inClause(excludeIds, 'u.id');
     const companies = await db.prepare(`
       SELECT c.id, c.name, c.total_shares, COALESCE(inv.stock_quantity, 0) as system_inventory
       FROM companies c
@@ -108,7 +137,7 @@ export async function handleAdmin(env, request, path, user) {
         SELECT u.username, h.quantity
         FROM stock_holdings h
         JOIN users u ON u.id = h.user_id
-        WHERE h.company_id = ?
+        WHERE h.company_id = ?${excl}
         ORDER BY h.quantity DESC
       `).bind(c.id).all();
       result.push({ ...c, holders: holders.results, held: holders.results.reduce((s, x) => s + x.quantity, 0) });
@@ -119,6 +148,7 @@ export async function handleAdmin(env, request, path, user) {
   if (path === '/api/admin/ipo') {
     const url = new URL(request.url);
     const companyId = url.searchParams.get('companyId');
+    const excludeIds = await resolveExclude(db, request);
     let query = `
       SELECT s.id, s.shares, s.total_cost, s.subscribed_at, c.name as company_name, c.share_price, i.phase, u.username
       FROM ipo_subscriptions s
@@ -127,10 +157,37 @@ export async function handleAdmin(env, request, path, user) {
       JOIN users u ON u.id = s.user_id
     `;
     const params = [];
-    if (companyId) { query += ' WHERE s.company_id = ?'; params.push(parseInt(companyId)); }
+    const conds = [];
+    if (companyId) conds.push('s.company_id = ?');
+    if (excludeIds.length > 0) conds.push(`s.user_id NOT IN (${excludeIds.join(',')})`);
+    if (conds.length > 0) query += ' WHERE ' + conds.join(' AND ');
+    if (companyId) params.push(parseInt(companyId));
     query += ' ORDER BY s.subscribed_at DESC';
     const rows = await db.prepare(query).bind(...params).all();
     return rows.results;
+  }
+
+  if (path === '/api/admin/trades') {
+    const excludeIds = await resolveExclude(db, request);
+    const excl = excludeIds.length > 0 ? ` AND t.user_id NOT IN (${excludeIds.join(',')})` : '';
+    const trades = await db.prepare(`
+      SELECT t.id, t.company_id, c.name as company_name, t.user_id, u.username, t.type, t.price, t.quantity, t.traded_at
+      FROM stock_trades t
+      JOIN users u ON u.id = t.user_id
+      JOIN companies c ON c.id = t.company_id
+      WHERE t.user_id > 0${excl}
+      ORDER BY t.traded_at DESC
+      LIMIT 300
+    `).all();
+    // 每人統計
+    const stats = {};
+    for (const tr of trades.results) {
+      if (!stats[tr.username]) stats[tr.username] = { username: tr.username, user_id: tr.user_id, buyCount: 0, sellCount: 0, buyVol: 0, sellVol: 0, spent: 0, revenue: 0 };
+      const s = stats[tr.username];
+      if (tr.type === 'buy') { s.buyCount++; s.buyVol += tr.quantity; s.spent += tr.price * tr.quantity; }
+      else { s.sellCount++; s.sellVol += tr.quantity; s.revenue += tr.price * tr.quantity; }
+    }
+    return { trades: trades.results, stats: Object.values(stats).sort((a, b) => (b.buyCount + b.sellCount) - (a.buyCount + a.sellCount)) };
   }
 
   if (path.startsWith('/api/admin/user/')) {

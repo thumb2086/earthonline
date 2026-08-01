@@ -849,12 +849,21 @@ function AdminPanel({ api }) {
   const [stockDist, setStockDist] = useState([])
   const [ipoList, setIpoList] = useState([])
   const [ipoCollapsed, setIpoCollapsed] = useState(false)
-  useEffect(() => {
-    api('/api/admin/users').then(d => setUsers(Array.isArray(d) ? d : []));
-    api('/api/admin/stats').then(setStats);
-    api('/api/admin/stocks').then(d => setStockDist(Array.isArray(d) ? d : []));
-    api('/api/admin/ipo').then(d => setIpoList(Array.isArray(d) ? d : []));
-  }, [])
+  const [tradeData, setTradeData] = useState({ trades: [], stats: [] })
+  const [exclude, setExclude] = useState(() => localStorage.getItem('eo_admin_exclude') || '')
+  const loadAll = (ex) => {
+    const q = ex ? '?exclude=' + encodeURIComponent(ex) : ''
+    api('/api/admin/users' + q).then(d => setUsers(Array.isArray(d) ? d : []));
+    api('/api/admin/stats' + q).then(setStats);
+    api('/api/admin/stocks' + q).then(d => setStockDist(Array.isArray(d) ? d : []));
+    api('/api/admin/ipo' + q).then(d => setIpoList(Array.isArray(d) ? d : []));
+    api('/api/admin/trades' + q).then(d => setTradeData(d || { trades: [], stats: [] }));
+  }
+  useEffect(() => { loadAll(exclude) }, [])
+  const applyExclude = () => {
+    localStorage.setItem('eo_admin_exclude', exclude)
+    loadAll(exclude)
+  }
 
   const stocksWithHolders = (stockDist || []).filter(s => s.held > 0)
   const holdingsByCompany = stocksWithHolders.map(s => ({
@@ -882,6 +891,15 @@ function AdminPanel({ api }) {
 
   return (
     <>
+      <div className="card mb-12">
+        <div className="card-title" style={{margin:0}}>統計排除設定</div>
+        <div className="text-dim text-sm mb-12">輸入要排除的用戶名（逗號分隔，例如：好吃的蛋包咖哩飯, duckkk），排除後所有統計/圖表/明細都會過濾</div>
+        <div className="flex gap-8 items-center">
+          <input value={exclude} onChange={e => setExclude(e.target.value)} placeholder="要排除的用戶名..." style={{flex:1}} />
+          <button className="btn btn-primary btn-sm" onClick={applyExclude}>套用</button>
+          <button className="btn btn-sm" onClick={() => { setExclude(''); localStorage.removeItem('eo_admin_exclude'); loadAll('') }}>清除</button>
+        </div>
+      </div>
       {stats && <div className="grid-3 mb-12">
         <div className="card"><div className="card-title">玩家</div><div className="text-lg">{stats.users}</div></div>
         <div className="card"><div className="card-title">總現金</div><div className="text-lg">${(stats.totalCash || 0).toLocaleString()}</div></div>
@@ -945,6 +963,25 @@ function AdminPanel({ api }) {
             </div>
           ))}
         </>}
+      </div>
+
+      <div className="card mb-12"><div className="card-title">📈 股票交易統計（所有人）</div>
+        {(tradeData?.stats || []).length === 0 && <div className="text-dim">暫無交易</div>}
+        {(tradeData?.stats || []).map(s => (
+          <div className="stat" key={s.user_id}>
+            <span><span className="text-accent" style={{fontWeight:600}}>{s.username}</span> <span style={{color:'var(--accent)'}}>買 {s.buyCount}次/{s.buyVol.toLocaleString()}股</span> <span style={{color:'var(--danger)'}}>賣 {s.sellCount}次/{s.sellVol.toLocaleString()}股</span></span>
+            <span className="text-dim text-sm">花 ${(s.spent||0).toLocaleString()} · 收 ${(s.revenue||0).toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+      <div className="card mb-12"><div className="card-title">📋 股票交易明細（最近300筆）</div>
+        {(tradeData?.trades || []).length === 0 && <div className="text-dim">暫無交易</div>}
+        {(tradeData?.trades || []).slice(0,50).map(t => (
+          <div className="stat" key={t.id}>
+            <span><span className="text-accent" style={{fontWeight:600}}>{t.username}</span> {t.type === 'buy' ? <span style={{color:'var(--accent)'}}>▲買入</span> : <span style={{color:'var(--danger)'}}>▼賣出</span>} {t.quantity.toLocaleString()}股 {t.company_name} @ ${t.price}</span>
+            <span className="text-dim text-sm">${(t.price * t.quantity).toLocaleString()} · {new Date(t.traded_at).toLocaleString('zh-TW')}</span>
+          </div>
+        ))}
       </div>
 
       <div className="card"><div className="card-title">使用者 ({users.length})</div>
