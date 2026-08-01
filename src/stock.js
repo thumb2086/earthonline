@@ -115,6 +115,7 @@ export async function handleStock(env, request, path, user) {
 
   if (path === '/api/stock/buy') {
     const { companyId = 1, quantity, force } = await request.json();
+    if (!Number.isInteger(quantity) || quantity <= 0) return { error: '股數必須為正整數' };
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
     if (!ipo || ipo.phase !== 'trading') return { error: '尚未上市' };
 
@@ -180,6 +181,7 @@ export async function handleStock(env, request, path, user) {
 
   if (path === '/api/stock/sell') {
     const { companyId = 1, quantity, force } = await request.json();
+    if (!Number.isInteger(quantity) || quantity <= 0) return { error: '股數必須為正整數' };
     const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).first();
     if (!holding || holding.quantity < quantity) return { error: '持股不足' };
 
@@ -241,6 +243,7 @@ export async function handleStock(env, request, path, user) {
 
   if (path === '/api/stock/ipo/subscribe') {
     const { companyId = 1, shares } = await request.json();
+    if (!Number.isInteger(shares) || shares <= 0) return { error: '股數必須為正整數' };
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
     if (!ipo || ipo.phase !== 'ipo') return { error: '不在 IPO 階段' };
 
@@ -259,7 +262,7 @@ export async function handleStock(env, request, path, user) {
 
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost, user.id).run();
     await db.prepare('INSERT INTO ipo_subscriptions (user_id, company_id, shares, total_cost, subscribed_at) VALUES (?, ?, ?, ?, ?)').bind(user.id, companyId, shares, totalCost, Date.now()).run();
-    await logTransaction(db, user.id, 'ipo_subscribe', -totalCost, `IPO認購 ${shares} 股 @ $${price}`);
+    await logTransaction(db, user.id, 'ipo_subscribe', -totalCost, `IPO認購 ${shares} 股 @ $${company?.share_price || 100}`);
     return { success: true, shares, totalCost };
   }
 
@@ -311,6 +314,7 @@ export async function handleStock(env, request, path, user) {
       await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
       await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', newPrice, quantity, now).run();
       await updateKline(db, companyId, newPrice, quantity, now);
+      await logTransaction(db, user.id, 'stock_buy', -marginAmount, `槓桿做多 ${quantity}股 @ $${newPrice} (${leverage}x)`);
       return { success: true, price: newPrice, quantity, leverage, marginAmount };
     } else {
       // Short: check system has enough cash to buy back
@@ -331,6 +335,7 @@ export async function handleStock(env, request, path, user) {
       await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
       await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
       await updateKline(db, companyId, newPrice, quantity, now);
+      await logTransaction(db, user.id, 'stock_sell', marginAmount, `槓桿做空 ${quantity}股 @ $${newPrice} (${leverage}x)`);
       return { success: true, price: newPrice, quantity, leverage, marginAmount };
     }
   }
@@ -363,11 +368,13 @@ async function closePosition(db, pos) {
       await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(pos.quantity, pos.user_id, pos.company_id).run();
     }
     await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(pos.quantity, pos.company_id).run();
+    await logTransaction(db, pos.user_id, 'stock_sell', Math.max(totalReturn, 0), `平倉做多 ${pos.quantity}股 @ $${currentPrice}`);
   } else {
     const buyCost = currentPrice * pos.quantity;
     const totalReturn = (pos.loan_amount - buyCost) + pos.margin_amount - pos.dividend_debt;
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(Math.max(totalReturn, 0), pos.user_id).run();
     await db.prepare('UPDATE stock_inventory SET cash = cash - ? WHERE company_id = ?').bind(buyCost, pos.company_id).run();
+    await logTransaction(db, pos.user_id, 'stock_buy', Math.max(totalReturn, 0), `平倉做空 ${pos.quantity}股 @ $${currentPrice}`);
   }
   await db.prepare('DELETE FROM margin_positions WHERE id = ?').bind(pos.id).run();
   return { success: true };

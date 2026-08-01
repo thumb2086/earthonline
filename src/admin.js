@@ -1,3 +1,7 @@
+import { getUserSubscriptions } from './subscription.js';
+import { getIncomePerMin, getLivingCostRate } from './income.js';
+import { getCompanyProfit } from './company.js';
+
 const UPGRADE_INCOME = {
   computer: [0, 5, 12, 30, 75, 180, 450, 1200],
   server: [0, 10, 25, 60, 150, 380, 950, 2400],
@@ -11,21 +15,6 @@ function getBaseIncomePerMin(levels) {
     (UPGRADE_INCOME.ai_assistant[levels.ai_assistant] || 0);
 }
 
-async function getUserCompanyProfit(db, userId) {
-  const companies = await db.prepare('SELECT * FROM companies WHERE owner_id = ?').bind(userId).all();
-  let total = 0;
-  for (const c of companies.results) {
-    const employees = await db.prepare('SELECT output, efficiency, morale FROM employees WHERE user_id = ? AND company_id = ?').bind(userId, c.id).all();
-    const totalOutput = employees.results.reduce((s, e) => s + Math.floor(e.output * e.efficiency * (e.morale / 100)), 0);
-    const mult = { tech: 1.2, manufacturing: 1.0, finance: 1.3, service: 0.9 }[c.industry] || 1.0;
-    const equipBonus = 1 + 0.1 * (c.equipment_level - 1);
-    const brandBonus = 1 + 0.05 * (c.brand_level - 1);
-    const income = Math.floor(c.base_income * mult * (totalOutput || 1) * equipBonus * brandBonus);
-    total += Math.max(0, income - 18);
-  }
-  return total;
-}
-
 export async function handleAdmin(env, request, path, user) {
   if (user.role !== 'admin') return { error: '管理員專用' };
 
@@ -37,6 +26,12 @@ export async function handleAdmin(env, request, path, user) {
              w.cash, w.savings, w.bank, w.total_earned,
              (SELECT COUNT(*) FROM employees WHERE user_id = u.id) as employees,
              (SELECT COALESCE(SUM(quantity), 0) FROM stock_holdings WHERE user_id = u.id) as stocks,
+             (SELECT COUNT(*) FROM companies WHERE owner_id = u.id) as companies,
+             (SELECT COUNT(*) FROM departments d JOIN companies c ON c.id = d.company_id WHERE c.owner_id = u.id) as departments,
+             (SELECT COALESCE(SUM(amount), 0) FROM investments WHERE user_id = u.id) as investments,
+             (SELECT COALESCE(SUM(remaining), 0) FROM loans WHERE user_id = u.id AND status = 'active') as loans,
+             (SELECT COUNT(*) FROM margin_positions WHERE user_id = u.id) as margin,
+             (SELECT COUNT(*) FROM subscriptions WHERE user_id = u.id AND enabled = 1) as subscriptions,
              (SELECT computer FROM income_levels WHERE user_id = u.id) as computer,
              (SELECT server FROM income_levels WHERE user_id = u.id) as server,
              (SELECT ai_assistant FROM income_levels WHERE user_id = u.id) as ai_assistant
@@ -47,8 +42,28 @@ export async function handleAdmin(env, request, path, user) {
     const results = [];
     for (const u of users.results) {
       const base = getBaseIncomePerMin({ computer: u.computer, server: u.server, ai_assistant: u.ai_assistant });
-      const companyProfit = await getUserCompanyProfit(db, u.id);
-      results.push({ ...u, incomePerMin: base + companyProfit });
+      const subs = await getUserSubscriptions(db, u.id);
+      const baseIncome = await getIncomePerMin(db, u.id, subs);
+      const companies = await db.prepare('SELECT * FROM companies WHERE owner_id = ?').bind(u.id).all();
+      let companyProfit = 0;
+      for (const c of companies.results) {
+        const p = await getCompanyProfit(db, c, subs);
+        companyProfit += Math.max(0, p.profit);
+      }
+      const invInterest = await db.prepare('SELECT COALESCE(SUM(amount),0) as a FROM investments WHERE user_id = ?').bind(u.id).first();
+      const invPerMin = Math.floor((invInterest?.a || 0) * 0.0002);
+      const livingCost = Math.floor((baseIncome + companyProfit) * getLivingCostRate(baseIncome + companyProfit));
+      const subCost = Object.entries(subs).filter(([k, v]) => v).reduce((s, [k]) => s + ({ home: 2, cloud: 5, insurance: 10, ai: 20, finance: 50, consultant: 100 }[k] || 0), 0);
+      results.push({
+        ...u,
+        incomePerMin: base + companyProfit + invPerMin,
+        detail: {
+          baseIncome, companyProfit, invPerMin,
+          expenses: { livingCost, subCost, employeeSalary: 0 },
+          netPerMin: baseIncome + companyProfit + invPerMin - livingCost - subCost,
+          subscriptions: subs,
+        },
+      });
     }
     return results;
   }
@@ -97,8 +112,12 @@ export async function handleAdmin(env, request, path, user) {
     const investments = await db.prepare('SELECT * FROM investments WHERE user_id = ?').bind(targetId).all();
     const employees = await db.prepare('SELECT * FROM employees WHERE user_id = ?').bind(targetId).all();
     const positions = await db.prepare('SELECT * FROM margin_positions WHERE user_id = ?').bind(targetId).all();
+    const companies = await db.prepare('SELECT * FROM companies WHERE owner_id = ?').bind(targetId).all();
+    const depts = await db.prepare('SELECT d.* FROM departments d JOIN companies c ON c.id = d.company_id WHERE c.owner_id = ?').bind(targetId).all();
+    const subs = await getUserSubscriptions(db, targetId);
+    const incomeLevels = await db.prepare('SELECT * FROM income_levels WHERE user_id = ?').bind(targetId).first();
 
-    return { ...target, holdings: holdings.results, loans: loans.results, investments: investments.results, employees: employees.results, marginPositions: positions.results };
+    return { ...target, holdings: holdings.results, loans: loans.results, investments: investments.results, employees: employees.results, marginPositions: positions.results, companies: companies.results, departments: depts.results, subscriptions: subs, incomeLevels };
   }
 
   return null;

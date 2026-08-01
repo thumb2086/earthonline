@@ -1,3 +1,5 @@
+import { logTransaction, logHourly } from './utils.js';
+
 const SAVINGS_RATE = 0.0005;
 const LOAN_BASE_RATE = 0.0015;
 
@@ -8,6 +10,7 @@ export async function handleBank(env, request, path, user) {
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet || wallet.cash < amount) return { error: '餘額不足' };
     await db.prepare('UPDATE wallets SET cash = cash - ?, savings = savings + ? WHERE user_id = ?').bind(amount, amount, user.id).run();
+    await logTransaction(db, user.id, 'bank_deposit', -amount, `活存存入 $${amount.toLocaleString()}`);
     return { success: true };
   }
 
@@ -16,6 +19,7 @@ export async function handleBank(env, request, path, user) {
     const wallet = await db.prepare('SELECT savings FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet || wallet.savings < amount) return { error: '活存不足' };
     await db.prepare('UPDATE wallets SET cash = cash + ?, savings = savings - ? WHERE user_id = ?').bind(amount, amount, user.id).run();
+    await logTransaction(db, user.id, 'bank_withdraw', amount, `活存提款 $${amount.toLocaleString()}`);
     return { success: true };
   }
 
@@ -32,6 +36,7 @@ export async function handleBank(env, request, path, user) {
     const rate = Math.min(LOAN_BASE_RATE * (1 + amount / 100000), 0.01);
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(amount, user.id).run();
     await db.prepare('INSERT INTO loans (user_id, amount, interest_rate, remaining, borrowed_at) VALUES (?, ?, ?, ?, ?)').bind(user.id, amount, rate, amount, Date.now()).run();
+    await logTransaction(db, user.id, 'loan', amount, `借貸 $${amount.toLocaleString()}`);
     return { success: true };
   }
 
@@ -43,6 +48,7 @@ export async function handleBank(env, request, path, user) {
     if (!wallet || wallet.cash < loan.remaining) return { error: '餘額不足' };
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(loan.remaining, user.id).run();
     await db.prepare("UPDATE loans SET remaining = 0, status = 'closed' WHERE id = ?").bind(loanId).run();
+    await logTransaction(db, user.id, 'loan', -loan.remaining, `償還貸款 $${loan.remaining.toLocaleString()}`);
     return { success: true };
   }
 
@@ -51,6 +57,12 @@ export async function handleBank(env, request, path, user) {
 
 export async function processBankTick(db) {
   await db.prepare('UPDATE wallets SET cash = cash + CAST(savings * ? AS INTEGER)').bind(SAVINGS_RATE).run();
+
+  const users = await db.prepare('SELECT id, savings FROM wallets WHERE savings > 0').all();
+  for (const u of users.results) {
+    const interest = Math.floor(u.savings * SAVINGS_RATE);
+    if (interest > 0) await logHourly(db, u.id, 'bank_interest', interest, '活存利息');
+  }
 
   const loans = await db.prepare("SELECT id, user_id, remaining, interest_rate FROM loans WHERE status = 'active'").all();
   for (const loan of loans.results) {

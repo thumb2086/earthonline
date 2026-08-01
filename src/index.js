@@ -1,4 +1,4 @@
-import { corsHeaders, json, authCheck, createJWT } from './utils.js';
+import { corsHeaders, json, authCheck, createJWT, logTransaction, logHourly } from './utils.js';
 import { handleIncome, processIncomeTick, getIncomePerMin } from './income.js';
 import { handleBank, processBankTick } from './bank.js';
 import { handleInvestment, processInvestmentTick } from './investment.js';
@@ -7,6 +7,7 @@ import { handleCompany, processCompanyTick } from './company.js';
 import { handleStock, processMarginTick, finalizeIPO } from './stock.js';
 import { handleContract } from './contract.js';
 import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
+import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
@@ -153,11 +154,14 @@ export default {
         if (dbUser?.last_active) {
           const minutesAway = Math.floor((now - dbUser.last_active) / 60000);
           if (minutesAway > 2) {
-            const income = await getIncomePerMin(env.DB, user.id);
-            const halfRate = Math.floor(income * 0.5);
+            const subs = await getUserSubscriptions(env.DB, user.id);
+            const income = await getIncomePerMin(env.DB, user.id, subs);
+            const offlineRate = subs.cloud ? 0.8 : 0.5;
+            const halfRate = Math.floor(income * offlineRate);
             offlineEarnings = halfRate * Math.min(minutesAway, 1440);
             if (offlineEarnings > 0) {
               await env.DB.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(offlineEarnings, offlineEarnings, user.id).run();
+              await logTransaction(env.DB, user.id, 'income', offlineEarnings, '離線收益');
             }
           }
         }
@@ -181,6 +185,7 @@ export default {
         ['/api/company', handleCompany],
         ['/api/stock', handleStock],
         ['/api/contract', handleContract],
+        ['/api/subscription', handleSubscription],
         ['/api/admin', handleAdmin],
       ];
 
@@ -205,6 +210,7 @@ export default {
       await processInvestmentTick(db);
       await processEmployeeTick(db);
       await processCompanyTick(db);
+      await processSubscriptionTick(db);
       await finalizeIPO(db);
       await processMarginTick(db);
       await processStockTick(db);
@@ -247,7 +253,10 @@ async function processStockTick(db) {
     const holdings = await db.prepare('SELECT user_id, quantity FROM stock_holdings WHERE company_id = ?').bind(company.id).all();
     for (const h of holdings.results) {
       const payout = Math.floor(dividendPerShare * h.quantity);
-      if (payout > 0) await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, h.user_id).run();
+      if (payout > 0) {
+        await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, h.user_id).run();
+        await logHourly(db, h.user_id, 'dividend', payout, `${company.name}股利`);
+      }
     }
 
     const shortPositions = await db.prepare("SELECT id, user_id, quantity FROM margin_positions WHERE company_id = ? AND type = 'short'").bind(company.id).all();

@@ -45,6 +45,7 @@ export default function App() {
     { id: 'company', label: '🏢 公司' },
     { id: 'stock', label: '📈 股票' },
     { id: 'contract', label: '📋 合約' },
+    { id: 'subscription', label: '📦 訂閱' },
     { id: 'history', label: '💰 明細' },
     { id: 'leaderboard', label: '🏆 排行' },
   ]
@@ -85,6 +86,7 @@ export default function App() {
           {view === 'stock' && <Stock api={api} toast={toast} prompt={prompt} />}
           {view === 'contract' && <Contract api={api} toast={toast} />}
           {view === 'history' && <History api={api} />}
+          {view === 'subscription' && <Subscription api={api} toast={toast} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}
           {view === 'admin' && <AdminPanel api={api} />}
         </div>
@@ -265,24 +267,40 @@ function Employee({ api, toast }) {
 function Company({ api, toast, prompt, promptMulti }) {
   const [cs, setCs] = useState([]); const [employees, setEmployees] = useState([]); const [ipoList, setIpoList] = useState([])
   const [positions, setPositions] = useState([]); const [selectedCompany, setSelectedCompany] = useState(null)
+  const [deptData, setDeptData] = useState(null)
   const posLabels = { intern: '實習生', specialist: '專員', engineer: '工程師', manager: '經理', expert: '專家' }
-  const POSITIONS_MAP = { intern: { salary: 1 }, specialist: { salary: 5 }, engineer: { salary: 20 }, manager: { salary: 50 }, expert: { salary: 200 } }
+  const POSITIONS_MAP = { intern: { salary: 3 }, specialist: { salary: 15 }, engineer: { salary: 50 }, manager: { salary: 130 }, expert: { salary: 350 } }
   const refresh = () => {
     api('/api/company/list').then(d => setCs(Array.isArray(d) ? d : []));
     api('/api/employee/positions').then(d => setPositions(Array.isArray(d) ? d : []));
     api('/api/company/ipo/list?my=1').then(d => setIpoList(Array.isArray(d) ? d : []));
   }
   useEffect(() => { refresh() }, [])
-  useEffect(() => { if (selectedCompany) api('/api/employee/list?companyId=' + selectedCompany).then(d => setEmployees(Array.isArray(d) ? d : [])); }, [selectedCompany])
-  const create = () => prompt('公司名稱', async (name) => {
-    const r = await api('/api/company/create', { name, industry: 'tech' })
+  useEffect(() => { if (selectedCompany) { api('/api/employee/list?companyId=' + selectedCompany).then(d => setEmployees(Array.isArray(d) ? d : [])); api('/api/company/departments?companyId=' + selectedCompany).then(setDeptData) } }, [selectedCompany])
+  const create = () => promptMulti('創建公司 ($200,000)', [
+    { label: '公司名稱', placeholder: '輸入名稱', default: '' },
+    { label: '產業類型 (tech/manufacturing/finance/service)', placeholder: 'tech', default: 'tech' },
+  ], async ([name, industry]) => {
+    if (!name) return toast('請輸入公司名稱', 'error')
+    const ind = (industry || 'tech').trim().toLowerCase()
+    if (!['tech', 'manufacturing', 'finance', 'service'].includes(ind)) return toast('類型需為 tech/manufacturing/finance/service', 'error')
+    const r = await api('/api/company/create', { name, industry: ind })
     if (r.success) { refresh(); toast('公司創建成功', 'success') } else toast(r.error, 'error')
   })
   const hire = async (pos, qty) => {
     if (!selectedCompany) return toast('請先選擇公司', 'error')
-    const r = await api('/api/employee/hire', { position: pos, companyId: selectedCompany, quantity: qty || 1 })
+    const deptId = deptData?.departments?.length > 0 ? deptData.departments[0].id : undefined
+    const r = await api('/api/employee/hire', { position: pos, companyId: selectedCompany, quantity: qty || 1, departmentId: deptId })
     if (r.success) { api('/api/employee/list?companyId=' + selectedCompany).then(d => setEmployees(Array.isArray(d) ? d : [])); toast(`僱用 ${r.hired} 人`, 'success') }
     else toast(r.error, 'error')
+  }
+  const createDept = (type) => async () => {
+    const r = await api('/api/company/department/create', { companyId: selectedCompany, type })
+    if (r.success) { api('/api/company/departments?companyId=' + selectedCompany).then(setDeptData); toast('部門開設成功', 'success') } else toast(r.error, 'error')
+  }
+  const upgradeDept = async (id) => {
+    const r = await api('/api/company/department/upgrade/' + id)
+    if (r.success) { api('/api/company/departments?companyId=' + selectedCompany).then(setDeptData); toast('部門升級成功', 'success') } else toast(r.error, 'error')
   }
   const startIpo = (c) => {
     promptMulti('設定IPO參數', [
@@ -302,7 +320,7 @@ function Company({ api, toast, prompt, promptMulti }) {
       <div className="card mb-12">
         <div className="flex justify-between items-center">
           <div className="card-title" style={{margin:0}}>我的公司</div>
-          <button className="btn btn-primary btn-sm" onClick={create}>+ 創建 ($50,000)</button>
+          <button className="btn btn-primary btn-sm" onClick={create}>+ 創建 ($200,000)</button>
         </div>
       </div>
       {(cs || []).map(c => <div className="card mb-12" key={c.id}>
@@ -316,6 +334,21 @@ function Company({ api, toast, prompt, promptMulti }) {
           {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
         </div>
       </div>)}
+      {selectedCompany && cs.length > 0 && <div className="card mb-12">
+        <div className="card-title">🏢 部門 — {cs.find(c=>c.id===selectedCompany)?.name}</div>
+        {(deptData?.departments || []).map(d => (
+          <div className="stat" key={d.id}>
+            <span className="text-accent" style={{fontWeight:600}}>{deptData.available?.[d.type]?.label || d.type} Lv.{d.level}</span>
+            <button className="btn btn-sm" onClick={() => upgradeDept(d.id)}>升級</button>
+          </div>
+        ))}
+        {(!deptData?.departments || deptData.departments.length === 0) && <div className="text-dim text-sm mb-12">尚未開設部門（部門提供員工效率加成）</div>}
+        <div className="flex gap-8 flex-wrap mt-12">
+          {deptData?.available && Object.entries(deptData.available).map(([type, info]) => (
+            <button key={type} className="btn btn-sm" onClick={createDept(type)}>+ {info.label}</button>
+          ))}
+        </div>
+      </div>}
       {selectedCompany && cs.length > 0 && <div className="card mb-12"><div className="card-title">僱用員工 — {cs.find(c=>c.id===selectedCompany)?.name}</div>
         <div className="grid-2 gap-12 mt-12">{(positions || []).map(p => (
           <div className="card" key={p.position} style={{padding:14}}>
@@ -483,6 +516,11 @@ function Stock({ api, toast, prompt }) {
 
   return (
     <>
+      <div className="flex gap-8 mb-12">
+        {stockList.map(s => (
+          <button key={s.id} className={`btn ${selectedStock === s.id ? 'btn-primary' : ''}`} onClick={() => setSelectedStock(s.id)}>{s.name}</button>
+        ))}
+      </div>
       {ipo?.phase === 'ipo' && <div className="card mb-12" style={{borderColor:'var(--warn)'}}>
         <div className="card-title" style={{color:'var(--warn)'}}>🚀 IPO 認購中 — {stockNames[selectedStock] || '股票'}</div>
         <div className="text-dim mb-12">價格 ${ipo.price || 100}/股 · 每人上限 1,000 股</div>
@@ -495,12 +533,7 @@ function Stock({ api, toast, prompt }) {
         </div>
         <button className="btn btn-sm mt-12" onClick={subIpo}>認購</button>
       </div>}
-      <div className="flex gap-8 mb-12">
-        {stockList.map(s => (
-          <button key={s.id} className={`btn ${selectedStock === s.id ? 'btn-primary' : ''}`} onClick={() => setSelectedStock(s.id)}>{s.name}</button>
-        ))}
-      </div>
-        {q && <><div className="grid-2 mt-12">
+        {ipo?.phase !== 'ipo' && q && <><div className="grid-2 mt-12">
           <div><div className="stat"><span className="stat-label">價格</span><span className="stat-value" style={{fontSize:20}}>${q.price}</span></div>
             <div className="stat"><span className="stat-label">買/賣</span><span className="stat-value">${q.buyPrice} / ${q.sellPrice}</span></div>
             <div className="stat"><span className="stat-label">單筆上限</span><span className="stat-value">{(q.maxTrade||0).toLocaleString()} 股</span></div></div>
@@ -525,7 +558,7 @@ function Stock({ api, toast, prompt }) {
         </div>
         <KLineChart api={api} timeframe={chartTimeframe} companyId={selectedStock} />
       </div>}
-      <div className="card mb-12">
+      {ipo?.phase !== 'ipo' && <div className="card mb-12">
         <div className="card-title">⚡ 槓桿交易</div>
         <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}} className="mt-12 mb-12">
           <select value={marginType} onChange={e => setMarginType(e.target.value)} className="select-sm">
@@ -563,8 +596,8 @@ function Stock({ api, toast, prompt }) {
             )
           })}
         </>}
-      </div>
-      <div className="grid-2">
+      </div>}
+      {ipo?.phase !== 'ipo' && <div className="grid-2">
         <div className="card"><div className="card-title">持倉</div>
           {(h || []).map(x => <div className="stat" key={x.company_id}><span className="stat-label">{x.company_name || '地球互動科技'}</span><span className="stat-value">{x.quantity} 股</span></div>)}
           {(!h || h.length === 0) && <div className="text-dim">無持股</div>}</div>
@@ -573,7 +606,7 @@ function Stock({ api, toast, prompt }) {
             <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲' : '▼'}</span> ${x.price}</span>
             <span className="stat-value">{x.quantity} 股</span></div>
           )}</div>
-      </div>
+      </div>}
     </>
   )
 }
@@ -639,27 +672,34 @@ function PieChart({ data, labels, colors, size = 200 }) {
       ctx.closePath()
       ctx.fillStyle = colors[i % colors.length]
       ctx.fill()
-
-      const pct = ((val / total) * 100).toFixed(1)
-      if (pct < 3) { angle += sliceAngle; return }
-      const midAngle = angle + sliceAngle / 2
-      const lx = cx + Math.cos(midAngle) * (r * 0.65)
-      const ly = cy + Math.sin(midAngle) * (r * 0.65)
-      ctx.fillStyle = '#fff'
-      ctx.font = '11px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText(`${labels[i]} ${pct}%`, lx, ly)
       angle += sliceAngle
     })
   }, [data, labels, colors, size])
 
-  return <canvas ref={canvasRef} style={{ display: 'block', margin: '0 auto' }} />
+  const total = data.reduce((s, v) => s + v, 0) || 1
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      <canvas ref={canvasRef} style={{ display: 'block' }} />
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {data.map((val, i) => {
+          const pct = ((val / total) * 100).toFixed(1)
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: colors[i % colors.length], flexShrink: 0 }} />
+              <span style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{labels[i]}</span>
+              <span style={{ color: 'var(--accent)', fontWeight: 600, flexShrink: 0 }}>{pct}%</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 const CHART_COLORS = ['#00ff41', '#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6']
 
 function AdminPanel({ api }) {
-  const [users, setUsers] = useState([]); const [stats, setStats] = useState(null)
+  const [users, setUsers] = useState([]); const [stats, setStats] = useState(null); const [expanded, setExpanded] = useState(null)
   useEffect(() => { api('/api/admin/users').then(d => setUsers(Array.isArray(d) ? d : [])); api('/api/admin/stats').then(setStats) }, [])
 
   const holdingsData = users.filter(u => u.stocks > 0).map(u => u.stocks)
@@ -698,9 +738,34 @@ function AdminPanel({ api }) {
       </div>
 
       <div className="card"><div className="card-title">使用者 ({users.length})</div>
-        {(users || []).map(u => <div className="stat" key={u.id}>
-          <span>#{u.id} {u.username} {u.role === 'admin' ? '⭐' : ''}</span>
-          <span className="text-dim text-sm">💰${(u.cash || 0).toLocaleString()} 📈${(u.total_earned || 0).toLocaleString()} ⏱${(u.incomePerMin || 0).toLocaleString()}/分</span>
+        {(users || []).map(u => <div className="stat" key={u.id} style={{flexDirection:'column', alignItems:'stretch', gap:6}}>
+          <div className="flex justify-between items-center">
+            <div>
+              <span style={{fontWeight:600}}>#{u.id} {u.username} {u.role === 'admin' ? '⭐' : ''}</span>
+              <div className="text-dim text-sm">💰${(u.cash || 0).toLocaleString()} 📈${(u.total_earned || 0).toLocaleString()} ⏱${(u.incomePerMin || 0).toLocaleString()}/分</div>
+            </div>
+            <button className="btn btn-sm" onClick={() => setExpanded(expanded === u.id ? null : u.id)}>{expanded === u.id ? '收起' : '資產配置'}</button>
+          </div>
+          {expanded === u.id && <div className="card" style={{padding:12, marginTop:4}}>
+            <div className="grid-2 gap-8">
+              <div className="stat"><span className="stat-label">活存</span><span className="stat-value">${(u.savings||0).toLocaleString()}</span></div>
+              <div className="stat"><span className="stat-label">定存</span><span className="stat-value">${(u.bank||0).toLocaleString()}</span></div>
+              <div className="stat"><span className="stat-label">持股</span><span className="stat-value">{u.stocks||0} 股</span></div>
+              <div className="stat"><span className="stat-label">投資</span><span className="stat-value">${(u.investments||0).toLocaleString()}</span></div>
+              <div className="stat"><span className="stat-label">貸款</span><span className="stat-value">${(u.loans||0).toLocaleString()}</span></div>
+              <div className="stat"><span className="stat-label">槓桿倉位</span><span className="stat-value">{u.margin||0}</span></div>
+              <div className="stat"><span className="stat-label">公司</span><span className="stat-value">{u.companies||0} ({u.departments||0}部門)</span></div>
+              <div className="stat"><span className="stat-label">員工</span><span className="stat-value">{u.employees||0}人</span></div>
+            </div>
+            {u.detail && <div>
+              <div className="divider" />
+              <div className="text-sm">
+                <div className="text-dim">每分收支估算:</div>
+                <div>基礎 ${(u.detail.baseIncome||0).toLocaleString()} + 公司 ${(u.detail.companyProfit||0).toLocaleString()} + 利息 ${(u.detail.invPerMin||0).toLocaleString()}</div>
+                <div>- 生活費 ${(u.detail.expenses?.livingCost||0).toLocaleString()} - 訂閱 ${(u.detail.expenses?.subCost||0).toLocaleString()} = <span className="text-accent" style={{fontWeight:600}}>淨 ${(u.detail.netPerMin||0).toLocaleString()}/分</span></div>
+              </div>
+            </div>}
+          </div>}
         </div>)}
       </div>
     </>
@@ -710,7 +775,7 @@ function AdminPanel({ api }) {
 function History({ api }) {
   const [txs, setTxs] = useState([])
   useEffect(() => { api('/api/transactions?limit=100').then(d => setTxs(Array.isArray(d) ? d : [])) }, [])
-  const typeLabels = { income: '⬆️ 收入', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', ipo_subscribe: '🚀 IPO認購', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', loan: '🏦 貸款', employee_hire: '👥 僱用', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', dividend: '💰 股利' }
+  const typeLabels = { income: '⬆️ 基礎收入', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', ipo_subscribe: '🚀 IPO認購', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', bank_interest: '🏦 活存利息', loan: '🏦 借貸', employee_hire: '👥 僱用', employee_salary: '👥 薪資', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', investment_interest: '💼 投資利息', investment_loss: '💼 投資虧損', company_profit: '🏢 公司利潤', company_loss: '🏢 公司虧損', dividend: '💰 股利', living_cost: '🏠 生活費', subscription: '📦 訂閱月費' }
   const typeColors = { income: 'var(--accent)', expense: 'var(--danger)', stock_buy: 'var(--danger)', stock_sell: 'var(--accent)', ipo_subscribe: 'var(--warn)', employee_hire: 'var(--danger)', company_create: 'var(--danger)', upgrade: 'var(--danger)' }
   return (
     <div className="card">
@@ -727,6 +792,35 @@ function History({ api }) {
           <div className="flex justify-between">
             <span className="text-dim" style={{fontSize:12}}>{tx.description}</span>
             <span className="text-dim" style={{fontSize:12}}>{new Date(tx.created_at).toLocaleString('zh-TW')}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Subscription({ api, toast }) {
+  const [subs, setSubs] = useState([])
+  const load = () => api('/api/subscription/list').then(d => setSubs(Array.isArray(d) ? d : []))
+  useEffect(() => { load() }, [])
+  const toggle = async (key, enabled) => {
+    const r = await api('/api/subscription/toggle', { key })
+    if (r.success) { load(); toast(enabled ? '已停用' : '已啟用', 'success') } else toast(r.error, 'error')
+  }
+  return (
+    <div className="card">
+      <div className="card-title">📦 訂閱服務</div>
+      <div className="text-dim text-sm mb-12">每分鐘扣費 · 現金不足自動停用 · 收支明細可查看</div>
+      {(subs || []).map(s => (
+        <div className="stat" key={s.key} style={{borderBottom:'1px solid var(--border)', paddingBottom:10, marginBottom:10}}>
+          <div className="flex justify-between items-center">
+            <div>
+              <div style={{fontSize:14, fontWeight:600}}>{s.label}</div>
+              <div className="text-dim text-sm">${s.cost.toLocaleString()}/分 · {s.desc}</div>
+            </div>
+            <button className={`btn btn-sm ${s.enabled ? 'btn-danger' : 'btn-primary'}`} onClick={() => toggle(s.key, s.enabled)}>
+              {s.enabled ? '停用' : '啟用'}
+            </button>
           </div>
         </div>
       ))}

@@ -94,3 +94,13 @@ export async function authCheck(request, env) {
 export async function logTransaction(db, userId, type, amount, description) {
   await db.prepare('INSERT INTO transaction_history (user_id, type, amount, description, created_at) VALUES (?, ?, ?, ?, ?)').bind(userId, type, amount, description || '', Date.now()).run();
 }
+
+export async function logHourly(db, userId, type, amount, description) {
+  const hourStart = Math.floor(Date.now() / 3600000) * 3600000;
+  const existing = await db.prepare('SELECT id FROM transaction_history WHERE user_id = ? AND type = ? AND description = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 1').bind(userId, type, description || '', hourStart).first();
+  if (existing) {
+    await db.prepare('UPDATE transaction_history SET amount = amount + ? WHERE id = ?').bind(amount, existing.id).run();
+  } else {
+    await db.prepare('INSERT INTO transaction_history (user_id, type, amount, description, created_at) VALUES (?, ?, ?, ?, ?)').bind(userId, type, amount, description || '', Date.now()).run();
+  }
+}
