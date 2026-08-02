@@ -425,10 +425,10 @@ async function processPriceWave(db) {
     const closes = klines.results.map(k => k.close);
     const basePrice = closes.length > 0 ? closes.reduce((s, v) => s + v, 0) / closes.length : (c.share_price || 100);
     let price = c.share_price || basePrice;
-    // 回歸: 偏離移動平均越多拉回越多 (1% 回歸率)
+    // 回歸: 偏離移動平均越多拉回越多 (0.3% 回歸率, 允許買賣推升的價格維持)
     const deviation = basePrice > 0 ? (price - basePrice) / basePrice : 0;
     const drift = (Math.random() * 2 - 1) * 0.005;
-    const revert = -deviation * 0.01;
+    const revert = -deviation * 0.003;
     const newPrice = Math.max(1, Math.round(price * (1 + drift + revert)));
     // 無條件同步 share_price, 確保報價與 K 線一致
     if (newPrice !== price) {

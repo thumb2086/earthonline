@@ -1,7 +1,7 @@
 ﻿import { logTransaction, logHourly } from './utils.js';
 import { getUserSubscriptions } from './subscription.js';
 
-const INDUSTRY_MULT = { tech: 1.2, manufacturing: 1.0, finance: 1.3, service: 0.9 };
+export const INDUSTRY_MULT = { tech: 1.2, manufacturing: 1.0, finance: 1.3, service: 0.9 };
 const UPGRADE_COSTS = {
   office: [0, 5000, 20000, 80000, 300000, 1000000, 3000000],
   equipment: [0, 10000, 40000, 150000, 500000, 1500000, 4000000],
@@ -209,6 +209,65 @@ export async function handleCompany(env, request, path, user) {
     const params = myOnly ? [user.id] : [];
     const result = await db.prepare(query).bind(...params).all();
     return result.results;
+  }
+
+  // ===== 買下公司: 掛牌出售 / 收購市場 / 收購 =====
+  if (path === '/api/company/sell/offer') {
+    const { companyId, price } = await request.json();
+    const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
+    if (!company) return { error: '公司不存在' };
+    const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
+    if (ipo && ipo.phase === 'ipo') return { error: 'IPO進行中無法出售' };
+
+    const p = parseInt(price) || 0;
+    if (p <= 0) {
+      await db.prepare('UPDATE companies SET sell_price = 0 WHERE id = ?').bind(companyId).run();
+      await logTransaction(db, user.id, 'company_cancel_sell', 0, `取消出售「${company.name}」`);
+      return { success: true, selling: false };
+    }
+    if (p < 10000) return { error: '售價至少 $10,000' };
+    await db.prepare('UPDATE companies SET sell_price = ? WHERE id = ?').bind(p, companyId).run();
+    await logTransaction(db, user.id, 'company_offer', 0, `掛牌出售「${company.name}」 $${p.toLocaleString()}`);
+    return { success: true, selling: true, price: p };
+  }
+
+  if (path === '/api/company/market') {
+    const market = await db.prepare(`
+      SELECT c.*, u.username as owner_name FROM companies c
+      LEFT JOIN users u ON u.id = c.owner_id
+      WHERE c.sell_price > 0 ORDER BY c.sell_price ASC
+    `).all();
+    const subs = await getUserSubscriptions(db, user.id);
+    return Promise.all(market.results.map(async c => {
+      const profit = await getCompanyProfit(db, c, subs);
+      return { ...profit, owner_name: c.owner_name };
+    }));
+  }
+
+  if (path === '/api/company/buy') {
+    const { companyId } = await request.json();
+    const company = await db.prepare('SELECT * FROM companies WHERE id = ?').bind(companyId).first();
+    if (!company) return { error: '公司不存在' };
+    if (!company.owner_id || company.owner_id <= 0) return { error: '系統公司無法收購' };
+    if (company.owner_id === user.id) return { error: '不能收購自己的公司' };
+    if (!company.sell_price || company.sell_price <= 0) return { error: '該公司未掛牌出售' };
+    const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
+    if (ipo && ipo.phase === 'ipo') return { error: 'IPO進行中無法收購' };
+
+    const price = company.sell_price;
+    const fee = Math.floor(price * 0.02);
+    const total = price + fee;
+    const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
+    if (!wallet || wallet.cash < total) return { error: `餘額不足（需 $${total.toLocaleString()}）` };
+
+    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(total, user.id).run();
+    await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(price, price, company.owner_id).run();
+    await db.prepare('UPDATE companies SET owner_id = ?, sell_price = 0 WHERE id = ?').bind(user.id, companyId).run();
+    // 公司員工一併轉移給新 owner
+    await db.prepare('UPDATE employees SET user_id = ? WHERE company_id = ?').bind(user.id, companyId).run();
+    await logTransaction(db, user.id, 'company_buy', -total, `收購「${company.name}」 $${price.toLocaleString()}（含手續費 $${fee.toLocaleString()}）`);
+    await logTransaction(db, company.owner_id, 'company_sell', price, `出售「${company.name}」給 ${user.username || user.id}`);
+    return { success: true, price, fee, total };
   }
 
   return null;

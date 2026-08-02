@@ -377,6 +377,7 @@ function Company({ api, toast, prompt, promptMulti }) {
   const [positions, setPositions] = useState([]); const [selectedCompany, setSelectedCompany] = useState(null)
   const [deptData, setDeptData] = useState(null)
   const [acquirable, setAcquirable] = useState([])
+  const [market, setMarket] = useState([])
   const posLabels = { intern: '實習生', specialist: '專員', engineer: '工程師', manager: '經理', expert: '專家' }
   const POSITIONS_MAP = { intern: { salary: 3 }, specialist: { salary: 15 }, engineer: { salary: 50 }, manager: { salary: 130 }, expert: { salary: 350 } }
   const refresh = () => {
@@ -384,6 +385,7 @@ function Company({ api, toast, prompt, promptMulti }) {
     api('/api/employee/positions').then(d => setPositions(Array.isArray(d) ? d : []));
     api('/api/company/ipo/list?my=1').then(d => setIpoList(Array.isArray(d) ? d : []));
     api('/api/company/acquirable').then(d => setAcquirable(Array.isArray(d) ? d : [])).catch(()=>{});
+    api('/api/company/market').then(d => setMarket(Array.isArray(d) ? d : [])).catch(()=>{});
   }
   useEffect(() => { refresh() }, [])
   useEffect(() => { if (selectedCompany) { api('/api/employee/list?companyId=' + selectedCompany).then(d => setEmployees(Array.isArray(d) ? d : [])); api('/api/company/departments?companyId=' + selectedCompany).then(setDeptData) } }, [selectedCompany])
@@ -412,6 +414,20 @@ function Company({ api, toast, prompt, promptMulti }) {
   const buyout = (c) => prompt(`收購 ${c.name}（$2${c.buyoutPrice.toLocaleString()}？）`, async (s) => {
     const r = await api('/api/company/buyout', { companyId: c.id })
     if (r.success) { toast(`收購成功！支付 $${r.buyPrice.toLocaleString()}`, 'success'); refresh() } else toast(r.error, 'error')
+  })
+  const offerSell = (c) => prompt(`掛牌出售 ${c.name}？輸入售價$`, async (v) => {
+    const price = parseInt(v); if (!price || price <= 0) return toast('價格無效', 'error')
+    const r = await api('/api/company/sell/offer', { companyId: c.id, price })
+    if (r.success) { refresh(); toast('已掛牌出售', 'success') } else toast(r.error, 'error')
+  })
+  const cancelSell = async (c) => {
+    const r = await api('/api/company/sell/offer', { companyId: c.id, price: 0 })
+    if (r.success) { refresh(); toast('已取消出售', 'success') } else toast(r.error, 'error')
+  }
+  const buyCompany = (c) => prompt(`確認收購 ${c.name}？$${(c.sell_price || 0).toLocaleString()}（員工將一併轉移）輸入 yes 確認`, async (v) => {
+    if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
+    const r = await api('/api/company/buy', { companyId: c.id })
+    if (r.success) { refresh(); toast(`收購成功！共支付 $${r.total.toLocaleString()}（含手續費 $${r.fee.toLocaleString()}）`, 'success') } else toast(r.error, 'error')
   })
   const hire = async (pos, qty) => {
     if (!selectedCompany) return toast('請先選擇公司', 'error')
@@ -465,8 +481,20 @@ function Company({ api, toast, prompt, promptMulti }) {
           <button className={`btn btn-sm ${selectedCompany===c.id?'btn-primary':''}`} onClick={() => setSelectedCompany(c.id)}>選擇此公司</button>
           {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
           {c.phase && <button className="btn btn-sm" onClick={() => diluteCompany(c)}>＋ 增資</button>}
+          {c.sell_price > 0
+            ? <button className="btn btn-sm" onClick={() => cancelSell(c)}>取消掛牌</button>
+            : <button className="btn btn-sm" onClick={() => offerSell(c)}>掛牌出售</button>}
         </div>
       </div>)}
+      {market.length > 0 && <div className="card mb-12">
+        <div className="card-title">🏦 收購市場</div>
+        {market.map(c => (
+          <div className="stat" key={c.id}>
+            <span><span style={{fontWeight:600}}>{c.name}</span> <span className="text-dim text-sm">{c.owner_name || ''} 掛牌 · ${c.sell_price?.toLocaleString?.() || 0}</span></span>
+            <button className="btn btn-sm btn-warn" onClick={() => buyCompany(c)}>買下</button>
+          </div>
+        ))}
+      </div>}
       {selectedCompany && cs.length > 0 && <div className="card mb-12">
         <div className="card-title">🏢 部門 — {cs.find(c=>c.id===selectedCompany)?.name}</div>
         {(deptData?.departments || []).map(d => (
@@ -752,6 +780,25 @@ function Stock({ api, toast, prompt, user }) {
   }
   const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})${r.limitHit ? ' ⚠️已達跌停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
   const subIpo = () => prompt('認購股數', async (s) => { const r = await api('/api/stock/ipo/subscribe', { companyId: selectedStock, shares: parseInt(s) }); if (r.success) { toast(`認購 ${s} 股成功`, 'success'); refreshStock() } else toast(r.error, 'error') })
+  const registerStock = () => promptMulti('自訂加股 ($200,000) 立即上市', [
+    { label: '股票名稱 (2~20字)', placeholder: '例: 天網科技', default: '' },
+    { label: '產業', options: [
+      { value: 'tech', label: '🔧 科技 (tech)' },
+      { value: 'manufacturing', label: '🏭 製造 (manufacturing)' },
+      { value: 'finance', label: '💰 金融 (finance)' },
+      { value: 'service', label: '🛒 服務 (service)' },
+    ], default: 'tech' },
+    { label: '發行價 $10~$100', placeholder: '50', default: '50' },
+    { label: '發行股數 1,000~100,000', placeholder: '10000', default: '10000' },
+  ], async ([name, industry, price, shares]) => {
+    const ind = (industry || 'tech').trim().toLowerCase()
+    const p = parseInt(price); const sh = parseInt(shares)
+    if (!name || !p || !sh) return toast('請填完整', 'error')
+    if (sh * p > 2000000) return toast('發行規模過大（股數 × 價格 ≤ $2,000,000）', 'error')
+    const r = await api('/api/stock/register', { name: name.trim(), industry: ind, price: p, shares: sh })
+    if (r.success) { toast(`新股票 ${r.name} 已上市！（創辦人持有 ${(r.totalShares - r.floatShares).toLocaleString()} 股）`, 'success'); refreshStock() }
+    else toast(r.error, 'error')
+  })
 
   const openMargin = async () => {
     const qty = parseInt(marginQty); const lev = parseInt(marginLev)
@@ -792,6 +839,7 @@ function Stock({ api, toast, prompt, user }) {
         {stockList.map(s => (
           <button key={s.id} className={`btn ${selectedStock === s.id ? 'btn-primary' : ''}`} onClick={() => setSelectedStock(s.id)}>{s.name}</button>
         ))}
+        <button className="btn btn-sm btn-warn" onClick={registerStock}>＋ 自訂加股</button>
       </div>
       {ipo?.phase === 'ipo' && <div className="card mb-12" style={{borderColor:'var(--warn)'}}>
         <div className="card-title" style={{color:'var(--warn)'}}>🚀 IPO 認購中 — {stockNames[selectedStock] || '股票'}</div>
