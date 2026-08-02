@@ -375,6 +375,7 @@ function Employee({ api, toast }) {
 function Company({ api, toast, prompt, promptMulti }) {
   const [cs, setCs] = useState([]); const [employees, setEmployees] = useState([]); const [ipoList, setIpoList] = useState([])
   const [positions, setPositions] = useState([]); const [selectedCompany, setSelectedCompany] = useState(null)
+  const [deptData, setDeptData] = useState(null); const [market, setMarket] = useState([]); const [holdings, setHoldings] = useState([])
   const [deptData, setDeptData] = useState(null)
   const [acquirable, setAcquirable] = useState([])
   const [market, setMarket] = useState([])
@@ -385,6 +386,7 @@ function Company({ api, toast, prompt, promptMulti }) {
     api('/api/company/list').then(d => setCs(Array.isArray(d) ? d : []));
     api('/api/employee/positions').then(d => setPositions(Array.isArray(d) ? d : []));
     api('/api/company/ipo/list?my=1').then(d => setIpoList(Array.isArray(d) ? d : []));
+    api('/api/company/market').then(d => setMarket(Array.isArray(d) ? d : []));
     api('/api/company/acquirable').then(d => setAcquirable(Array.isArray(d) ? d : [])).catch(()=>{});
     api('/api/company/market').then(d => setMarket(Array.isArray(d) ? d : [])).catch(()=>{});
     api('/api/stock/holdings').then(d => setHoldings(Array.isArray(d) ? d : []));
@@ -470,6 +472,11 @@ function Company({ api, toast, prompt, promptMulti }) {
     const r = await api('/api/company/liquidate', { companyId: c.id })
     if (r.success) { refresh(); toast(`公司已清算，獲得 $${r.payout.toLocaleString()}`, 'success') } else toast(r.error, 'error')
   })
+  const liquidate = (c) => prompt(`清算「${c.name}」可得 $${(c.liquidationValue || 0).toLocaleString()}？(公司將解散且股票下市，輸入 yes 確認)`, async (v) => {
+    if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
+    const r = await api('/api/company/liquidate', { companyId: c.id })
+    if (r.success) { refresh(); toast(`公司已清算，獲得 $${r.payout.toLocaleString()}`, 'success') } else toast(r.error, 'error')
+  })
   const heldOf = (companyId) => holdings.find(x => x.company_id === companyId)?.quantity || 0
   const retire = (c) => {
     const held = heldOf(c.id)
@@ -500,6 +507,10 @@ function Company({ api, toast, prompt, promptMulti }) {
         <div className="flex gap-8 mt-12">
           <button className={`btn btn-sm ${selectedCompany===c.id?'btn-primary':''}`} onClick={() => setSelectedCompany(c.id)}>選擇此公司</button>
           {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
+          {heldOf(c.id) > 0 && <button className="btn btn-sm" onClick={() => retire(c)}>退股</button>}
+          {c.sell_price > 0
+            ? <button className="btn btn-sm" onClick={() => cancelSell(c)}>取消出售</button>
+            : <button className="btn btn-sm" onClick={() => offerSell(c)}>🏷️ 掛牌出售</button>}
           {c.phase && <button className="btn btn-sm" onClick={() => diluteCompany(c)}>＋ 增資</button>}
           {heldOf(c.id) > 0 && <button className="btn btn-sm" onClick={() => retire(c)}>退股</button>}
           {c.sell_price > 0
