@@ -339,10 +339,18 @@ async function processStockTick(db, doDividend = true) {
       const sellVol = trades.results.filter(t => t.type === 'sell').reduce((s, t) => s + t.quantity, 0);
       try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, buyVol, sellVol, block).run(); } catch (e) {}
     } else {
-      // 無交易: 價格不變, 只補K線
+      // 無交易: 每5分鐘窗口第一次tick時微幅波動(±0.5%)
       const prev = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 1').bind(company.id).first();
       const prevClose = prev?.close || company.share_price || 100;
-      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(company.id, prevClose, prevClose, prevClose, prevClose, block).run(); } catch (e) {}
+      let kClose = prevClose;
+      const fiveMinBlock = Math.floor(block / 300000) * 300000;
+      const firstTickInWindow = !prev || prev.minute < fiveMinBlock;
+      if (firstTickInWindow && Math.random() < 0.5) {
+        const drift = (Math.random() * 2 - 1) * 0.005;
+        kClose = Math.max(1, Math.round(prevClose * (1 + drift)));
+        await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(kClose, company.id).run();
+      }
+      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(company.id, prevClose, Math.max(prevClose, kClose), Math.min(prevClose, kClose), kClose, block).run(); } catch (e) {}
     }
 
     if (!doDividend) continue;

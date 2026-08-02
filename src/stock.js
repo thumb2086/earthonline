@@ -312,10 +312,12 @@ export async function handleStock(env, request, path, user) {
     const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
     const ipo = await db.prepare('SELECT * FROM ipo_state WHERE company_id = ?').bind(companyId).first();
     const company = await db.prepare('SELECT share_price, total_shares FROM companies WHERE id = ?').bind(companyId).first();
+    const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
     const subs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = ?').bind(companyId).first();
     const mySubs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = ? AND user_id = ?').bind(companyId, user.id).first();
     const myHoldings = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).first();
-    const maxSub = Math.floor((company?.total_shares || 100000) * 0.3);
+    // IPO上限 = 實際發行量 (系統庫存), 不是 total_shares
+    const maxSub = inv?.stock_quantity || 0;
     const remainMs = ipo?.started_at ? Math.max(0, ((ipo.duration_minutes || 60) * 60000) - (Date.now() - ipo.started_at)) : 0;
     return { phase: ipo?.phase, subscribed: subs?.total || 0, maxSubscribed: maxSub, price: company?.share_price || 100, myShares: mySubs?.total || 0, myHoldings: myHoldings?.quantity || 0, remainMs, isFull: (subs?.total || 0) >= maxSub };
   }
@@ -335,8 +337,8 @@ export async function handleStock(env, request, path, user) {
     if ((userSubs?.total || 0) + shares > 1000) return { error: '每人上限 1,000 股' };
 
     const totalSubs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = ?').bind(companyId).first();
-    const totalShares = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
-    const ipoMax = Math.floor((totalShares?.total_shares || 1000000) * 0.3);
+    const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
+    const ipoMax = inv?.stock_quantity || 0;
     if ((totalSubs?.total || 0) + shares > ipoMax) return { error: `IPO 額度已滿 (${ipoMax.toLocaleString()})` };
 
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost, user.id).run();
@@ -493,8 +495,8 @@ export async function finalizeIPO(db) {
     const durationMs = (ipo.duration_minutes || 60) * 60000;
     const timeUp = Date.now() - ipo.started_at >= durationMs;
 
-    const company = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(ipo.company_id).first();
-    const maxSub = Math.floor((company?.total_shares || 100000) * 0.3);
+    const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(ipo.company_id).first();
+    const maxSub = inv?.stock_quantity || 0;
     const subTotal = await db.prepare('SELECT COALESCE(SUM(shares), 0) as t FROM ipo_subscriptions WHERE company_id = ?').bind(ipo.company_id).first();
     const isFull = (subTotal?.t || 0) >= maxSub;
 

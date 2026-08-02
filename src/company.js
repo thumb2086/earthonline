@@ -148,10 +148,14 @@ export async function handleCompany(env, request, path, user) {
     let query = `SELECT c.*, i.phase, COALESCE(inv.stock_quantity, 0) as inventory,
       (SELECT COALESCE(SUM(shares),0) FROM ipo_subscriptions WHERE company_id=c.id) as subscribed
       FROM companies c LEFT JOIN ipo_state i ON c.id=i.company_id LEFT JOIN stock_inventory inv ON c.id=inv.company_id`;
-    if (myOnly) { query += ' WHERE c.owner_id = ?'; }
-    else { query += ' WHERE c.owner_id = 0 OR c.owner_id = ?'; }
+    if (myOnly) {
+      query += ' WHERE c.owner_id = ?';
+    } else {
+      // IPO/已上市是公開的, 所有玩家都看得到
+      query += ' WHERE i.phase IS NOT NULL';
+    }
     query += ' ORDER BY c.id';
-    const params = myOnly ? [user.id] : [user.id];
+    const params = myOnly ? [user.id] : [];
     const result = await db.prepare(query).bind(...params).all();
     return result.results;
   }

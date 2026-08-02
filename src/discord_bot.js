@@ -117,12 +117,15 @@ export async function handleInteractions(request, env) {
         if (!ipo || ipo.phase !== 'trading') return textResponse(`🟡 **${company.name}** 尚未上市（${ipo?.phase || '未IPO'}）`);
         const inv = await db.prepare('SELECT stock_quantity, cash FROM stock_inventory WHERE company_id = ?').bind(company.id).first();
         const circulating = (company.total_shares || 0) - (inv?.stock_quantity || 0);
+        const lastTrade = await db.prepare('SELECT traded_at FROM stock_trades WHERE company_id = ? ORDER BY traded_at DESC LIMIT 1').bind(company.id).first();
+        const lastTime = lastTrade?.traded_at ? new Date(lastTrade.traded_at).toLocaleString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
         return textResponse(
           `📈 **${company.name}**\n` +
           `價格 **$${company.share_price}**\n` +
           `流通 ${circulating.toLocaleString()} 股 · 庫存 ${(inv?.stock_quantity || 0).toLocaleString()} 股\n` +
           `單筆上限 ${Math.max(1, Math.floor(circulating * 0.05)).toLocaleString()} 股\n` +
-          `手續費 1.5%`
+          `手續費 1.5%\n` +
+          `⏱ 最後成交 ${lastTime}`
         );
       }
 
