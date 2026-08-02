@@ -1,4 +1,4 @@
-import { logTransaction } from './utils.js';
+﻿import { logTransaction } from './utils.js';
 
 const SPREAD_BASE = 0.03;
 const FEE_RATE = 0.015;
@@ -27,14 +27,20 @@ async function getCurrentPrice(db, companyId) {
   return last?.price || 100;
 }
 
-async function updateKline(db, companyId, price, quantity, timestamp) {
+async function updateKline(db, companyId, price, quantity, timestamp, type = null) {
   const interval = 5000;
   const block = Math.floor(timestamp / interval) * interval;
   const existing = await db.prepare('SELECT id FROM stock_klines WHERE company_id = ? AND minute = ?').bind(companyId, block).first();
   if (existing) {
-    await db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ?, volume = volume + ? WHERE id = ?').bind(price, price, price, quantity, existing.id).run();
+    if (type === 'buy') {
+      await db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ?, volume = volume + ?, buy_volume = buy_volume + ? WHERE id = ?').bind(price, price, price, quantity, quantity, existing.id).run();
+    } else if (type === 'sell') {
+      await db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ?, volume = volume + ?, sell_volume = sell_volume + ? WHERE id = ?').bind(price, price, price, quantity, quantity, existing.id).run();
+    } else {
+      await db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ?, volume = volume + ? WHERE id = ?').bind(price, price, price, quantity, existing.id).run();
+    }
   } else {
-    await db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(companyId, price, price, price, price, quantity, block).run();
+    await db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(companyId, price, price, price, price, quantity, type === 'buy' ? quantity : 0, type === 'sell' ? quantity : 0, block).run();
   }
 }
 
@@ -66,10 +72,15 @@ export async function handleStock(env, request, path, user) {
     const holdings = await db.prepare('SELECT sh.company_id, sh.quantity, c.name as company_name FROM stock_holdings sh JOIN companies c ON c.id = sh.company_id WHERE user_id = ?').bind(user.id).all();
     const results = [];
     for (const h of holdings.results) {
+      // 平均成本 = 總買入成本 / 總買入股數 (賣出不影響均價)
       const buys = await db.prepare("SELECT COALESCE(SUM(price * quantity), 0) as cost, COALESCE(SUM(quantity), 0) as qty FROM stock_trades WHERE user_id = ? AND company_id = ? AND type = 'buy'").bind(user.id, h.company_id).first();
-      const sells = await db.prepare("SELECT COALESCE(SUM(price * quantity), 0) as rev FROM stock_trades WHERE user_id = ? AND company_id = ? AND type = 'sell'").bind(user.id, h.company_id).first();
-      const netCost = (buys?.cost || 0) - (sells?.rev || 0);
-      const avgCost = h.quantity > 0 ? Math.max(0, Math.round(netCost / h.quantity)) : 0;
+      const buyQty = buys?.qty || 0;
+      let avgCost = buyQty > 0 ? Math.max(0, Math.round((buys?.cost || 0) / buyQty)) : 0;
+      // 若無買入紀錄(IPO認購/贈送), 用公司 IPO 價
+      if (avgCost === 0 && buyQty === 0) {
+        const comp = await db.prepare('SELECT share_price FROM companies WHERE id = ?').bind(h.company_id).first();
+        avgCost = comp?.share_price || 0;
+      }
       results.push({ ...h, avgCost });
     }
     return results;
@@ -105,8 +116,8 @@ export async function handleStock(env, request, path, user) {
   }
 
   if (path === '/api/stock/klines/agg') {
-    const companyId = 1;
     const reqUrl = new URL(request.url);
+    const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
     const aggMs = parseInt(reqUrl.searchParams.get('interval') || '300000');
     const limit = parseInt(reqUrl.searchParams.get('limit') || '120');
     const klines = await db.prepare('SELECT * FROM stock_klines WHERE company_id = ? ORDER BY minute DESC').bind(companyId).all();
@@ -187,7 +198,7 @@ export async function handleStock(env, request, path, user) {
 
     await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', buyPrice, quantity, now).run();
-    await updateKline(db, companyId, newPrice, quantity, now);
+    await updateKline(db, companyId, newPrice, quantity, now, 'buy');
     await logTransaction(db, user.id, 'stock_buy', -(totalCost + fee), `買入 ${quantity} 股 @ $${buyPrice}`);
     return { success: true, price: newPrice, fillPrice: buyPrice, quantity, totalCost: totalCost + fee };
   }
@@ -238,7 +249,7 @@ export async function handleStock(env, request, path, user) {
 
     await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
-    await updateKline(db, companyId, newPrice, quantity, now);
+    await updateKline(db, companyId, newPrice, quantity, now, 'sell');
     await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${newPrice}`);
     return { success: true, price: newPrice, fillPrice: newPrice, quantity, netRevenue };
   }
@@ -347,7 +358,7 @@ export async function handleStock(env, request, path, user) {
 
       await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
       await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', newPrice, quantity, now).run();
-      await updateKline(db, companyId, newPrice, quantity, now);
+      await updateKline(db, companyId, newPrice, quantity, now, 'buy');
       await logTransaction(db, user.id, 'stock_buy', -marginAmount, `槓桿做多 ${quantity}股 @ $${newPrice} (${leverage}x)`);
       return { success: true, price: newPrice, quantity, leverage, marginAmount };
     } else {
@@ -360,7 +371,7 @@ export async function handleStock(env, request, path, user) {
 
       await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
       await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
-      await updateKline(db, companyId, newPrice, quantity, now);
+      await updateKline(db, companyId, newPrice, quantity, now, 'sell');
       await logTransaction(db, user.id, 'stock_sell', marginAmount, `槓桿做空 ${quantity}股 @ $${newPrice} (${leverage}x)`);
       return { success: true, price: newPrice, quantity, leverage, marginAmount };
     }

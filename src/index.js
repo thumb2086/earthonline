@@ -335,7 +335,9 @@ async function processStockTick(db, doDividend = true) {
       const high = Math.max(...trades.results.map(t => t.price));
       const low = Math.min(...trades.results.map(t => t.price));
       const volume = trades.results.reduce((s, t) => s + t.quantity, 0);
-      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, block).run(); } catch (e) {}
+      const buyVol = trades.results.filter(t => t.type === 'buy').reduce((s, t) => s + t.quantity, 0);
+      const sellVol = trades.results.filter(t => t.type === 'sell').reduce((s, t) => s + t.quantity, 0);
+      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, buyVol, sellVol, block).run(); } catch (e) {}
     } else {
       // 無交易: 價格不變, 只補K線
       const prev = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 1').bind(company.id).first();

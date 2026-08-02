@@ -489,15 +489,15 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
-    setKlines([]); setLoaded(false)
+    setLoaded(false)
     const fetchKlines = () => {
       if (timeframe === 'realtime') {
-        api('/api/stock/klines?companyId=' + companyId).then(d => setKlines((Array.isArray(d) ? [...d].reverse() : []).slice(-120))).catch(()=>{})
+        api('/api/stock/klines?companyId=' + companyId).then(d => { setKlines((Array.isArray(d) ? [...d].reverse() : []).slice(-120)); setLoaded(true) }).catch(()=>{})
       } else {
-        api(`/api/stock/klines/agg?interval=${timeframe === '1h' ? '3600000' : '300000'}&limit=120&companyId=${companyId}`).then(d => setKlines(Array.isArray(d) ? d : [])).catch(()=>{})
+        api(`/api/stock/klines/agg?interval=${timeframe === '1h' ? '3600000' : '300000'}&limit=120&companyId=${companyId}`).then(d => { setKlines(Array.isArray(d) ? d : []); setLoaded(true) }).catch(()=>{})
       }
     }
-    fetchKlines(); setLoaded(true)
+    fetchKlines()
     const id = setInterval(fetchKlines, 5000)
     return () => clearInterval(id)
   }, [timeframe, companyId])
@@ -739,10 +739,10 @@ function Stock({ api, toast, prompt }) {
           <button className="btn btn-primary btn-sm" onClick={openMargin}>開倉</button>
         </div>
         <div className="text-dim text-sm">維持率 130% 追繳 · 100% 強制平倉</div>
-        {positions.length > 0 && <>
+        {positions.filter(p => p.company_id === selectedStock).length > 0 && <>
           <div className="divider" />
           <div className="card-title">槓桿持倉</div>
-          {positions.map(p => {
+          {positions.filter(p => p.company_id === selectedStock).map(p => {
             const pnl = p.type === 'long'
               ? ((q?.price || 0) - p.entry_price) * p.quantity - p.dividend_debt
               : (p.entry_price - (q?.price || 0)) * p.quantity - p.dividend_debt;
@@ -764,7 +764,7 @@ function Stock({ api, toast, prompt }) {
       </div>}
       {ipo?.phase !== 'ipo' && <div className="grid-2">
         <div className="card"><div className="card-title">持倉</div>
-          {(h || []).map(x => {
+          {(h || []).filter(x => x.company_id === selectedStock).map(x => {
             const pnl = ((q?.price || 0) - (x.avgCost || 0)) * x.quantity
             return (
               <div className="stat" key={x.company_id}>
