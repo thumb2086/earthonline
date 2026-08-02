@@ -151,6 +151,30 @@ export async function handleAdmin(env, request, path, user) {
     return rows.results;
   }
 
+  if (path === '/api/admin/grant' && request.method === 'POST') {
+    const { userId, amount, type = 'cash' } = await request.json();
+    if (!userId || !amount || amount === 0) return { error: '參數無效' };
+    const target = await db.prepare('SELECT id, username FROM users WHERE id = ?').bind(userId).first();
+    if (!target) return { error: '用戶不存在' };
+    const sign = amount > 0 ? '+' : '';
+    if (type === 'cash') {
+      await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(amount, userId).run();
+      await db.prepare('INSERT INTO transaction_history (user_id, type, amount, description, created_at) VALUES (?, ?, ?, ?, ?)').bind(userId, 'admin_grant', amount, `管理員${amount > 0 ? '贈送' : '扣除'} $${sign}${amount.toLocaleString()} 現金`, Date.now()).run();
+    } else if (type === 'earned') {
+      await db.prepare('UPDATE wallets SET total_earned = total_earned + ? WHERE user_id = ?').bind(amount, userId).run();
+    } else if (type === 'shares') {
+      const { companyId } = await request.json();
+      if (!companyId) return { error: '請指定公司' };
+      const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(userId, companyId).first();
+      if (holding) {
+        await db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(amount, userId, companyId).run();
+      } else {
+        await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(userId, companyId, amount).run();
+      }
+    }
+    return { success: true };
+  }
+
   if (path === '/api/admin/dilute' && request.method === 'POST') {
     const { companyId, shares } = await request.json();
     if (!companyId || !shares || shares <= 0) return { error: '參數無效' };

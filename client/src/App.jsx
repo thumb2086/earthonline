@@ -1074,6 +1074,7 @@ function PieChart({ data, labels, colors, size = 200 }) {
 const CHART_COLORS = ['#00ff41', '#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6']
 
 function AdminPanel({ api }) {
+  const { toast, prompt, promptMulti } = useToast()
   const [users, setUsers] = useState([]); const [stats, setStats] = useState(null); const [expanded, setExpanded] = useState(null)
   const [stockDist, setStockDist] = useState([])
   const [ipoList, setIpoList] = useState([])
@@ -1103,6 +1104,14 @@ function AdminPanel({ api }) {
       const shares = parseInt(n); if (!shares || shares <= 0) return
       const r = await api('/api/admin/dilute', { companyId, shares })
       if (r.success) { toast(`增資成功！${companyName} 總股數 → ${r.newTotal.toLocaleString()}`, 'success'); loadAll(exclude) }
+      else toast(r.error, 'error')
+    })
+  }
+  const grantMoney = (u) => {
+    prompt(`給 ${u.username} 加錢（負數=扣款）`, async (n) => {
+      const amount = parseInt(n); if (!amount) return
+      const r = await api('/api/admin/grant', { userId: u.id, amount })
+      if (r.success) { toast(`已${amount > 0 ? '加' : '扣'} $${Math.abs(amount).toLocaleString()} 給 ${u.username}`, 'success'); loadAll(exclude) }
       else toast(r.error, 'error')
     })
   }
@@ -1275,7 +1284,10 @@ function AdminPanel({ api }) {
               <span style={{fontWeight:600}}>#{u.id} {u.username} {u.role === 'admin' ? '⭐' : ''}</span>
               <div className="text-dim text-sm">💰${(u.cash || 0).toLocaleString()} 📈${(u.total_earned || 0).toLocaleString()} ⏱${(u.incomePerMin || 0).toLocaleString()}/分 📊${(u.stocks || 0)}股</div>
             </div>
-            <button className="btn btn-sm" onClick={() => setExpanded(expanded === u.id ? null : u.id)}>{expanded === u.id ? '收起' : '資產配置'}</button>
+            <div className="flex gap-8 items-center">
+              <button className="btn btn-sm" onClick={() => setExpanded(expanded === u.id ? null : u.id)}>{expanded === u.id ? '收起' : '資產配置'}</button>
+              <button className="btn btn-sm btn-warn" onClick={() => grantMoney(u)}>💰 加錢</button>
+            </div>
           </div>
           {expanded === u.id && <div className="card" style={{padding:12, marginTop:4}}>
             <div className="grid-2 gap-8">

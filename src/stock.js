@@ -15,9 +15,9 @@ function roundPrice(p) { return Math.round(p * 100) / 100; }
 
 function getPriceImpact(quantity, circulating, totalShares) {
   if (circulating <= 0) return 0;
-  const effective = Math.max(circulating, totalShares * MIN_CIRCULATING_RATIO);
-  const ratio = quantity / effective;
-  const rawImpact = Math.sqrt(ratio) * 0.15;
+  // 分母 = 流通 + 本筆量: 單筆大單佔比決定影響 (不受總股本無限膨脹稀釋)
+  const ratio = quantity / (circulating + quantity);
+  const rawImpact = Math.sqrt(ratio) * 0.5;
   return Math.min(rawImpact, MAX_PRICE_IMPACT);
 }
 
@@ -324,9 +324,9 @@ export async function handleStock(env, request, path, user) {
     }
 
     await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
-    await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', buyPrice, quantity, now).run();
+    await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', newPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now, 'buy');
-    await logTransaction(db, user.id, 'stock_buy', -(totalCost + fee), `買入 ${quantity} 股 @ $${buyPrice}`);
+    await logTransaction(db, user.id, 'stock_buy', -(totalCost + fee), `買入 ${quantity} 股 @ $${newPrice}`);
     return { success: true, price: newPrice, fillPrice: buyPrice, quantity, totalCost: totalCost + fee, limitHit };
   }
 
