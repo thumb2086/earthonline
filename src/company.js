@@ -39,7 +39,8 @@ export async function handleCompany(env, request, path, user) {
     return Promise.all(companies.results.map(async c => {
       const profit = await getCompanyProfit(db, c, subs);
       const depts = await db.prepare('SELECT * FROM departments WHERE company_id = ? ORDER BY id').bind(c.id).all();
-      return { ...profit, departments: depts.results };
+      const liquidationValue = await getLiquidationValue(db, c);
+      return { ...profit, liquidationValue, departments: depts.results };
     }));
   }
 
@@ -193,6 +194,31 @@ export async function handleCompany(env, request, path, user) {
     }));
   }
 
+  if (path === '/api/company/liquidate') {
+    const { companyId } = await request.json();
+    const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
+    if (!company) return { error: '公司不存在' };
+    const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
+    if (ipo && ipo.phase === 'ipo') return { error: 'IPO進行中無法清算，請先等待上市' };
+    const marginCount = await db.prepare('SELECT COUNT(*) as cnt FROM margin_positions WHERE company_id = ?').bind(companyId).first();
+    if ((marginCount?.cnt || 0) > 0) return { error: '該公司有槓桿持倉，無法清算' };
+    const otherHolders = await db.prepare('SELECT COUNT(*) as cnt FROM stock_holdings WHERE company_id = ? AND user_id != ? AND quantity > 0').bind(companyId, user.id).first();
+    if ((otherHolders?.cnt || 0) > 0) return { error: '尚有其他股東持股，無法清算' };
+
+    const value = await getLiquidationValue(db, company);
+    await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(value, value, user.id).run();
+    await logTransaction(db, user.id, 'company_liquidate', value, `清算公司「${company.name}」`);
+
+    await db.prepare('DELETE FROM companies WHERE id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM ipo_state WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM stock_inventory WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM departments WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM employees WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM stock_holdings WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM ipo_subscriptions WHERE company_id = ?').bind(companyId).run();
+    return { success: true, payout: value };
+  }
+
   if (path === '/api/company/buy') {
     const { companyId } = await request.json();
     const company = await db.prepare('SELECT * FROM companies WHERE id = ?').bind(companyId).first();
@@ -220,6 +246,26 @@ export async function handleCompany(env, request, path, user) {
   }
 
   return null;
+}
+
+// 清算價值: 升級/部門/員工投資的折價回收 + 營收基數
+const EMPLOYEE_HIRE_COSTS = { intern: 500, specialist: 5000, engineer: 30000, manager: 150000, expert: 800000 };
+const sumCosts = (arr, level) => arr.slice(1, Math.min(level + 1, arr.length)).reduce((a, b) => a + b, 0);
+
+async function getLiquidationValue(db, company) {
+  let value = 0;
+  value += Math.floor(sumCosts(UPGRADE_COSTS.office, company.office_level) * 0.6);
+  value += Math.floor(sumCosts(UPGRADE_COSTS.equipment, company.equipment_level) * 0.6);
+  value += Math.floor(sumCosts(UPGRADE_COSTS.brand, company.brand_level) * 0.6);
+  const depts = await db.prepare('SELECT type, level FROM departments WHERE company_id = ? ORDER BY id').bind(company.id).all();
+  depts.results.forEach((d, i) => {
+    value += Math.floor((DEPT_COSTS[i + 1] || 0) * 0.5);
+    value += Math.floor(sumCosts(DEPT_UPGRADE_COSTS, d.level) * 0.5);
+  });
+  const employees = await db.prepare('SELECT position FROM employees WHERE company_id = ?').bind(company.id).all();
+  employees.results.forEach(e => { value += Math.floor((EMPLOYEE_HIRE_COSTS[e.position] || 0) * 0.5); });
+  value += company.base_income * 60;
+  return value;
 }
 
 // 部門對員工效率加成: 職位命中 => 1 + 0.10 * deptLevel (plus 全體 +10% for marketing/support/asset/legal)
