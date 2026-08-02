@@ -373,7 +373,7 @@ function Employee({ api, toast }) {
 function Company({ api, toast, prompt, promptMulti }) {
   const [cs, setCs] = useState([]); const [employees, setEmployees] = useState([]); const [ipoList, setIpoList] = useState([])
   const [positions, setPositions] = useState([]); const [selectedCompany, setSelectedCompany] = useState(null)
-  const [deptData, setDeptData] = useState(null); const [market, setMarket] = useState([])
+  const [deptData, setDeptData] = useState(null); const [market, setMarket] = useState([]); const [holdings, setHoldings] = useState([])
   const posLabels = { intern: '實習生', specialist: '專員', engineer: '工程師', manager: '經理', expert: '專家' }
   const POSITIONS_MAP = { intern: { salary: 3 }, specialist: { salary: 15 }, engineer: { salary: 50 }, manager: { salary: 130 }, expert: { salary: 350 } }
   const refresh = () => {
@@ -381,6 +381,7 @@ function Company({ api, toast, prompt, promptMulti }) {
     api('/api/employee/positions').then(d => setPositions(Array.isArray(d) ? d : []));
     api('/api/company/ipo/list?my=1').then(d => setIpoList(Array.isArray(d) ? d : []));
     api('/api/company/market').then(d => setMarket(Array.isArray(d) ? d : []));
+    api('/api/stock/holdings').then(d => setHoldings(Array.isArray(d) ? d : []));
   }
   useEffect(() => { refresh() }, [])
   useEffect(() => { if (selectedCompany) { api('/api/employee/list?companyId=' + selectedCompany).then(d => setEmployees(Array.isArray(d) ? d : [])); api('/api/company/departments?companyId=' + selectedCompany).then(setDeptData) } }, [selectedCompany])
@@ -447,6 +448,17 @@ function Company({ api, toast, prompt, promptMulti }) {
     const r = await api('/api/company/liquidate', { companyId: c.id })
     if (r.success) { refresh(); toast(`公司已清算，獲得 $${r.payout.toLocaleString()}`, 'success') } else toast(r.error, 'error')
   })
+  const heldOf = (companyId) => holdings.find(x => x.company_id === companyId)?.quantity || 0
+  const retire = (c) => {
+    const held = heldOf(c.id)
+    if (held <= 0) return toast('你沒有該公司持股', 'error')
+    prompt(`退股「${c.name}」— 你持有 ${held.toLocaleString()} 股 @ 市價 $${c.share_price || 100}（輸入退股股數，股份將註銷）`, async (v) => {
+      const shares = parseInt(v); if (!shares || shares <= 0) return toast('股數無效', 'error')
+      if (shares > held) return toast(`超過持股（你持有 ${held.toLocaleString()} 股）`, 'error')
+      const r = await api('/api/company/retire', { companyId: c.id, shares })
+      if (r.success) { refresh(); toast(`退股 ${r.shares.toLocaleString()} 股 @ $${r.price}，實收 $${r.net.toLocaleString()}（股份已註銷）`, 'success') } else toast(r.error, 'error')
+    })
+  }
   return (
     <>
       <div className="card mb-12">
@@ -463,9 +475,11 @@ function Company({ api, toast, prompt, promptMulti }) {
         <div className="stat"><span className="stat-label">成本</span><span className="stat-value">${(c.costs || 0).toLocaleString()}/分</span></div>
         <div className="stat"><span className="stat-label">淨利潤</span><span className="stat-value">${(c.profit || 0).toLocaleString()}/分</span></div>
         <div className="stat"><span className="stat-label">清算可得</span><span className="stat-value">$${(c.liquidationValue || 0).toLocaleString()}</span></div>
+        <div className="stat"><span className="stat-label">你持股</span><span className="stat-value">{(heldOf(c.id) || 0).toLocaleString()} 股</span></div>
         <div className="flex gap-8 mt-12">
           <button className={`btn btn-sm ${selectedCompany===c.id?'btn-primary':''}`} onClick={() => setSelectedCompany(c.id)}>選擇此公司</button>
           {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
+          {heldOf(c.id) > 0 && <button className="btn btn-sm" onClick={() => retire(c)}>退股</button>}
           {c.sell_price > 0
             ? <button className="btn btn-sm" onClick={() => cancelSell(c)}>取消出售</button>
             : <button className="btn btn-sm" onClick={() => offerSell(c)}>🏷️ 掛牌出售</button>}
