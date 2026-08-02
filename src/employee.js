@@ -61,6 +61,24 @@ export async function handleEmployee(env, request, path, user) {
     return { success: true, hired: quantity };
   }
 
+  if (path === '/api/employee/fire') {
+    const { position, companyId, quantity = 1 } = await request.json();
+    if (!companyId) return { error: '請選擇公司' };
+    const company = await db.prepare('SELECT id FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
+    if (!company) return { error: '公司不存在或非owner' };
+    const info = POSITIONS[position];
+    if (!info) return { error: '無效職位' };
+
+    const rows = await db.prepare('SELECT id, efficiency FROM employees WHERE company_id = ? AND position = ? ORDER BY efficiency ASC LIMIT ?').bind(companyId, position, quantity).all();
+    if (rows.results.length === 0) return { error: '沒有可解僱的員工' };
+    const fired = rows.results.length;
+    const refund = Math.floor(info.hireCost * 0.5 * fired);
+    await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(refund, user.id).run();
+    await db.prepare('DELETE FROM employees WHERE id IN (' + rows.results.map(() => '?').join(',') + ')').bind(...rows.results.map(r => r.id)).run();
+    await logTransaction(db, user.id, 'employee_fire', refund, `解僱${fired}位${info.label}（退還50%）`);
+    return { success: true, fired, refund };
+  }
+
   if (path.startsWith('/api/employee/train/')) {
     const employeeId = parseInt(path.split('/').pop());
     const emp = await db.prepare('SELECT position, efficiency FROM employees WHERE id = ? AND user_id = ?').bind(employeeId, user.id).first();

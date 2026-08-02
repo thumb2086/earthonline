@@ -38,6 +38,59 @@ async function isAdmin(discordId, env) {
 }
 
 const CALLBACK_PATH = '/api/auth/cb';
+const GOOGLE_CALLBACK_PATH = '/api/auth/google/cb';
+
+async function handleGoogleLogin(request, env, headers, url) {
+  try {
+    const code = url.searchParams.get('code');
+    if (!code) return json({ error: 'Missing code' }, headers, 400);
+
+    const redirectUri = (env.FRONTEND_URL || `${url.origin}`) + GOOGLE_CALLBACK_PATH;
+    const bodyParams = new URLSearchParams();
+    bodyParams.append('client_id', env.GOOGLE_CLIENT_ID);
+    bodyParams.append('client_secret', env.GOOGLE_CLIENT_SECRET);
+    bodyParams.append('code', code);
+    bodyParams.append('grant_type', 'authorization_code');
+    bodyParams.append('redirect_uri', redirectUri);
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      body: bodyParams.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    if (!tokenRes.ok) return json({ error: 'Google token exchange failed' }, headers, 400);
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) return json({ error: 'Google OAuth failed' }, headers, 400);
+
+    const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { authorization: `Bearer ${tokenData.access_token}` },
+    });
+    if (!userRes.ok) return json({ error: 'Google user fetch failed' }, headers, 400);
+    const gUser = await userRes.json();
+
+    let account = await env.DB.prepare('SELECT id, username, role FROM users WHERE google_id = ?').bind(gUser.id).first();
+    if (!account) {
+      let baseName = (gUser.name || gUser.email || 'google_user').replace(/\s+/g, '_').replace(/[^\w\u4e00-\u9fff-]/g, '');
+      if (!baseName) baseName = 'google_user';
+      let finalName = baseName;
+      let counter = 1;
+      while (await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(finalName).first()) {
+        finalName = `${baseName}_${counter++}`;
+      }
+      const info = await env.DB.prepare('INSERT INTO users (username, password_hash, role, google_id, google_username, google_avatar, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(finalName, '', 'user', gUser.id, gUser.name || gUser.email, gUser.picture || '', Date.now()).run();
+      const userId = info.meta.last_row_id;
+      await env.DB.prepare('INSERT INTO wallets (user_id, cash, created_at) VALUES (?, 100, ?)').bind(userId, Date.now()).run();
+      await env.DB.prepare('INSERT INTO income_levels (user_id) VALUES (?)').bind(userId).run();
+      account = { id: userId, username: finalName, role: 'user' };
+    }
+
+    const token = await createJWT({ id: account.id, username: account.username, role: account.role }, env.JWT_SECRET);
+    const frontendUrl = env.FRONTEND_URL || `${url.origin}`;
+    return Response.redirect(`${frontendUrl}/?token=${token}`, 302);
+  } catch (err) {
+    return json({ error: 'google callback error: ' + err.message }, headers, 500);
+  }
+}
 
 async function handleDiscordLogin(request, env, headers, url) {
   try {
@@ -116,6 +169,16 @@ export default {
 
       if (path === CALLBACK_PATH && request.method === 'GET') {
         return await handleDiscordLogin(request, env, headers, url);
+      }
+
+      if (path === '/api/auth/google' && request.method === 'GET') {
+        const redirectUri = (env.FRONTEND_URL || `${url.origin}`) + GOOGLE_CALLBACK_PATH;
+        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
+        return Response.redirect(googleAuthUrl, 302);
+      }
+
+      if (path === GOOGLE_CALLBACK_PATH && request.method === 'GET') {
+        return await handleGoogleLogin(request, env, headers, url);
       }
 
       // Discord Bot interactions (slash commands)
@@ -334,7 +397,7 @@ export default {
 
 export { DiscordGateway };
 
-// 輕量價格波動: 每分鐘 ±1.5% + 寫入即時K線
+// 輕量價格波動: 每分鐘 ±0.5% + 回歸力(基準=近60分鐘移動平均, 純波動被抑制但買賣趨勢不被拉回)
 async function processPriceWave(db) {
   const companies = await db.prepare('SELECT id, share_price FROM companies').all();
   const now = Date.now();
@@ -343,15 +406,44 @@ async function processPriceWave(db) {
   for (const c of companies.results) {
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(c.id).first();
     if (!ipo || ipo.phase !== 'trading') continue;
-    let price = c.share_price || 100;
-    if (Math.random() < 0.7) {
-      const drift = (Math.random() * 2 - 1) * 0.015;
-      price = Math.max(1, Math.round(price * (1 + drift)));
+
+    // 自動增資 (每分鐘檢查): 庫存 < 35% 總股本 → 補足到 45%
+    const invRow = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(c.id).first();
+    if (invRow) {
+      const invMin = Math.floor(c.total_shares * 0.35);
+      if (invRow.stock_quantity < invMin) {
+        const topUp = Math.floor(c.total_shares * 0.45) - invRow.stock_quantity;
+        if (topUp > 0) {
+          await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, c.id).run();
+          await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, c.id).run();
+          await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${c.name} 庫存不足，自動增資發行 ${topUp.toLocaleString()} 股新股`, Date.now()).run();
+        }
+      }
+    }
+    // 基準 = 近60分鐘均價 (最後120根5秒K線)
+    const klines = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(c.id).all();
+    const closes = klines.results.map(k => k.close);
+    const basePrice = closes.length > 0 ? closes.reduce((s, v) => s + v, 0) / closes.length : (c.share_price || 100);
+    let price = c.share_price || basePrice;
+    // 回歸: 偏離移動平均越多拉回越多 (0.3% 回歸率, 允許買賣推升的價格維持)
+    const deviation = basePrice > 0 ? (price - basePrice) / basePrice : 0;
+    const drift = (Math.random() * 2 - 1) * 0.005;
+    const revert = -deviation * 0.003;
+    const newPrice = Math.max(1, Math.round(price * (1 + drift + revert)));
+    // 無條件同步 share_price, 確保報價與 K 線一致
+    if (newPrice !== price) {
+      await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, c.id).run();
+    } else {
       await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(price, c.id).run();
     }
-    // 寫入即時K線 (1筆)
+    // 寫入即時K線 (與交易 updateKline 相同語義: 保留 volume/買賣量, close=最新市價)
     try {
-      await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(c.id, price, price, price, price, block).run();
+      const existing = await db.prepare('SELECT id FROM stock_klines WHERE company_id = ? AND minute = ?').bind(c.id, block).first();
+      if (existing) {
+        await db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ? WHERE id = ?').bind(Math.max(price, newPrice), Math.min(price, newPrice), newPrice, existing.id).run();
+      } else {
+        await db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, Math.max(price, newPrice), Math.min(price, newPrice), newPrice, block).run();
+      }
     } catch (e) {}
   }
 }
@@ -361,6 +453,28 @@ async function processStockTick(db, doDividend = true) {
   for (const company of companies.results) {
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(company.id).first();
     if (!ipo || ipo.phase !== 'trading') continue;
+
+    // 自動收購: 某玩家持有超過 50% 總股數 → 自動成為 owner
+    if (company.owner_id === 0 || company.owner_id === null) {
+      const topHolder = await db.prepare('SELECT user_id, SUM(quantity) as total FROM stock_holdings WHERE company_id = ? GROUP BY user_id ORDER BY total DESC LIMIT 1').bind(company.id).first();
+      if (topHolder && topHolder.total > company.total_shares * 0.5) {
+        await db.prepare('UPDATE companies SET owner_id = ? WHERE id = ?').bind(topHolder.user_id, company.id).run();
+        const holderName = await db.prepare('SELECT username FROM users WHERE id = ?').bind(topHolder.user_id).first();
+        await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${holderName?.username || '玩家'} 持股超過 50%，收購 ${company.name}！`, Date.now()).run();
+      }
+    }
+
+    // 自動增資 (每2分鐘檢查, 與 processPriceWave 每分鐘檢查互補): 庫存 < 35% → 補到 45%
+    const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(company.id).first();
+    const minInv = Math.floor(company.total_shares * 0.35);
+    if (inv && inv.stock_quantity < minInv) {
+      const topUp = Math.floor(company.total_shares * 0.45) - inv.stock_quantity;
+      if (topUp > 0) {
+        await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, company.id).run();
+        await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, company.id).run();
+        await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${company.name} 庫存不足，自動增資發行 ${topUp.toLocaleString()} 股新股`, Date.now()).run();
+      }
+    }
 
     const interval = 5000;
     const block = Math.floor(Date.now() / interval) * interval;
