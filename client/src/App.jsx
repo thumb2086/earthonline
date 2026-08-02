@@ -420,7 +420,7 @@ function Company({ api, toast, prompt, promptMulti }) {
       const founderRatio = parseInt(founderStr) || 60
       const minutes = parseInt(minStr) || 60
       if (price < 10) return toast('價格至少$10', 'error')
-      if (totalShares < 1000) return toast('發行股數至少1,000', 'error')
+      if (totalShares < 100 || totalShares > 5000) return toast('發行股數需 100~5,000', 'error')
       if (founderRatio < 0 || founderRatio > 90) return toast('保留比例 0~90%', 'error')
       if (minutes < 5 || minutes > 1440) return toast('時間5~1440分鐘', 'error')
       const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: price, totalShares, ipoMinutes: minutes, founderRatio: founderRatio / 100 })

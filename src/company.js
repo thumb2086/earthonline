@@ -121,7 +121,7 @@ export async function handleCompany(env, request, path, user) {
     const existingIpo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
     if (existingIpo && existingIpo.phase !== null) return { error: '已有IPO記錄' };
     if (!ipoPrice || ipoPrice < 10) return { error: 'IPO價格至少$10' };
-    if (!totalShares || totalShares < 1000) return { error: '發行股數至少1,000' };
+    if (!totalShares || totalShares < 100 || totalShares > 5000) return { error: '發行股數需 100~5,000' };
     const minutes = Math.max(5, Math.min(1440, parseInt(ipoMinutes) || 60));
     // 創辦人保留比例 (IPO發行比例 = 1 - founderRatio)
     const founderKeep = Math.min(Math.max(parseFloat(founderRatio) || 0.6, 0), 0.9);
