@@ -433,3 +433,39 @@ select, .select-sm {
   max-height: 400px; overflow-y: auto;
 }
 .list-container::-webkit-scrollbar { width: 3px; }
+
+/* ─── Mobile Responsive ─── */
+@media (max-width: 768px) {
+  .topbar { padding: 0 12px; height: 52px; flex-wrap: wrap; }
+  .topbar-left { gap: 8px; flex-wrap: wrap; }
+  .badge { padding: 4px 10px; font-size: 11px; }
+  .badge-danger { display: none; }
+  .logo { font-size: 14px; }
+
+  .body { flex-direction: column; }
+  .sidebar {
+    width: 100%; flex-direction: row; overflow-x: auto;
+    padding: 8px; gap: 4px; border-right: none; border-bottom: 1px solid var(--border);
+  }
+  .tab { width: auto; white-space: nowrap; padding: 8px 12px; font-size: 12px; }
+  .tab.active { box-shadow: inset 0 -2px 0 var(--accent); }
+
+  .content { padding: 12px; }
+
+  .grid-3, .grid-4 { grid-template-columns: 1fr; gap: 10px; }
+  .grid-2 { grid-template-columns: 1fr; gap: 10px; }
+
+  .card { padding: 14px; }
+
+  .flex.gap-8, .flex.gap-12 { flex-wrap: wrap; }
+  input[type="number"], input[type="text"] { width: 100% !important; min-width: 0 !important; box-sizing: border-box; }
+  .btn { padding: 7px 12px; font-size: 12px; }
+}
+
+@media (max-width: 480px) {
+  .grid-2 { grid-template-columns: 1fr; }
+  .content { padding: 10px; }
+  .card { padding: 12px; }
+  .stat-label { font-size: 12px; }
+  .stat-value { font-size: 13px; }
+}

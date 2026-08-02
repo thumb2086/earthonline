@@ -13,6 +13,14 @@
     }
   ],
   "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "GATEWAY", "class_name": "DiscordGateway" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["DiscordGateway"] }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

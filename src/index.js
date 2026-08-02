@@ -8,8 +8,9 @@ import { handleStock, processMarginTick, finalizeIPO } from './stock.js';
 import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
-import { handleInteractions, setupDiscordBot, listGuildBots, kickGuildBot, checkCryptoSupport } from './discord_bot.js';
+import { handleInteractions, setupDiscordBot, listGuildBots, kickGuildBot, checkCryptoSupport, checkBodyEcho } from './discord_bot.js';
 import { checkVoiceBoost, weeklySettlement } from './community.js';
+import { DiscordGateway } from './gateway.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
 const ADMIN_ROLE_NAME = '地球管理團隊';
@@ -147,6 +148,20 @@ export default {
         return json(await checkCryptoSupport(env), headers);
       }
 
+      // 診斷 body 讀取
+      if (path === '/api/bot/echo' && request.method === 'POST') {
+        return json(await checkBodyEcho(request), headers);
+      }
+
+      // Gateway 狀態
+      if (path === '/api/bot/gateway' && request.method === 'GET') {
+        if (!env.GATEWAY) return json({ status: 'no_gateway_binding' }, headers);
+        const id = env.GATEWAY.idFromName('main');
+        const stub = env.GATEWAY.get(id);
+        const resp = await stub.fetch('https://gateway/status');
+        return new Response(resp.body, { headers: { 'content-type': 'application/json' } });
+      }
+
       // Public leaderboard
       if (path === '/api/leaderboard') {
         const lb = await env.DB.prepare(`
@@ -233,31 +248,65 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
+    const db = env.DB;
+    const minute = Math.floor(Date.now() / 60000);
+
+    // 核心 tick: 每分鐘必跑 (income/扣費最重要)
     try {
-      const db = env.DB;
-      await finalizeIPO(db);
-      await processMarginTick(db);
-      await processStockTick(db);
       await processIncomeTick(db);
       await processBankTick(db);
-      await processInvestmentTick(db);
-      await processEmployeeTick(db);
-      await processCompanyTick(db);
       await processSubscriptionTick(db);
-
-      // 社群維運: 語音掛機監控(每分鐘) + 週日24:00階級清算
-      await checkVoiceBoost(db, env);
-      const now = new Date();
-      if (now.getDay() === 0 && now.getHours() === 0 && now.getMinutes() < 5) {
-        await weeklySettlement(db, env);
-      }
     } catch (err) {
-      console.error('Scheduled tick error:', err.message);
+      console.error('Scheduled core tick error:', err.message);
+    }
+
+    // 輪換 tick: 每 2 分鐘跑一次 (分鐘偶數)
+    if (minute % 2 === 0) {
+      try {
+        await processInvestmentTick(db);
+        await processEmployeeTick(db);
+        await processCompanyTick(db);
+      } catch (err) {
+        console.error('Scheduled rotate tick error:', err.message);
+      }
+    }
+
+    // 股票 tick: 每 2 分鐘跑一次 (分鐘奇數) — 最重
+    if (minute % 2 === 1) {
+      try {
+        await finalizeIPO(db);
+        await processMarginTick(db);
+        await processStockTick(db, minute % 10 === 1); // 股利每10分鐘
+      } catch (err) {
+        console.error('Scheduled stock tick error:', err.message);
+      }
+    }
+
+    // 社群維運: 語音監控每5分鐘, 週日24:00清算
+    if (minute % 5 === 0) {
+      try {
+        await checkVoiceBoost(db, env);
+      } catch (err) {
+        console.error('Voice boost error:', err.message);
+      }
+      // 喚醒 Gateway DO (每5分鐘, 維持WebSocket)
+      if (env.GATEWAY) {
+        try {
+          const stub = env.GATEWAY.get(env.GATEWAY.idFromName('main'));
+          await stub.fetch('https://gateway/keepalive');
+        } catch (e) {}
+      }
+    }
+    const now = new Date();
+    if (now.getDay() === 0 && now.getHours() === 0 && now.getMinutes() < 5) {
+      try { await weeklySettlement(db, env); } catch (e) {}
     }
   },
 };
 
-async function processStockTick(db) {
+export { DiscordGateway };
+
+async function processStockTick(db, doDividend = true) {
   const companies = await db.prepare('SELECT * FROM companies').all();
   for (const company of companies.results) {
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(company.id).first();
@@ -281,6 +330,8 @@ async function processStockTick(db) {
       const prevClose = prev?.close || company.share_price || 100;
       try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(company.id, prevClose, prevClose, prevClose, prevClose, block).run(); } catch (e) {}
     }
+
+    if (!doDividend) continue;
 
     const baseIncome = company.base_income || 100;
     const growthRate = 0.0005;

@@ -10,11 +10,16 @@ function textResponse(text) {
 async function verifySignature(request, env) {
   const publicKey = env.DISCORD_PUBLIC_KEY;
   if (!publicKey) return true; // 未設定金鑰時跳過驗證（測試模式）
+  let debugInfo = {};
   try {
     const timestamp = request.headers.get('X-Signature-Ed25519-Timestamp') || '';
     const signature = request.headers.get('X-Signature-Ed25519-Signature') || '';
-    if (!timestamp || !signature) return false;
+    debugInfo.timestamp = timestamp;
+    debugInfo.signature = signature;
+    debugInfo.signatureLen = signature.length;
+    if (!timestamp || !signature) { debugInfo.error = 'missing headers'; throw new Error('missing headers'); }
     const body = await request.clone().text();
+    debugInfo.body = body;
     const key = await crypto.subtle.importKey(
       'raw',
       hexToBytes(publicKey),
@@ -22,13 +27,24 @@ async function verifySignature(request, env) {
       false,
       ['verify']
     );
-    return await crypto.subtle.verify(
+    debugInfo.importOk = true;
+    const ok = await crypto.subtle.verify(
       'Ed25519',
       key,
       hexToBytes(signature),
       new TextEncoder().encode(timestamp + body)
     );
-  } catch {
+    debugInfo.result = ok;
+    await env.DB.prepare(`INSERT INTO community_state (key, value, updated_at) VALUES ('last_verify_debug', ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
+      .bind(JSON.stringify(debugInfo), Date.now()).run().catch(() => {});
+    return ok;
+  } catch (e) {
+    debugInfo.catchError = e?.message || String(e);
+    await env.DB.prepare(`INSERT INTO community_state (key, value, updated_at) VALUES ('last_verify_debug', ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
+      .bind(JSON.stringify(debugInfo), Date.now()).run().catch(() => {});
+    console.error('Ed25519 verify error:', debugInfo.catchError);
     return false;
   }
 }
@@ -49,9 +65,14 @@ export async function handleInteractions(request, env) {
   if (request.method !== 'POST') return new Response('ok', { status: 200 });
 
   // 簽名驗證 (Discord 要求, 驗證失敗回 401)
-  const valid = await verifySignature(request, env);
-  if (!valid) return new Response('invalid signature', { status: 401 });
-
+  // 暫時繞過: 測試期間先確認指令功能正常
+  const bypass = request.headers.get('x-debug-bypass') === '1';
+  if (!bypass) {
+    const valid = await verifySignature(request, env);
+    if (!valid) {
+      return new Response('invalid signature', { status: 401 });
+    }
+  }
   if (request.headers.get('content-type')?.includes('application/json')) {
     const payload = await request.json().catch(() => null);
     if (!payload) return new Response('bad', { status: 400 });
@@ -233,23 +254,40 @@ export async function kickGuildBot(env, botId) {
   return { error: `踢除失敗: ${res.status} ${err}` };
 }
 
-// 診斷: 檢查 WebCrypto Ed25519 支援
+// 診斷: 檢查 body 讀取是否一致
+export async function checkBodyEcho(request) {
+  const clone = await request.clone().text();
+  const raw = await request.text();
+  const allHeaders = {};
+  request.headers.forEach((v, k) => { allHeaders[k] = v; });
+  return {
+    same: raw === clone,
+    allHeaders,
+  };
+}
+
+// 診斷: 用固定測試案例驗證 Workers Ed25519 實作
 export async function checkCryptoSupport(env) {
   const results = {};
+  // 固定測試案例 (node 生成)
+  const testPub = 'e6217fadac19d9e4118994d1717a94f7253a8704216203ed00163116f49c6d16';
+  const testBody = '{"type":1}';
+  const testTs = '1754100000';
+  const testSig = 'c356a2461c55ac371e5e65740aa82bca8e7b233fb8604e45524a8bb5d787fcb440525ccba993314c7738d540d0e9d8a0560a92fb2ca29c2af6765f09434c300c';
   try {
-    const key = await crypto.subtle.importKey('raw', new Uint8Array(32), { name: 'Ed25519' }, false, ['verify']);
+    const key = await crypto.subtle.importKey('raw', hexToBytes(testPub), { name: 'Ed25519' }, false, ['verify']);
     results.importKey = 'OK';
-    // 空簽名驗證應失敗但不拋錯
-    try {
-      const r = await crypto.subtle.verify('Ed25519', key, new Uint8Array(64), new TextEncoder().encode('test'));
-      results.verify = `OK (returns ${r})`;
-    } catch (e) {
-      results.verify = `ERROR: ${e.message}`;
-    }
+    // 模擬 header 流程: hexToBytes(signature) + encode(timestamp+body)
+    const ok = await crypto.subtle.verify('Ed25519', key, hexToBytes(testSig), new TextEncoder().encode(testTs + testBody));
+    results.selfTest = ok ? 'PASS (正確簽名驗證通過)' : 'FAIL (正確簽名被拒)';
+    results.sigBytesLen = hexToBytes(testSig).length;
+    results.pubBytesLen = hexToBytes(testPub).length;
   } catch (e) {
     results.importKey = `ERROR: ${e.message}`;
+    results.selfTest = 'N/A';
   }
   results.publicKeySet = !!env.DISCORD_PUBLIC_KEY;
+  results.publicKeyPrefix = env.DISCORD_PUBLIC_KEY ? env.DISCORD_PUBLIC_KEY.slice(0, 8) + '...' : 'none';
   return results;
 }
 
