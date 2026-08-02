@@ -245,6 +245,34 @@ export async function handleCompany(env, request, path, user) {
     }));
   }
 
+  if (path === '/api/company/retire') {
+    const { companyId, shares } = await request.json();
+    const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
+    if (!company) return { error: '公司不存在' };
+    const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
+    if (ipo && ipo.phase === 'ipo') return { error: 'IPO進行中無法退股' };
+    const sharesNum = parseInt(shares);
+    if (!Number.isInteger(sharesNum) || sharesNum <= 0) return { error: '股數必須為正整數' };
+    const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).first();
+    if (!holding || holding.quantity < sharesNum) return { error: '持股不足' };
+
+    const price = company.share_price || 100;
+    const totalValue = price * sharesNum;
+    const fee = Math.floor(totalValue * 0.015);
+    const net = totalValue - fee;
+
+    await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(net, net, user.id).run();
+    if (holding.quantity === sharesNum) {
+      await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).run();
+    } else {
+      await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(sharesNum, user.id, companyId).run();
+    }
+    // 股份註銷: 減少總股本, 不回流市場庫存
+    await db.prepare('UPDATE companies SET total_shares = MAX(total_shares - ?, 1) WHERE id = ?').bind(sharesNum, companyId).run();
+    await logTransaction(db, user.id, 'company_retire', net, `退股「${company.name}」 ${sharesNum.toLocaleString()} 股 @ $${price}（股份註銷）`);
+    return { success: true, price, shares: sharesNum, net, totalShares: Math.max(company.total_shares - sharesNum, 1) };
+  }
+
   if (path === '/api/company/liquidate') {
     const { companyId } = await request.json();
     const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
