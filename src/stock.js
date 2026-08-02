@@ -5,7 +5,7 @@ const FEE_RATE = 0.015;
 const LEVERAGE_OPTIONS = [2, 3, 5];
 const LIQUIDATION_RATE = 100;
 const MAX_TRADE_RATIO = 0.05; // max 5% of circulating per trade
-const MAX_PRICE_CHANGE_PER_MIN = 0.10; // ±10% per minute
+const MAX_PRICE_CHANGE_PER_MIN = 0.20; // ±20% per minute (防炒作但允許較大波動)
 
 const MAX_PRICE_IMPACT = 0.10;
 const MIN_CIRCULATING_RATIO = 0.10;
@@ -174,13 +174,15 @@ export async function handleStock(env, request, path, user) {
 
     const impact = getPriceImpact(quantity, circulating, companyData.total_shares);
     let newPrice = Math.round(price * (1 + impact));
+    let limitHit = false;
 
-    // Price change limit: ±10% per minute
+    // Price change limit: ±20% per minute
     const oneMinAgo = Date.now() - 60000;
     const recentTrades = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
     if (recentTrades) {
       const minPrice = Math.floor(recentTrades.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
       const maxPrice = Math.ceil(recentTrades.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
+      if (newPrice > maxPrice) limitHit = true;
       newPrice = Math.max(minPrice, Math.min(maxPrice, newPrice));
     }
 
@@ -200,7 +202,7 @@ export async function handleStock(env, request, path, user) {
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', buyPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now, 'buy');
     await logTransaction(db, user.id, 'stock_buy', -(totalCost + fee), `買入 ${quantity} 股 @ $${buyPrice}`);
-    return { success: true, price: newPrice, fillPrice: buyPrice, quantity, totalCost: totalCost + fee };
+    return { success: true, price: newPrice, fillPrice: buyPrice, quantity, totalCost: totalCost + fee, limitHit };
   }
 
   if (path === '/api/stock/sell') {
@@ -228,12 +230,14 @@ export async function handleStock(env, request, path, user) {
 
     const impact = getPriceImpact(quantity, circulatingS, companyS.total_shares);
     let newPrice = Math.max(1, Math.round(price * (1 - impact)));
+    let limitHit = false;
 
     const oneMinAgo = Date.now() - 60000;
     const recentTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
     if (recentTrade) {
       const minP = Math.floor(recentTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
       const maxP = Math.ceil(recentTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
+      if (newPrice < minP) limitHit = true;
       newPrice = Math.max(minP, Math.min(maxP, newPrice));
     }
     const now = Date.now();
@@ -251,7 +255,7 @@ export async function handleStock(env, request, path, user) {
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now, 'sell');
     await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${newPrice}`);
-    return { success: true, price: newPrice, fillPrice: newPrice, quantity, netRevenue };
+    return { success: true, price: newPrice, fillPrice: newPrice, quantity, netRevenue, limitHit };
   }
 
   if (path === '/api/stock/ipo/mine') {
