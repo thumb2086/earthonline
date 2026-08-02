@@ -34,7 +34,9 @@ export async function handleCompany(env, request, path, user) {
   }
 
   if (path === '/api/company/list') {
-    const companies = await db.prepare('SELECT * FROM companies WHERE owner_id = ?').bind(user.id).all();
+    const companies = await db.prepare(`
+      SELECT c.*, i.phase FROM companies c LEFT JOIN ipo_state i ON c.id = i.company_id WHERE c.owner_id = ?
+    `).bind(user.id).all();
     const subs = await getUserSubscriptions(db, user.id);
     return Promise.all(companies.results.map(async c => {
       const profit = await getCompanyProfit(db, c, subs);
@@ -245,32 +247,31 @@ export async function handleCompany(env, request, path, user) {
     }));
   }
 
-  if (path === '/api/company/retire') {
-    const { companyId, shares } = await request.json();
+  if (path === '/api/company/delist') {
+    const { companyId } = await request.json();
     const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
     if (!company) return { error: '公司不存在' };
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
-    if (ipo && ipo.phase === 'ipo') return { error: 'IPO進行中無法退股' };
-    const sharesNum = parseInt(shares);
-    if (!Number.isInteger(sharesNum) || sharesNum <= 0) return { error: '股數必須為正整數' };
+    if (!ipo || ipo.phase !== 'trading') return { error: '尚未上市或不在交易階段' };
+    const marginCount = await db.prepare('SELECT COUNT(*) as cnt FROM margin_positions WHERE company_id = ?').bind(companyId).first();
+    if ((marginCount?.cnt || 0) > 0) return { error: '該公司有槓桿持倉，無法下市' };
+    const otherHolders = await db.prepare('SELECT COUNT(*) as cnt FROM stock_holdings WHERE company_id = ? AND user_id != ? AND quantity > 0').bind(companyId, user.id).first();
+    if ((otherHolders?.cnt || 0) > 0) return { error: '尚有其他股東持股，無法下市' };
+
+    // 創辦人持股以市價兌現（下市後無市場可交易）
     const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).first();
-    if (!holding || holding.quantity < sharesNum) return { error: '持股不足' };
-
-    const price = company.share_price || 100;
-    const totalValue = price * sharesNum;
-    const fee = Math.floor(totalValue * 0.015);
-    const net = totalValue - fee;
-
-    await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(net, net, user.id).run();
-    if (holding.quantity === sharesNum) {
+    let payout = 0;
+    if (holding && holding.quantity > 0) {
+      const gross = (company.share_price || 100) * holding.quantity;
+      const fee = Math.floor(gross * 0.015);
+      payout = gross - fee;
+      await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, user.id).run();
       await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).run();
-    } else {
-      await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(sharesNum, user.id, companyId).run();
     }
-    // 股份註銷: 減少總股本, 不回流市場庫存
-    await db.prepare('UPDATE companies SET total_shares = MAX(total_shares - ?, 1) WHERE id = ?').bind(sharesNum, companyId).run();
-    await logTransaction(db, user.id, 'company_retire', net, `退股「${company.name}」 ${sharesNum.toLocaleString()} 股 @ $${price}（股份註銷）`);
-    return { success: true, price, shares: sharesNum, net, totalShares: Math.max(company.total_shares - sharesNum, 1) };
+    // 下市: 移除上市狀態, 公司本身保留
+    await db.prepare('DELETE FROM ipo_state WHERE company_id = ?').bind(companyId).run();
+    await logTransaction(db, user.id, 'company_delist', payout, `「${company.name}」下市${payout > 0 ? `，持股兌現 $${payout.toLocaleString()}` : ''}`);
+    return { success: true, payout };
   }
 
   if (path === '/api/company/liquidate') {

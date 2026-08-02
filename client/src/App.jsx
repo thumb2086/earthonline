@@ -470,16 +470,11 @@ function Company({ api, toast, prompt, promptMulti }) {
     if (r.success) { refresh(); toast(`公司已清算，獲得 $${r.payout.toLocaleString()}`, 'success') } else toast(r.error, 'error')
   })
   const heldOf = (companyId) => holdings.find(x => x.company_id === companyId)?.quantity || 0
-  const retire = (c) => {
-    const held = heldOf(c.id)
-    if (held <= 0) return toast('你沒有該公司持股', 'error')
-    prompt(`退股「${c.name}」— 你持有 ${held.toLocaleString()} 股 @ 市價 $${c.share_price || 100}（輸入退股股數，股份將註銷）`, async (v) => {
-      const shares = parseInt(v); if (!shares || shares <= 0) return toast('股數無效', 'error')
-      if (shares > held) return toast(`超過持股（你持有 ${held.toLocaleString()} 股）`, 'error')
-      const r = await api('/api/company/retire', { companyId: c.id, shares })
-      if (r.success) { refresh(); toast(`退股 ${r.shares.toLocaleString()} 股 @ $${r.price}，實收 $${r.net.toLocaleString()}（股份已註銷）`, 'success') } else toast(r.error, 'error')
-    })
-  }
+  const delist = (c) => prompt(`下市「${c.name}」？(股票將從市場移除，你持有的股份會以市價兌現，公司本身保留，輸入 yes 確認)`, async (v) => {
+    if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
+    const r = await api('/api/company/delist', { companyId: c.id })
+    if (r.success) { refresh(); toast(`「${c.name}」已下市${r.payout > 0 ? `，持股兌現 $${r.payout.toLocaleString()}` : ''}`, 'success') } else toast(r.error, 'error')
+  })
   return (
     <>
       <div className="card mb-12">
@@ -499,15 +494,11 @@ function Company({ api, toast, prompt, promptMulti }) {
         <div className="flex gap-8 mt-12">
           <button className={`btn btn-sm ${selectedCompany===c.id?'btn-primary':''}`} onClick={() => setSelectedCompany(c.id)}>選擇此公司</button>
           {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
-          {heldOf(c.id) > 0 && <button className="btn btn-sm" onClick={() => retire(c)}>退股</button>}
-          {c.sell_price > 0
-            ? <button className="btn btn-sm" onClick={() => cancelSell(c)}>取消出售</button>
-            : <button className="btn btn-sm" onClick={() => offerSell(c)}>🏷️ 掛牌出售</button>}
-          {c.phase && <button className="btn btn-sm" onClick={() => diluteCompany(c)}>＋ 增資</button>}
-          {heldOf(c.id) > 0 && <button className="btn btn-sm" onClick={() => retire(c)}>退股</button>}
+          {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => diluteCompany(c)}>＋ 增資</button>}
+          {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => delist(c)}>📉 下市</button>}
           {c.sell_price > 0
             ? <button className="btn btn-sm" onClick={() => cancelSell(c)}>取消掛牌</button>
-            : <button className="btn btn-sm" onClick={() => offerSell(c)}>掛牌出售</button>}
+            : <button className="btn btn-sm" onClick={() => offerSell(c)}>🏷️ 掛牌出售</button>}
           <button className="btn btn-sm btn-danger" onClick={() => liquidate(c)}>🗑️ 清算</button>
         </div>
       </div>)}
