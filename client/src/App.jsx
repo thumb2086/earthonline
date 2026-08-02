@@ -463,6 +463,11 @@ function Company({ api, toast, prompt, promptMulti }) {
       if (r.success) { refresh(); toast(`IPO啟動 $${price} × ${totalShares.toLocaleString()}股 / ${minutes}分鐘（創辦人保留 ${founderRatio}%）`, 'success') } else toast(r.error, 'error')
     })
   }
+  const liquidate = (c) => prompt(`清算「${c.name}」可得 $${(c.liquidationValue || 0).toLocaleString()}？(公司將解散且股票下市，輸入 yes 確認)`, async (v) => {
+    if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
+    const r = await api('/api/company/liquidate', { companyId: c.id })
+    if (r.success) { refresh(); toast(`公司已清算，獲得 $${r.payout.toLocaleString()}`, 'success') } else toast(r.error, 'error')
+  })
   return (
     <>
       <div className="card mb-12">
@@ -477,6 +482,7 @@ function Company({ api, toast, prompt, promptMulti }) {
         <div className="stat"><span className="stat-label">收入</span><span className="stat-value">${(c.income || 0).toLocaleString()}/分</span></div>
         <div className="stat"><span className="stat-label">成本</span><span className="stat-value">${(c.costs || 0).toLocaleString()}/分</span></div>
         <div className="stat"><span className="stat-label">淨利潤</span><span className="stat-value">${(c.profit || 0).toLocaleString()}/分</span></div>
+        <div className="stat"><span className="stat-label">清算可得</span><span className="stat-value">$${(c.liquidationValue || 0).toLocaleString()}</span></div>
         <div className="flex gap-8 mt-12">
           <button className={`btn btn-sm ${selectedCompany===c.id?'btn-primary':''}`} onClick={() => setSelectedCompany(c.id)}>選擇此公司</button>
           {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
@@ -484,6 +490,7 @@ function Company({ api, toast, prompt, promptMulti }) {
           {c.sell_price > 0
             ? <button className="btn btn-sm" onClick={() => cancelSell(c)}>取消掛牌</button>
             : <button className="btn btn-sm" onClick={() => offerSell(c)}>掛牌出售</button>}
+          <button className="btn btn-sm btn-danger" onClick={() => liquidate(c)}>🗑️ 清算</button>
         </div>
       </div>)}
       {market.length > 0 && <div className="card mb-12">
