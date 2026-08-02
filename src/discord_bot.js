@@ -310,21 +310,57 @@ export async function listGuildBots(env) {
   return { ourBotId: app?.id, ourBotName: app?.name, bots };
 }
 
-// 列出應用程式目前註冊的指令
+// 清除 guild commands (殘留的舊描述指令)
+export async function clearGuildCommands(env) {
+  const botToken = env.DISCORD_BOT_TOKEN;
+  const guildId = env.DISCORD_GUILD_ID;
+  if (!botToken) return { error: '缺少 DISCORD_BOT_TOKEN' };
+  if (!guildId) return { error: '缺少 DISCORD_GUILD_ID' };
+  const appRes = await fetch('https://discord.com/api/v10/applications/@me', {
+    headers: { Authorization: `Bot ${botToken}` },
+  });
+  if (!appRes.ok) return { error: `無法取得應用: ${appRes.status}` };
+  const app = await appRes.json();
+  const res = await fetch(`https://discord.com/api/v10/applications/${app.id}/guilds/${guildId}/commands`, {
+    method: 'PUT',
+    headers: { Authorization: `Bot ${botToken}`, 'Content-Type': 'application/json' },
+    body: '[]', // 清空 guild commands
+  });
+  if (!res.ok) return { error: `清除失敗: ${res.status} ${await res.text()}` };
+  return { success: true, message: 'Guild commands 已清除' };
+}
+
+// 列出應用程式目前註冊的指令 (全局 + guild)
 export async function listAppCommands(env) {
   const botToken = env.DISCORD_BOT_TOKEN;
+  const guildId = env.DISCORD_GUILD_ID;
   if (!botToken) return { error: '缺少 DISCORD_BOT_TOKEN' };
   const appRes = await fetch('https://discord.com/api/v10/applications/@me', {
     headers: { Authorization: `Bot ${botToken}` },
   });
   if (!appRes.ok) return { error: `無法取得應用: ${appRes.status}` };
   const app = await appRes.json();
-  const res = await fetch(`https://discord.com/api/v10/applications/${app.id}/commands`, {
+
+  // 全局指令
+  const gRes = await fetch(`https://discord.com/api/v10/applications/${app.id}/commands`, {
     headers: { Authorization: `Bot ${botToken}` },
   });
-  if (!res.ok) return { error: `查詢失敗: ${res.status}` };
-  const cmds = await res.json();
-  return { appId: app.id, commands: cmds.map(c => ({ name: c.name, id: c.id, description: c.description })) };
+  const globalCmds = gRes.ok ? await gRes.json() : [];
+
+  // guild 指令 (若有 guild)
+  let guildCmds = [];
+  if (guildId) {
+    const lRes = await fetch(`https://discord.com/api/v10/applications/${app.id}/guilds/${guildId}/commands`, {
+      headers: { Authorization: `Bot ${botToken}` },
+    });
+    if (lRes.ok) guildCmds = await lRes.json();
+  }
+
+  return {
+    appId: app.id,
+    global: globalCmds.map(c => ({ name: c.name, id: c.id, description: c.description })),
+    guild: guildCmds.map(c => ({ name: c.name, id: c.id, description: c.description })),
+  };
 }
 
 // 一次性設定: 查 Public Key + 註冊 Slash Commands (+可改名)
