@@ -1,4 +1,4 @@
-﻿import { logTransaction } from './utils.js';
+﻿import { logTransaction, notify } from './utils.js';
 import { INDUSTRY_MULT } from './company.js';
 
 const SPREAD_BASE = 0.03;
@@ -14,9 +14,9 @@ const MIN_CIRCULATING_RATIO = 0.10;
 function roundPrice(p) { return Math.round(p * 100) / 100; }
 
 function getPriceImpact(quantity, circulating, totalShares) {
-  if (circulating <= 0) return 0;
-  // 分母 = 流通 + 本筆量: 單筆大單佔比決定影響 (不受總股本無限膨脹稀釋)
-  const ratio = quantity / (circulating + quantity);
+  // 分母 = 流通 + 本筆量; 流通為 0 (庫存=總股本) 時改用總股本為基準, 避免影響歸零
+  const denom = (circulating > 0 ? circulating : totalShares) + quantity;
+  const ratio = quantity / denom;
   const rawImpact = Math.sqrt(ratio) * 0.5;
   return Math.min(rawImpact, MAX_PRICE_IMPACT);
 }
@@ -297,12 +297,14 @@ export async function handleStock(env, request, path, user) {
     const fee = Math.floor(totalCost * FEE_RATE);
     if (wallet.cash < totalCost + fee) return { error: `餘額不足` };
 
-    const impact = getPriceImpact(quantity, circulating, companyData.total_shares);
+    // 影響基於近1分鐘累計買入量: 分次買與一次買效果一致 (防拆單套利)
+    const oneMinAgo = Date.now() - 60000;
+    const cumBuy = await db.prepare(`SELECT COALESCE(SUM(quantity),0) as q FROM stock_trades WHERE company_id = ? AND type = 'buy' AND traded_at >= ?`).bind(companyId, oneMinAgo).first();
+    const impact = getPriceImpact((cumBuy?.q || 0) + quantity, circulating, companyData.total_shares);
     let newPrice = Math.round(price * (1 + impact));
     let limitHit = false;
 
     // Price change limit: ±20% per minute
-    const oneMinAgo = Date.now() - 60000;
     const recentTrades = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
     if (recentTrades) {
       const minPrice = Math.floor(recentTrades.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
@@ -349,11 +351,13 @@ export async function handleStock(env, request, path, user) {
     const fee = Math.floor(totalRevenue * FEE_RATE);
     const netRevenue = totalRevenue - fee;
 
-    const impact = getPriceImpact(quantity, circulatingS, companyS.total_shares);
+    // 影響基於近1分鐘累計賣出量 (防拆單套利, 與買入對稱)
+    const oneMinAgo = Date.now() - 60000;
+    const cumSell = await db.prepare(`SELECT COALESCE(SUM(quantity),0) as q FROM stock_trades WHERE company_id = ? AND type = 'sell' AND traded_at >= ?`).bind(companyId, oneMinAgo).first();
+    const impact = getPriceImpact((cumSell?.q || 0) + quantity, circulatingS, companyS.total_shares);
     let newPrice = Math.max(1, Math.round(price * (1 - impact)));
     let limitHit = false;
 
-    const oneMinAgo = Date.now() - 60000;
     const recentTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
     if (recentTrade) {
       const minP = Math.floor(recentTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
@@ -590,11 +594,15 @@ export async function processMarginTick(db) {
         if (lastCall) {
           await db.prepare("UPDATE margin_positions SET margin_call_at = ? WHERE id = ?").bind(Date.now(), pos.id).run();
           await logTransaction(db, pos.user_id, 'margin_call', 0, `⚠️ 維持率 ${maintenanceRate.toFixed(1)}% 低於 115%，請補保證金或平倉`);
+          await notify(db, pos.user_id, 'margin_call', `⚠️ 槓桿倉位維持率 ${maintenanceRate.toFixed(1)}% 低於 115%，請盡快補繳保證金或平倉！`);
         }
       } else if (maintenanceRate >= 115) {
         await db.prepare("UPDATE margin_positions SET margin_call_at = NULL WHERE id = ?").bind(pos.id).run();
       }
-      if (maintenanceRate < LIQUIDATION_RATE) await closePosition(db, pos);
+      if (maintenanceRate < LIQUIDATION_RATE) {
+        await notify(db, pos.user_id, 'liquidated', `💥 你的槓桿倉位（${pos.type === 'long' ? '做多' : '做空'} ${pos.quantity}股）維持率跌破 100%，已被強制平倉！`);
+        await closePosition(db, pos);
+      }
     } else {
       // 做空維持率 = (賣出款項+保證金+補繳-股息債務) / 當前市值 (5x 做空開倉 120%, 漲 5% 觸發追繳)
       const effectiveRate = (pos.loan_amount + pos.margin_amount + (pos.extra_margin || 0) - pos.dividend_debt) / (currentPrice * pos.quantity) * 100;
@@ -603,11 +611,15 @@ export async function processMarginTick(db) {
         if (lastCall) {
           await db.prepare("UPDATE margin_positions SET margin_call_at = ? WHERE id = ?").bind(Date.now(), pos.id).run();
           await logTransaction(db, pos.user_id, 'margin_call', 0, `⚠️ 維持率 ${effectiveRate.toFixed(1)}% 低於 115%，請補保證金或平倉`);
+          await notify(db, pos.user_id, 'margin_call', `⚠️ 槓桿倉位維持率 ${effectiveRate.toFixed(1)}% 低於 115%，請盡快補繳保證金或平倉！`);
         }
       } else if (effectiveRate >= 115) {
         await db.prepare("UPDATE margin_positions SET margin_call_at = NULL WHERE id = ?").bind(pos.id).run();
       }
-      if (effectiveRate < LIQUIDATION_RATE) await closePosition(db, pos);
+      if (effectiveRate < LIQUIDATION_RATE) {
+        await notify(db, pos.user_id, 'liquidated', `💥 你的槓桿倉位（${pos.type === 'long' ? '做多' : '做空'} ${pos.quantity}股）維持率跌破 100%，已被強制平倉！`);
+        await closePosition(db, pos);
+      }
     }
   }
 }
@@ -626,6 +638,7 @@ export async function finalizeIPO(db) {
     if (!timeUp && !isFull) continue;
 
     const subs = await db.prepare('SELECT user_id, shares FROM ipo_subscriptions WHERE company_id = ?').bind(ipo.company_id).all();
+    const companyName = await db.prepare('SELECT name FROM companies WHERE id = ?').bind(ipo.company_id).first();
     for (const sub of subs.results) {
       const existing = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(sub.user_id, ipo.company_id).first();
       if (existing) {
@@ -634,7 +647,12 @@ export async function finalizeIPO(db) {
         await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(sub.user_id, ipo.company_id, sub.shares).run();
       }
       await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(sub.shares, ipo.company_id).run();
+      await notify(db, sub.user_id, 'ipo_listed', `🚀 「${companyName?.name || '公司'}」已上市！你認購的 ${sub.shares.toLocaleString()} 股已入帳。`);
     }
     await db.prepare("UPDATE ipo_state SET phase = 'trading' WHERE company_id = ?").bind(ipo.company_id).run();
+    const owner = await db.prepare('SELECT owner_id FROM companies WHERE id = ?').bind(ipo.company_id).first();
+    if (owner && owner.owner_id > 0) {
+      await notify(db, owner.owner_id, 'ipo_listed', `🚀 你的公司「${companyName?.name || ''}」已完成 IPO 上市！`);
+    }
   }
 }

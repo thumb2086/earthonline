@@ -1,4 +1,4 @@
-import { corsHeaders, json, authCheck, createJWT, logTransaction, logHourly } from './utils.js';
+import { corsHeaders, json, authCheck, createJWT, logTransaction, logHourly, notify } from './utils.js';
 import { handleIncome, processIncomeTick, getIncomePerMin } from './income.js';
 import { handleBank, processBankTick } from './bank.js';
 import { handleInvestment, processInvestmentTick } from './investment.js';
@@ -307,6 +307,19 @@ export default {
         return json(txs.results, headers);
       }
 
+      if (path === '/api/notifications') {
+        const url = new URL(request.url);
+        const limit = parseInt(url.searchParams.get('limit') || '30');
+        const rows = await env.DB.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').bind(user.id, limit).all();
+        const unread = await env.DB.prepare('SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND read = 0').bind(user.id).first();
+        return json({ items: rows.results, unread: unread?.c || 0 }, headers);
+      }
+
+      if (path === '/api/notifications/read' && request.method === 'POST') {
+        await env.DB.prepare('UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0').bind(user.id).run();
+        return json({ success: true }, headers);
+      }
+
       const routes = [
         ['/api/income', handleIncome],
         ['/api/bank', handleBank],
@@ -454,14 +467,19 @@ async function processStockTick(db, doDividend = true) {
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(company.id).first();
     if (!ipo || ipo.phase !== 'trading') continue;
 
-    // 自動收購: 某玩家持有超過 50% 總股數 → 自動成為 owner
-    if (company.owner_id === 0 || company.owner_id === null) {
-      const topHolder = await db.prepare('SELECT user_id, SUM(quantity) as total FROM stock_holdings WHERE company_id = ? GROUP BY user_id ORDER BY total DESC LIMIT 1').bind(company.id).first();
-      if (topHolder && topHolder.total > company.total_shares * 0.5) {
-        await db.prepare('UPDATE companies SET owner_id = ? WHERE id = ?').bind(topHolder.user_id, company.id).run();
-        const holderName = await db.prepare('SELECT username FROM users WHERE id = ?').bind(topHolder.user_id).first();
-        await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${holderName?.username || '玩家'} 持股超過 50%，收購 ${company.name}！`, Date.now()).run();
+    // 自動奪權: 任何玩家持股超過 50% 總股數 → 自動成為 owner (現實控股邏輯, 適用所有公司)
+    const topHolder = await db.prepare('SELECT user_id, SUM(quantity) as total FROM stock_holdings WHERE company_id = ? GROUP BY user_id ORDER BY total DESC LIMIT 1').bind(company.id).first();
+    if (topHolder && topHolder.total > company.total_shares * 0.5 && topHolder.user_id !== company.owner_id) {
+      const oldOwner = company.owner_id;
+      await db.prepare('UPDATE companies SET owner_id = ?, sell_price = 0 WHERE id = ?').bind(topHolder.user_id, company.id).run();
+      const holderName = await db.prepare('SELECT username FROM users WHERE id = ?').bind(topHolder.user_id).first();
+      const oldOwnerName = oldOwner > 0 ? await db.prepare('SELECT username FROM users WHERE id = ?').bind(oldOwner).first() : null;
+      await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${holderName?.username || '玩家'} 持股超過 50%，奪得 ${company.name} 控制權！`, Date.now()).run();
+      if (oldOwner > 0) {
+        await logTransaction(db, oldOwner, 'takeover', 0, `${holderName?.username || '玩家'} 持股過半，奪取 ${company.name} 控制權`);
+        await notify(db, oldOwner, 'takeover', `⚠️ ${holderName?.username || '玩家'} 持股超過 50%，奪取了你的公司「${company.name}」控制權！`);
       }
+      await notify(db, topHolder.user_id, 'takeover', `🎉 你持股超過 50%，奪得「${company.name}」控制權，成為新 owner！`);
     }
 
     // 自動增資 (每2分鐘檢查, 與 processPriceWave 每分鐘檢查互補): 庫存 < 35% → 補到 45%

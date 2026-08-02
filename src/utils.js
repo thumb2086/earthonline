@@ -104,3 +104,8 @@ export async function logHourly(db, userId, type, amount, description) {
     await db.prepare('INSERT INTO transaction_history (user_id, type, amount, description, created_at) VALUES (?, ?, ?, ?, ?)').bind(userId, type, amount, description || '', Date.now()).run();
   }
 }
+
+// 通知信箱
+export async function notify(db, userId, type, message) {
+  await db.prepare('INSERT INTO notifications (user_id, type, message, created_at) VALUES (?, ?, ?, ?)').bind(userId, type, message || '', Date.now()).run();
+}

@@ -1,4 +1,4 @@
-import { logTransaction, logHourly } from './utils.js';
+import { logTransaction, logHourly, notify } from './utils.js';
 import { getUserSubscriptions } from './subscription.js';
 
 const INVEST_TYPES = {
@@ -164,4 +164,5 @@ async function applyStartupRisk(db, inv) {
   await db.prepare('UPDATE wallets SET cash = MAX(cash - ?, 0) WHERE user_id = ?').bind(loss, inv.user_id).run();
   await db.prepare('UPDATE investments SET amount = amount - ? WHERE id = ?').bind(loss, inv.id).run();
   await logHourly(db, inv.user_id, 'investment_loss', -loss, `${info.label}虧損`);
+  await notify(db, inv.user_id, 'investment_loss', `📉 你的${info.label}虧損 $${loss.toLocaleString()}（-${(lossPct * 100).toFixed(1)}%）`);
 }

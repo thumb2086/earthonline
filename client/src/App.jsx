@@ -7,7 +7,24 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [view, setView] = useState('dashboard')
   const [rev, setRev] = useState(0)
+  const [notifs, setNotifs] = useState({ items: [], unread: 0 })
+  const [notifOpen, setNotifOpen] = useState(false)
   const { toast, prompt, promptMulti } = useToast()
+
+  useEffect(() => {
+    if (!token) return
+    fetch('/api/notifications', { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json())
+      .then(d => setNotifs(d || { items: [], unread: 0 }))
+      .catch(() => {})
+  }, [token, rev])
+
+  const openNotifs = async () => {
+    setNotifOpen(o => !o)
+    if (!notifOpen) {
+      fetch('/api/notifications/read', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }).catch(() => {})
+    }
+  }
 
   useEffect(() => {
     if (!token) return
@@ -66,6 +83,23 @@ export default function App() {
           <span className="badge badge-danger">📈 累計 {(user?.total_earned ?? 0).toLocaleString()}</span>
         </div>
         <div className="topbar-right">
+          <div style={{position:'relative'}}>
+            <button className="btn btn-sm" onClick={openNotifs} style={{position:'relative'}}>
+              🔔{notifs.unread > 0 && <span style={{position:'absolute', top:-4, right:-4, background:'var(--danger)', color:'#fff', borderRadius:8, fontSize:9, padding:'1px 5px', fontWeight:700}}>{notifs.unread}</span>}
+            </button>
+            {notifOpen && (
+              <div style={{position:'absolute', right:0, top:34, width:320, maxHeight:400, overflowY:'auto', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, boxShadow:'0 8px 30px rgba(0,0,0,0.5)', zIndex:1000, padding:10}}>
+                <div style={{fontWeight:700, fontSize:13, marginBottom:8, color:'var(--text)'}}>📬 通知信箱</div>
+                {notifs.items.length === 0 && <div className="text-dim text-sm">尚無通知</div>}
+                {notifs.items.map(n => (
+                  <div key={n.id} style={{padding:'6px 4px', borderBottom:'1px solid var(--border)', fontSize:12, color:'var(--text2)'}}>
+                    <div>{n.message}</div>
+                    <div className="text-dim" style={{fontSize:10, marginTop:2}}>{new Date(n.created_at).toLocaleString('zh-TW')}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <span className="text-dim" style={{fontWeight:500}}>{user?.username ?? '載入中...'}{user?.role === 'admin' ? ' ⭐' : ''}</span>
           <button className="btn btn-sm btn-danger" onClick={logout}>登出</button>
         </div>
@@ -375,17 +409,13 @@ function Employee({ api, toast }) {
 function Company({ api, toast, prompt, promptMulti }) {
   const [cs, setCs] = useState([]); const [employees, setEmployees] = useState([]); const [ipoList, setIpoList] = useState([])
   const [positions, setPositions] = useState([]); const [selectedCompany, setSelectedCompany] = useState(null)
-  const [deptData, setDeptData] = useState(null); const [market, setMarket] = useState([]); const [holdings, setHoldings] = useState([])
-  const [acquirable, setAcquirable] = useState([])
+  const [deptData, setDeptData] = useState(null); const [holdings, setHoldings] = useState([])
   const posLabels = { intern: '實習生', specialist: '專員', engineer: '工程師', manager: '經理', expert: '專家' }
   const POSITIONS_MAP = { intern: { salary: 3 }, specialist: { salary: 15 }, engineer: { salary: 50 }, manager: { salary: 130 }, expert: { salary: 350 } }
   const refresh = () => {
     api('/api/company/list').then(d => setCs(Array.isArray(d) ? d : []));
     api('/api/employee/positions').then(d => setPositions(Array.isArray(d) ? d : []));
     api('/api/company/ipo/list?my=1').then(d => setIpoList(Array.isArray(d) ? d : []));
-    api('/api/company/market').then(d => setMarket(Array.isArray(d) ? d : []));
-    api('/api/company/acquirable').then(d => setAcquirable(Array.isArray(d) ? d : [])).catch(()=>{});
-    api('/api/company/market').then(d => setMarket(Array.isArray(d) ? d : [])).catch(()=>{});
     api('/api/stock/holdings').then(d => setHoldings(Array.isArray(d) ? d : []));
   }
   useEffect(() => { refresh() }, [])
@@ -416,19 +446,10 @@ function Company({ api, toast, prompt, promptMulti }) {
     const r = await api('/api/company/buyout', { companyId: c.id })
     if (r.success) { toast(`收購成功！支付 $${r.buyPrice.toLocaleString()}`, 'success'); refresh() } else toast(r.error, 'error')
   })
-  const offerSell = (c) => prompt(`掛牌出售 ${c.name}？輸入售價$`, async (v) => {
-    const price = parseInt(v); if (!price || price <= 0) return toast('價格無效', 'error')
-    const r = await api('/api/company/sell/offer', { companyId: c.id, price })
-    if (r.success) { refresh(); toast('已掛牌出售', 'success') } else toast(r.error, 'error')
-  })
-  const cancelSell = async (c) => {
-    const r = await api('/api/company/sell/offer', { companyId: c.id, price: 0 })
-    if (r.success) { refresh(); toast('已取消出售', 'success') } else toast(r.error, 'error')
-  }
-  const buyCompany = (c) => prompt(`確認收購 ${c.name}？$${(c.sell_price || 0).toLocaleString()}（員工將一併轉移）輸入 yes 確認`, async (v) => {
+  const forceBuy = (c) => prompt(`強制收購 ${c.name} 其他股東的流通股？(市價×1.2 溢價) 輸入 yes 確認`, async (v) => {
     if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
-    const r = await api('/api/company/buy', { companyId: c.id })
-    if (r.success) { refresh(); toast(`收購成功！共支付 $${r.total.toLocaleString()}（含手續費 $${r.fee.toLocaleString()}）`, 'success') } else toast(r.error, 'error')
+    const r = await api('/api/company/forcebuy', { companyId: c.id })
+    if (r.success) { refresh(); toast(`強制收購成功！支付 $${r.totalCost.toLocaleString()} 買回 ${r.totalShares.toLocaleString()} 股（含20%溢價）`, 'success') } else toast(r.error, 'error')
   })
   const hire = async (pos, qty) => {
     if (!selectedCompany) return toast('請先選擇公司', 'error')
@@ -495,22 +516,11 @@ function Company({ api, toast, prompt, promptMulti }) {
           <button className={`btn btn-sm ${selectedCompany===c.id?'btn-primary':''}`} onClick={() => setSelectedCompany(c.id)}>選擇此公司</button>
           {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => diluteCompany(c)}>＋ 增資</button>}
+          {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => forceBuy(c)}>💼 強制收購</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => delist(c)}>📉 下市</button>}
-          {c.sell_price > 0
-            ? <button className="btn btn-sm" onClick={() => cancelSell(c)}>取消掛牌</button>
-            : <button className="btn btn-sm" onClick={() => offerSell(c)}>🏷️ 掛牌出售</button>}
           <button className="btn btn-sm btn-danger" onClick={() => liquidate(c)}>🗑️ 清算</button>
         </div>
       </div>)}
-      {market.length > 0 && <div className="card mb-12">
-        <div className="card-title">🏦 收購市場</div>
-        {market.map(c => (
-          <div className="stat" key={c.id}>
-            <span><span style={{fontWeight:600}}>{c.name}</span> <span className="text-dim text-sm">{c.owner_name || ''} 掛牌 · ${c.sell_price?.toLocaleString?.() || 0}</span></span>
-            <button className="btn btn-sm btn-warn" onClick={() => buyCompany(c)}>買下</button>
-          </div>
-        ))}
-      </div>}
       {selectedCompany && cs.length > 0 && <div className="card mb-12">
         <div className="card-title">🏢 部門 — {cs.find(c=>c.id===selectedCompany)?.name}</div>
         {(deptData?.departments || []).map(d => (

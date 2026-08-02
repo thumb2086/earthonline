@@ -1,4 +1,4 @@
-import { logHourly } from './utils.js';
+import { logHourly, notify } from './utils.js';
 
 export const SUBSCRIPTIONS = {
   home: { label: '🏠 高級住宅', cost: 2, desc: '基礎收入 +10%' },
@@ -51,6 +51,7 @@ export async function processSubscriptionTick(db) {
     if (!wallet) continue;
     if (wallet.cash < info.cost) {
       await db.prepare('UPDATE subscriptions SET enabled = 0 WHERE id = ?').bind(sub.id).run();
+      await notify(db, sub.user_id, 'subscription_stopped', `⚠️ 現金不足，「${info.label}」訂閱已暫停。補充現金後可重新啟用。`);
       continue;
     }
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(info.cost, sub.user_id).run();
