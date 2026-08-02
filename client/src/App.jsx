@@ -876,6 +876,7 @@ function AdminPanel({ api }) {
   const [stockDist, setStockDist] = useState([])
   const [ipoList, setIpoList] = useState([])
   const [ipoCollapsed, setIpoCollapsed] = useState(false)
+  const [tradesCollapsed, setTradesCollapsed] = useState(false)
   const [tradeData, setTradeData] = useState({ trades: [], stats: [] })
   const [exclude, setExclude] = useState(() => localStorage.getItem('eo_admin_exclude') || '')
   const loadAll = (ex) => {
@@ -1001,14 +1002,20 @@ function AdminPanel({ api }) {
           </div>
         ))}
       </div>
-      <div className="card mb-12"><div className="card-title">📋 股票交易明細（最近300筆）</div>
-        {(tradeData?.trades || []).length === 0 && <div className="text-dim">暫無交易</div>}
-        {(tradeData?.trades || []).slice(0,50).map(t => (
-          <div className="stat" key={t.id}>
-            <span><span className="text-accent" style={{fontWeight:600}}>{t.username}</span> {t.type === 'buy' ? <span style={{color:'var(--accent)'}}>▲買入</span> : <span style={{color:'var(--danger)'}}>▼賣出</span>} {t.quantity.toLocaleString()}股 {t.company_name} @ ${t.price}</span>
-            <span className="text-dim text-sm">${(t.price * t.quantity).toLocaleString()} · {new Date(t.traded_at).toLocaleString('zh-TW')}</span>
-          </div>
-        ))}
+      <div className="card mb-12">
+        <div className="flex justify-between items-center">
+          <div className="card-title" style={{margin:0}}>📋 股票交易明細（最近300筆）</div>
+          <button className="btn btn-sm" onClick={() => setTradesCollapsed(!tradesCollapsed)}>{tradesCollapsed ? '展開' : '收合'}</button>
+        </div>
+        {!tradesCollapsed && <>
+          {(tradeData?.trades || []).length === 0 && <div className="text-dim">暫無交易</div>}
+          {(tradeData?.trades || []).slice(0,50).map(t => (
+            <div className="stat" key={t.id}>
+              <span><span className="text-accent" style={{fontWeight:600}}>{t.username}</span> {t.type === 'buy' ? <span style={{color:'var(--accent)'}}>▲買入</span> : <span style={{color:'var(--danger)'}}>▼賣出</span>} {t.quantity.toLocaleString()}股 {t.company_name} @ ${t.price}</span>
+              <span className="text-dim text-sm">${(t.price * t.quantity).toLocaleString()} · {new Date(t.traded_at).toLocaleString('zh-TW')}</span>
+            </div>
+          ))}
+        </>}
       </div>
 
       <div className="card"><div className="card-title">使用者 ({users.length})</div>
