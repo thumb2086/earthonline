@@ -376,10 +376,7 @@ function Company({ api, toast, prompt, promptMulti }) {
   const [cs, setCs] = useState([]); const [employees, setEmployees] = useState([]); const [ipoList, setIpoList] = useState([])
   const [positions, setPositions] = useState([]); const [selectedCompany, setSelectedCompany] = useState(null)
   const [deptData, setDeptData] = useState(null); const [market, setMarket] = useState([]); const [holdings, setHoldings] = useState([])
-  const [deptData, setDeptData] = useState(null)
   const [acquirable, setAcquirable] = useState([])
-  const [market, setMarket] = useState([])
-  const [holdings, setHoldings] = useState([])
   const posLabels = { intern: '實習生', specialist: '專員', engineer: '工程師', manager: '經理', expert: '專家' }
   const POSITIONS_MAP = { intern: { salary: 3 }, specialist: { salary: 15 }, engineer: { salary: 50 }, manager: { salary: 130 }, expert: { salary: 350 } }
   const refresh = () => {
@@ -467,11 +464,6 @@ function Company({ api, toast, prompt, promptMulti }) {
       if (r.success) { refresh(); toast(`IPO啟動 $${price} × ${totalShares.toLocaleString()}股 / ${minutes}分鐘（創辦人保留 ${founderRatio}%）`, 'success') } else toast(r.error, 'error')
     })
   }
-  const liquidate = (c) => prompt(`清算「${c.name}」可得 $${(c.liquidationValue || 0).toLocaleString()}？(公司將解散且股票下市，輸入 yes 確認)`, async (v) => {
-    if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
-    const r = await api('/api/company/liquidate', { companyId: c.id })
-    if (r.success) { refresh(); toast(`公司已清算，獲得 $${r.payout.toLocaleString()}`, 'success') } else toast(r.error, 'error')
-  })
   const liquidate = (c) => prompt(`清算「${c.name}」可得 $${(c.liquidationValue || 0).toLocaleString()}？(公司將解散且股票下市，輸入 yes 確認)`, async (v) => {
     if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
     const r = await api('/api/company/liquidate', { companyId: c.id })
