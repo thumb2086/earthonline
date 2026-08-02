@@ -412,16 +412,19 @@ function Company({ api, toast, prompt, promptMulti }) {
     promptMulti('設定IPO參數', [
       { label: 'IPO價格 ($)', placeholder: '100', default: '100' },
       { label: '發行股數', placeholder: String(c.total_shares || 100000), default: String(c.total_shares || 100000) },
+      { label: '創辦人保留 % (0~90)', placeholder: '60', default: '60' },
       { label: '認購時間 (分鐘)', placeholder: '60', default: '60' },
-    ], async ([priceStr, sharesStr, minStr]) => {
+    ], async ([priceStr, sharesStr, founderStr, minStr]) => {
       const price = parseInt(priceStr) || 100
       const totalShares = parseInt(sharesStr) || (c.total_shares || 100000)
+      const founderRatio = parseInt(founderStr) || 60
       const minutes = parseInt(minStr) || 60
       if (price < 10) return toast('價格至少$10', 'error')
       if (totalShares < 1000) return toast('發行股數至少1,000', 'error')
+      if (founderRatio < 0 || founderRatio > 90) return toast('保留比例 0~90%', 'error')
       if (minutes < 5 || minutes > 1440) return toast('時間5~1440分鐘', 'error')
-      const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: price, totalShares, ipoMinutes: minutes })
-      if (r.success) { refresh(); toast(`IPO啟動 $${price} × ${totalShares.toLocaleString()}股 / ${minutes}分鐘`, 'success') } else toast(r.error, 'error')
+      const r = await api('/api/company/ipo/start', { companyId: c.id, ipoPrice: price, totalShares, ipoMinutes: minutes, founderRatio: founderRatio / 100 })
+      if (r.success) { refresh(); toast(`IPO啟動 $${price} × ${totalShares.toLocaleString()}股 / ${minutes}分鐘（創辦人保留 ${founderRatio}%）`, 'success') } else toast(r.error, 'error')
     })
   }
   return (
@@ -588,6 +591,7 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
 
 function Stock({ api, toast, prompt }) {
   const [q, setQ] = useState(null); const [h, setH] = useState([]); const [t, setT] = useState([]); const [myTrades, setMyTrades] = useState([]); const [ipo, setIpo] = useState(null)
+  const [pnlData, setPnlData] = useState({ stocks: [], totalPnl: 0 })
   const [positions, setPositions] = useState([])
   const [marginType, setMarginType] = useState('long')
   const [marginQty, setMarginQty] = useState('')
@@ -626,8 +630,13 @@ function Stock({ api, toast, prompt }) {
     api('/api/stock/trades?companyId=' + selectedStock + '&mine=1').then(d => setMyTrades(Array.isArray(d)?d:[]));
     api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[]));
     api('/api/stock/ipo/info?companyId=' + selectedStock).then(setIpo);
+    api('/api/stock/pnl').then(d => setPnlData(d || { stocks: [], totalPnl: 0 })).catch(()=>{});
   }
   useEffect(() => { refreshStock() }, [selectedStock])
+  useEffect(() => {
+    const id = setInterval(refreshStock, 5000)
+    return () => clearInterval(id)
+  }, [selectedStock])
   const buy = async () => {
     const fresh = await api('/api/stock/quote?companyId=' + selectedStock)
     if (fresh?.price) setQ(fresh)
@@ -659,7 +668,7 @@ function Stock({ api, toast, prompt }) {
     })
   }
   const maxBuy = async () => { const n = q?.maxTrade || 0; if (n <= 0) return; const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`買入 ${n} 股 @ $${r.fillPrice}${r.limitHit ? ' ⚠️已達漲停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
-  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})${r.limitHit ? ' ⚠️已達跌停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
+  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; toast(`全部賣出 ${n} 股會突破單筆上限並承受大額滑點，確定？`, 'info'); const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})${r.limitHit ? ' ⚠️已達跌停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
   const subIpo = () => prompt('認購股數', async (s) => { const r = await api('/api/stock/ipo/subscribe', { companyId: selectedStock, shares: parseInt(s) }); if (r.success) { toast(`認購 ${s} 股成功`, 'success'); refreshStock() } else toast(r.error, 'error') })
 
   const openMargin = async () => {
@@ -763,20 +772,36 @@ function Stock({ api, toast, prompt }) {
         </>}
       </div>}
       {ipo?.phase !== 'ipo' && <div className="grid-2">
-        <div className="card"><div className="card-title">持倉</div>
-          {(h || []).filter(x => x.company_id === selectedStock).map(x => {
-            const pnl = ((q?.price || 0) - (x.avgCost || 0)) * x.quantity
-            return (
-              <div className="stat" key={x.company_id}>
-                <div>
-                  <span className="stat-label">{x.company_name || '地球互動科技'}</span>
-                  <span className="stat-value">{x.quantity} 股</span>
-                  <div className="text-dim text-sm">均價 ${(x.avgCost || 0).toLocaleString()} · 現價 ${q?.price || '?'} · <span style={{color: pnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{pnl >= 0 ? '+' : ''}{pnl.toLocaleString()}</span></div>
-                </div>
+        <div className="card"><div className="card-title">持倉損益</div>
+          {(pnlData?.stocks || []).filter(x => x.companyId === selectedStock).map(x => (
+            <div key={x.companyId}>
+              <div className="stat">
+                <span className="stat-label">{x.companyName}</span>
+                <span className="stat-value">{x.holdings} 股</span>
               </div>
-            )
-          })}
-          {(!h || h.length === 0) && <div className="text-dim">無持股</div>}</div>
+              <div className="stat">
+                <span className="stat-label">均價</span>
+                <span className="stat-value">${(x.avgCost || 0).toLocaleString()}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">現價</span>
+                <span className="stat-value">${x.currentPrice || '?'}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">已實現損益</span>
+                <span className="stat-value" style={{color: x.realizedPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{x.realizedPnl >= 0 ? '+' : ''}{x.realizedPnl.toLocaleString()}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">浮動損益</span>
+                <span className="stat-value" style={{color: x.unrealizedPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{x.unrealizedPnl >= 0 ? '+' : ''}{x.unrealizedPnl.toLocaleString()}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label" style={{fontWeight:700}}>總損益</span>
+                <span className="stat-value" style={{fontWeight:700, color: x.totalPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{x.totalPnl >= 0 ? '+' : ''}{x.totalPnl.toLocaleString()}</span>
+              </div>
+            </div>
+          ))}
+          {(!pnlData?.stocks || pnlData.stocks.filter(x => x.companyId === selectedStock).length === 0) && <div className="text-dim">無持股</div>}</div>
         <div className="card"><div className="card-title">全部成交紀錄</div>
           {(t || []).slice(0,10).map(x => <div className="stat" key={x.id}>
             <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲' : '▼'}</span> ${x.price}</span>
@@ -1056,7 +1081,7 @@ function AdminPanel({ api }) {
 function History({ api }) {
   const [txs, setTxs] = useState([])
   useEffect(() => { api('/api/transactions?limit=100').then(d => setTxs(Array.isArray(d) ? d : [])) }, [])
-  const typeLabels = { income: '⬆️ 基礎收入(本小時)', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', ipo_subscribe: '🚀 IPO認購', ipo_revenue: '🚀 IPO募集', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', bank_interest: '🏦 活存利息(本小時)', loan: '🏦 借貸', loan_interest: '🏦 貸款利息(本小時)', employee_hire: '👥 僱用', employee_salary: '👥 薪資', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', investment_interest: '💼 投資利息(本小時)', investment_loss: '💼 投資虧損', company_profit: '🏢 公司利潤(本小時)', company_loss: '🏢 公司虧損(本小時)', dividend: '💰 股利(本小時)', living_cost: '🏠 生活費(本小時)', subscription: '📦 訂閱月費(本小時)' }
+  const typeLabels = { income: '⬆️ 基礎收入(本小時)', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', margin_open: '⚡ 槓桿開倉', margin_close: '⚡ 平倉', ipo_subscribe: '🚀 IPO認購', ipo_revenue: '🚀 IPO募集', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', bank_interest: '🏦 活存利息(本小時)', loan: '🏦 借貸', loan_interest: '🏦 貸款利息(本小時)', employee_hire: '👥 僱用', employee_salary: '👥 薪資', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', investment_interest: '💼 投資利息(本小時)', investment_loss: '💼 投資虧損', company_profit: '🏢 公司利潤(本小時)', company_loss: '🏢 公司虧損(本小時)', dividend: '💰 股利(本小時)', living_cost: '🏠 生活費(本小時)', subscription: '📦 訂閱月費(本小時)' }
   const typeColors = { income: 'var(--accent)', expense: 'var(--danger)', stock_buy: 'var(--danger)', stock_sell: 'var(--accent)', ipo_subscribe: 'var(--warn)', employee_hire: 'var(--danger)', company_create: 'var(--danger)', upgrade: 'var(--danger)' }
   return (
     <div className="card">

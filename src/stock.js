@@ -86,6 +86,44 @@ export async function handleStock(env, request, path, user) {
     return results;
   }
 
+  if (path === '/api/stock/pnl') {
+    // 每支股票的完整損益 (FIFO 移動平均)
+    const companies = await db.prepare('SELECT id, name FROM companies').all();
+    const results = [];
+    for (const c of companies.results) {
+      const trades = await db.prepare('SELECT type, price, quantity, traded_at FROM stock_trades WHERE user_id = ? AND company_id = ? ORDER BY traded_at ASC').bind(user.id, c.id).all();
+      if (trades.results.length === 0) continue;
+
+      let cost = 0, qty = 0, realizedPnl = 0;
+      for (const t of trades.results) {
+        const total = t.price * t.quantity;
+        if (t.type === 'buy') {
+          cost += total; qty += t.quantity;
+        } else {
+          const avgCost = qty > 0 ? cost / qty : 0;
+          realizedPnl += (t.price - avgCost) * t.quantity;
+          cost -= avgCost * t.quantity; qty -= t.quantity;
+          if (qty < 0) qty = 0;
+          if (cost < 0) cost = 0;
+        }
+      }
+      const currentPrice = await getCurrentPrice(db, c.id);
+      const unrealizedPnl = (currentPrice - (qty > 0 ? cost / qty : 0)) * qty;
+      results.push({
+        companyId: c.id,
+        companyName: c.name,
+        holdings: qty,
+        avgCost: qty > 0 ? Math.round(cost / qty) : 0,
+        currentPrice,
+        realizedPnl: Math.round(realizedPnl),
+        unrealizedPnl: Math.round(unrealizedPnl),
+        totalPnl: Math.round(realizedPnl + unrealizedPnl),
+      });
+    }
+    const total = results.reduce((s, r) => s + r.totalPnl, 0);
+    return { stocks: results, totalPnl: total };
+  }
+
   if (path === '/api/stock/trades') {
     const reqUrl = new URL(request.url);
     const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
@@ -363,7 +401,7 @@ export async function handleStock(env, request, path, user) {
       await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
       await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', newPrice, quantity, now).run();
       await updateKline(db, companyId, newPrice, quantity, now, 'buy');
-      await logTransaction(db, user.id, 'stock_buy', -marginAmount, `槓桿做多 ${quantity}股 @ $${newPrice} (${leverage}x)`);
+      await logTransaction(db, user.id, 'margin_open', -marginAmount, `槓桿做多 ${quantity}股 @ $${newPrice} (${leverage}x)`);
       return { success: true, price: newPrice, quantity, leverage, marginAmount };
     } else {
       // Short: check system has enough cash to buy back
@@ -376,7 +414,7 @@ export async function handleStock(env, request, path, user) {
       await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
       await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
       await updateKline(db, companyId, newPrice, quantity, now, 'sell');
-      await logTransaction(db, user.id, 'stock_sell', marginAmount, `槓桿做空 ${quantity}股 @ $${newPrice} (${leverage}x)`);
+      await logTransaction(db, user.id, 'margin_open', marginAmount, `槓桿做空 ${quantity}股 @ $${newPrice} (${leverage}x)`);
       return { success: true, price: newPrice, quantity, leverage, marginAmount };
     }
   }
@@ -411,6 +449,7 @@ async function closePosition(db, pos) {
   if (pos.type === 'long') {
     const sellValue = closePrice * pos.quantity;
     const totalReturn = (sellValue - pos.loan_amount) + pos.margin_amount - pos.dividend_debt;
+    const pnl = totalReturn - pos.margin_amount;
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(Math.max(totalReturn, 0), pos.user_id).run();
     const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(pos.user_id, pos.company_id).first();
     if (holding && holding.quantity <= pos.quantity) {
@@ -419,13 +458,14 @@ async function closePosition(db, pos) {
       await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(pos.quantity, pos.user_id, pos.company_id).run();
     }
     await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(pos.quantity, pos.company_id).run();
-    await logTransaction(db, pos.user_id, 'stock_sell', Math.max(totalReturn, 0), `平倉做多 ${pos.quantity}股 @ $${closePrice}`);
+    await logTransaction(db, pos.user_id, 'margin_close', Math.max(totalReturn, 0), `平倉做多 ${pos.quantity}股 @ $${closePrice}（損益 ${pnl >= 0 ? '+' : ''}${pnl.toLocaleString()}）`);
   } else {
     const buyCost = closePrice * pos.quantity;
     const totalReturn = (pos.loan_amount - buyCost) + pos.margin_amount - pos.dividend_debt;
+    const pnl = totalReturn - pos.margin_amount;
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(Math.max(totalReturn, 0), pos.user_id).run();
     await db.prepare('UPDATE stock_inventory SET cash = cash - ? WHERE company_id = ?').bind(buyCost, pos.company_id).run();
-    await logTransaction(db, pos.user_id, 'stock_buy', Math.max(totalReturn, 0), `平倉做空 ${pos.quantity}股 @ $${closePrice}`);
+    await logTransaction(db, pos.user_id, 'margin_close', Math.max(totalReturn, 0), `平倉做空 ${pos.quantity}股 @ $${closePrice}（損益 ${pnl >= 0 ? '+' : ''}${pnl.toLocaleString()}）`);
   }
   await db.prepare('DELETE FROM margin_positions WHERE id = ?').bind(pos.id).run();
   return { success: true };

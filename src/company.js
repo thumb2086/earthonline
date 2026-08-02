@@ -1,4 +1,4 @@
-import { logTransaction, logHourly } from './utils.js';
+﻿import { logTransaction, logHourly } from './utils.js';
 import { getUserSubscriptions } from './subscription.js';
 
 const INDUSTRY_MULT = { tech: 1.2, manufacturing: 1.0, finance: 1.3, service: 0.9 };
@@ -114,7 +114,7 @@ export async function handleCompany(env, request, path, user) {
   }
 
   if (path === '/api/company/ipo/start') {
-    const { companyId, ipoPrice, totalShares, ipoMinutes = 60 } = await request.json();
+    const { companyId, ipoPrice, totalShares, ipoMinutes = 60, founderRatio = 0.6 } = await request.json();
     if (!companyId) return { error: '請選擇公司' };
     const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
     if (!company) return { error: '公司不存在或非owner' };
@@ -123,11 +123,23 @@ export async function handleCompany(env, request, path, user) {
     if (!ipoPrice || ipoPrice < 10) return { error: 'IPO價格至少$10' };
     if (!totalShares || totalShares < 1000) return { error: '發行股數至少1,000' };
     const minutes = Math.max(5, Math.min(1440, parseInt(ipoMinutes) || 60));
+    // 創辦人保留比例 (IPO發行比例 = 1 - founderRatio)
+    const founderKeep = Math.min(Math.max(parseFloat(founderRatio) || 0.6, 0), 0.9);
 
     await db.prepare('UPDATE companies SET total_shares = ?, share_price = ? WHERE id = ?').bind(totalShares, ipoPrice, companyId).run();
+    const ipoShares = Math.floor(totalShares * (1 - founderKeep));
     await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'ipo', Date.now(), minutes).run();
-    await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, 0, ?)').bind(companyId, totalShares).run();
-    return { success: true, message: `IPO已啟動，${minutes}分鐘後自動上市` };
+    await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, 0, ?)').bind(companyId, ipoShares).run();
+    // 創辦人持有剩餘股份
+    const founderShares = totalShares - ipoShares;
+    const founderHolding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(company.owner_id, companyId).first();
+    if (founderHolding) {
+      await db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(founderShares, company.owner_id, companyId).run();
+    } else {
+      await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(company.owner_id, companyId, founderShares).run();
+    }
+    await logTransaction(db, company.owner_id, 'ipo_revenue', 0, `創辦人持有 ${founderShares.toLocaleString()} 股 (IPO發行 ${ipoShares.toLocaleString()} 股)`);
+    return { success: true, message: `IPO已啟動，${minutes}分鐘後自動上市（創辦人保留 ${(founderKeep*100).toFixed(0)}%）` };
   }
 
   if (path === '/api/company/ipo/list') {
