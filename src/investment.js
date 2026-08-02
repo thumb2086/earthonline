@@ -2,18 +2,18 @@ import { logTransaction, logHourly } from './utils.js';
 import { getUserSubscriptions } from './subscription.js';
 
 const INVEST_TYPES = {
-  bond: { label: '債券', rateMin: 0.00005, rateMax: 0.00005, unlockEarned: 1000, maxPerUser: 10000000, risk: 0 },
-  index_fund: { label: '指數基金', rateMin: 0.00005, rateMax: 0.00015, unlockEarned: 5000, maxPerUser: 20000000, risk: 0 },
-  real_estate: { label: '房地產', rateMin: 0.0002, rateMax: 0.0002, unlockEarned: 50000, maxPerUser: 50000000, risk: 0 },
-  startup: { label: '新創投資', rateMin: 0.0003, rateMax: 0.0007, unlockEarned: 200000, maxPerUser: 100000000, risk: 0.0005 },
+  bond: { label: '債券', rateMin: 0.0001, rateMax: 0.0001, unlockEarned: 1000, maxPerUser: 10000000, risk: 0 },
+  index_fund: { label: '指數基金', rateMin: 0.0001, rateMax: 0.00025, unlockEarned: 5000, maxPerUser: 20000000, risk: 0 },
+  real_estate: { label: '房地產', rateMin: 0.0004, rateMax: 0.0004, unlockEarned: 50000, maxPerUser: 50000000, risk: 0 },
+  startup: { label: '新創投資', rateMin: 0.0008, rateMax: 0.0015, unlockEarned: 200000, maxPerUser: 100000000, risk: 0.0005 },
 };
 
 // 定存期限 (分鐘): 利率/分
 const DEPOSIT_TERMS = [
-  { minutes: 60, rate: 0.0008, label: '1小時' },
-  { minutes: 360, rate: 0.0012, label: '6小時' },
-  { minutes: 1440, rate: 0.002, label: '24小時' },
-  { minutes: 10080, rate: 0.003, label: '7天' },
+  { minutes: 60, rate: 0.0012, label: '1小時' },
+  { minutes: 360, rate: 0.0018, label: '6小時' },
+  { minutes: 1440, rate: 0.003, label: '24小時' },
+  { minutes: 10080, rate: 0.0045, label: '7天' },
 ];
 
 function getDiminishingRate(baseRate, totalInvested, maxPerUser) {

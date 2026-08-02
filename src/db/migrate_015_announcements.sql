@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS community_announcements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);

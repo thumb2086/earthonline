@@ -146,6 +146,90 @@ export async function handleAdmin(env, request, path, user) {
     return result;
   }
 
+  if (path === '/api/admin/announcements') {
+    const rows = await db.prepare('SELECT * FROM community_announcements ORDER BY created_at DESC LIMIT 20').all();
+    return rows.results;
+  }
+
+  if (path === '/api/admin/dilute' && request.method === 'POST') {
+    const { companyId, shares } = await request.json();
+    if (!companyId || !shares || shares <= 0) return { error: '參數無效' };
+    const company = await db.prepare('SELECT id, name, total_shares FROM companies WHERE id = ?').bind(companyId).first();
+    if (!company) return { error: '公司不存在' };
+    await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(shares, companyId).run();
+    await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(shares, companyId).run();
+    await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${company.name} 管理員增資發行 ${shares.toLocaleString()} 股新股`, Date.now()).run();
+    return { success: true, newTotal: company.total_shares + shares };
+  }
+
+  if (path === '/api/admin/delist' && request.method === 'POST') {
+    const { companyId } = await request.json();
+    if (!companyId) return { error: '參數無效' };
+    const company = await db.prepare('SELECT id, name FROM companies WHERE id = ?').bind(companyId).first();
+    if (!company) return { error: '公司不存在' };
+    const ipo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
+    if (!ipo || ipo.phase !== 'trading') return { error: '僅上市中的公司可下架' };
+    await db.prepare("UPDATE ipo_state SET phase = 'delisted' WHERE company_id = ?").bind(companyId).run();
+    await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${company.name} 已下架（停止交易）`, Date.now()).run();
+    return { success: true };
+  }
+
+  if (path === '/api/admin/relist' && request.method === 'POST') {
+    const { companyId } = await request.json();
+    if (!companyId) return { error: '參數無效' };
+    const company = await db.prepare('SELECT id, name FROM companies WHERE id = ?').bind(companyId).first();
+    if (!company) return { error: '公司不存在' };
+    await db.prepare("UPDATE ipo_state SET phase = 'trading' WHERE company_id = ?").bind(companyId).run();
+    await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${company.name} 重新上市`, Date.now()).run();
+    return { success: true };
+  }
+
+  if (path === '/api/admin/margin') {
+    const excludeIds = await resolveExclude(db, request);
+    const excl = excludeIds.length > 0 ? ` AND mp.user_id NOT IN (${excludeIds.join(',')})` : '';
+    const rows = await db.prepare(`
+      SELECT mp.id, mp.user_id, u.username, mp.company_id, c.name as company_name,
+             mp.type, mp.quantity, mp.entry_price, mp.margin_amount, mp.loan_amount,
+             mp.leverage, mp.opened_at, mp.margin_call_at, c.share_price
+      FROM margin_positions mp
+      JOIN users u ON u.id = mp.user_id
+      JOIN companies c ON c.id = mp.company_id
+      WHERE 1=1${excl}
+      ORDER BY mp.opened_at DESC
+    `).all();
+    const list = rows.results.map(mp => {
+      const diff = mp.type === 'long' ? (mp.share_price - mp.entry_price) * mp.quantity : (mp.entry_price - mp.share_price) * mp.quantity;
+      const equity = mp.margin_amount + diff;
+      // 維持率: 做多 = 持倉市值/借款; 做空 = (賣出款項+保證金-股息債務)/當前市值 (與 processMarginTick 一致)
+      let maintenance;
+      if (mp.type === 'long') {
+        maintenance = mp.loan_amount > 0 ? ((mp.share_price * mp.quantity) / mp.loan_amount) : 0;
+      } else {
+        maintenance = mp.share_price * mp.quantity > 0 ? ((mp.loan_amount + mp.margin_amount - (mp.dividend_debt || 0)) / (mp.share_price * mp.quantity)) : 0;
+      }
+      return { ...mp, pnl: diff, equity: Math.floor(equity), maintenanceRate: Math.floor(maintenance * 100) };
+    });
+    // 圓餅圖: 按用戶統計槓桿曝險 (持倉市值)
+    const byUser = {};
+    for (const mp of list) {
+      if (!byUser[mp.username]) byUser[mp.username] = { username: mp.username, exposure: 0, positions: 0 };
+      byUser[mp.username].exposure += mp.quantity * mp.share_price;
+      byUser[mp.username].positions++;
+    }
+    // 圓餅圖: 按公司統計
+    const byCompany = {};
+    for (const mp of list) {
+      if (!byCompany[mp.company_name]) byCompany[mp.company_name] = { name: mp.company_name, exposure: 0, positions: 0 };
+      byCompany[mp.company_name].exposure += mp.quantity * mp.share_price;
+      byCompany[mp.company_name].positions++;
+    }
+    return {
+      positions: list,
+      byUser: Object.values(byUser).sort((a, b) => b.exposure - a.exposure),
+      byCompany: Object.values(byCompany).sort((a, b) => b.exposure - a.exposure),
+    };
+  }
+
   if (path === '/api/admin/ipo') {
     const url = new URL(request.url);
     const companyId = url.searchParams.get('companyId');

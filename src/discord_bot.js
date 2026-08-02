@@ -24,6 +24,57 @@ function updateMessage(text, buttons = null) {
 
 const REFRESH_BTN = () => [{ label: '🔄 更新', id: 'refresh' }];
 
+// 生成 /price 全部股票摘要
+async function priceContent(db) {
+  const trading = await db.prepare(`
+    SELECT c.id, c.name, c.share_price, c.total_shares, 
+           COALESCE(inv.stock_quantity, 0) as sys_inv
+    FROM companies c
+    LEFT JOIN stock_inventory inv ON inv.company_id = c.id
+    JOIN ipo_state i ON i.company_id = c.id AND i.phase = 'trading'
+    ORDER BY c.id
+  `).all();
+  if (trading.results.length === 0) return '📉 目前沒有上市股票';
+
+  // 大盤指數
+  let currentCap = 0, baseCap = 0;
+  for (const c of trading.results) {
+    const circulating = Math.max(c.total_shares - c.sys_inv, 1);
+    const first = await db.prepare('SELECT open FROM stock_klines WHERE company_id = ? ORDER BY minute ASC LIMIT 1').bind(c.id).first();
+    const basePrice = first?.open || c.share_price || 100;
+    currentCap += (c.share_price || 100) * circulating;
+    baseCap += basePrice * circulating;
+  }
+  const indexValue = baseCap > 0 ? Math.round((currentCap / baseCap) * 1000) : 1000;
+
+  // 昨日收盤 (5分鐘前)
+  const prev = await db.prepare('SELECT close FROM stock_klines WHERE company_id = 1 ORDER BY minute DESC LIMIT 60').all();
+  const prevClose = prev.results.length > 1 ? prev.results[prev.results.length - 1].close : 1000;
+  const idxChange = indexValue - prevClose;
+  const idxPct = prevClose > 0 ? ((idxChange / prevClose) * 100).toFixed(2) : '0.00';
+  const idxArrow = idxChange >= 0 ? '📈' : '📉';
+
+  let out = `${idxArrow} **大盤指數 ${indexValue.toLocaleString()}** ${idxChange >= 0 ? '+' : ''}${idxChange} (${idxPct}%)\n`;
+  out += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+  for (const c of trading.results) {
+    const circulating = Math.max(c.total_shares - c.sys_inv, 1);
+    const maxTrade = Math.max(1, Math.floor(circulating * 0.05));
+    // 最近漲跌
+    const recent = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 6').all();
+    const oldP = recent.results.length > 5 ? recent.results[5].close : c.share_price;
+    const chg = c.share_price - oldP;
+    const chgPct = oldP > 0 ? ((chg / oldP) * 100).toFixed(2) : '0.00';
+    const arrow = chg >= 0 ? '🔴' : '🟢';
+
+    out += `${arrow} **${c.name}** $${c.share_price}\n` +
+      `　${chg >= 0 ? '+' : ''}${chg} (${chgPct}%) · 流通 ${circulating} · 上限 ${maxTrade} 股\n`;
+  }
+  out += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+  out += `💰 手續費 1.5% · 📊 /price 001 查看個股`;
+  return out;
+}
+
 // 生成 /ipo 內容
 async function ipoContent(db) {
   const ipos = await db.prepare(`
@@ -164,9 +215,7 @@ export async function handleInteractions(request, env) {
           return updateMessage(await ipoContent(db), REFRESH_BTN().map(b => ({ ...b, id: 'refresh_ipo' })));
         }
         if (cmd === 'price' || cmd === 'stock') {
-          // 從訊息內容提取股票名 (最後一行後的原始輸入無法取得, 改用 id)
-          const content = payload.message?.content || '';
-          return updateMessage('請重新輸入 /price 指令，按鈕更新僅支援 /ipo 與 /server', null);
+          return updateMessage(await priceContent(db), REFRESH_BTN().map(b => ({ ...b, id: 'refresh_price' })));
         }
         if (cmd === 'server') {
           return updateMessage(await serverContent(db), REFRESH_BTN().map(b => ({ ...b, id: 'refresh_server' })));
@@ -189,7 +238,11 @@ export async function handleInteractions(request, env) {
       }
 
       if (name === 'price' || name === 'stock') {
-        const stockName = payload.data?.options?.[0]?.value || '1';
+        const stockName = payload.data?.options?.[0]?.value;
+        // 無參數 → 全部股票摘要
+        if (!stockName) {
+          return textResponse(await priceContent(db), REFRESH_BTN().map(b => ({ ...b, id: 'refresh_price' })));
+        }
         // 找公司: 名稱或代號(001/002...)或id
         let company = null;
         const num = parseInt(stockName);
@@ -467,7 +520,7 @@ export async function setupDiscordBot(env, renameTo) {
 
   const commands = [
     { name: 'ipo', description: '🚀 查看 IPO 認購狀態' },
-    { name: 'price', description: '📈 查看股票價格', options: [{ type: 3, name: 'stock', description: '股票名稱或代號 (001/002...)', required: true }] },
+    { name: 'price', description: '📈 查看全部股票或個股 (001/002/蛋包)', options: [{ type: 3, name: 'stock', description: '股票名稱或代號 (留空顯示全部)', required: false }] },
     { name: 'leaderboard', description: '🏆 全球掛機排行榜 TOP 10' },
     { name: 'profile', description: '🪪 產生你的專屬身分卡' },
     { name: 'server', description: '🌍 伺服器即時狀態' },

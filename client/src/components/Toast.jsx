@@ -61,9 +61,16 @@ export function ToastProvider({ children }) {
             {modal.fields ? modal.fields.map((f, i) => (
               <div key={i} style={{ marginBottom: 12 }}>
                 <div style={{ color: 'var(--dim)', fontSize: 12, marginBottom: 4 }}>{f.label}</div>
-                <input autoFocus={i === 0} value={modal.values[i]} onChange={e => setModal(prev => { const v = [...prev.values]; v[i] = e.target.value; return { ...prev, values: v } })}
-                  placeholder={f.placeholder || ''}
-                  style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 14px', borderRadius: 6, fontSize: 13, width: '100%', outline: 'none' }} />
+                {f.options ? (
+                  <select autoFocus={i === 0} value={modal.values[i]} onChange={e => setModal(prev => { const v = [...prev.values]; v[i] = e.target.value; return { ...prev, values: v } })}
+                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 14px', borderRadius: 6, fontSize: 13, width: '100%', outline: 'none' }}>
+                    {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <input autoFocus={i === 0} value={modal.values[i]} onChange={e => setModal(prev => { const v = [...prev.values]; v[i] = e.target.value; return { ...prev, values: v } })}
+                    placeholder={f.placeholder || ''}
+                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 14px', borderRadius: 6, fontSize: 13, width: '100%', outline: 'none' }} />
+                )}
               </div>
             )            ) : (
               <div>

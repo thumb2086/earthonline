@@ -113,6 +113,57 @@ export async function handleCompany(env, request, path, user) {
     return { success: true };
   }
 
+  // 自訂增資: owner 對自己公司增資發行新股 (賣給系統換現金)
+  if (path === '/api/company/acquirable') {
+    const rows = await db.prepare(`
+      SELECT c.id, c.name, c.industry, c.share_price, c.total_shares, c.owner_id, u.username as owner_name
+      FROM companies c JOIN users u ON u.id = c.owner_id
+      WHERE c.owner_id > 0 AND c.owner_id != ? AND c.id IN (SELECT company_id FROM ipo_state WHERE phase IS NOT NULL)
+      ORDER BY c.total_shares * c.share_price DESC
+    `).bind(user.id).all();
+    return rows.results.map(c => ({ ...c, buyoutPrice: Math.floor(c.total_shares * c.share_price * 2) }));
+  }
+
+  if (path === '/api/company/dilute') {
+    const { companyId, shares, price } = await request.json();
+    if (!companyId || !shares || shares <= 0) return { error: '參數無效' };
+    const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
+    if (!company) return { error: '公司不存在或非owner' };
+    const pricePerShare = Math.max(1, parseInt(price) || company.share_price || 10);
+    const revenue = shares * pricePerShare;
+    // 新股進入庫存 (系統持有, 玩家可買)
+    await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(shares, companyId).run();
+    const inv = await db.prepare('SELECT id FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
+    if (inv) {
+      await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ?, cash = cash - ? WHERE company_id = ?').bind(shares, revenue, companyId).run();
+    } else {
+      await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, ?, ?)').bind(companyId, -revenue, shares).run();
+    }
+    await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(revenue, user.id).run();
+    await logTransaction(db, user.id, 'ipo_revenue', revenue, `增資 ${shares} 股 @ $${pricePerShare}`);
+    return { success: true, shares, revenue };
+  }
+
+  // 買下公司: 以 2 倍身價買斷 (owner 轉移, 原 owner 拿錢)
+  if (path === '/api/company/buyout') {
+    const { companyId } = await request.json();
+    if (!companyId) return { error: '參數無效' };
+    const company = await db.prepare('SELECT * FROM companies WHERE id = ?').bind(companyId).first();
+    if (!company) return { error: '公司不存在' };
+    if (company.owner_id === user.id) return { error: '這是你的公司' };
+    if (company.owner_id === 0 || company.owner_id === null) return { error: '系統公司無法收購' };
+    const buyPrice = Math.floor((company.total_shares || 0) * (company.share_price || 10) * 2);
+    const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
+    if (!wallet || wallet.cash < buyPrice) return { error: `收購需要 $${buyPrice.toLocaleString()}` };
+    const oldOwner = company.owner_id;
+    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(buyPrice, user.id).run();
+    await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(buyPrice, oldOwner).run();
+    await db.prepare('UPDATE companies SET owner_id = ? WHERE id = ?').bind(user.id, companyId).run();
+    await logTransaction(db, user.id, 'buyout', -buyPrice, `收購 ${company.name}`);
+    await logTransaction(db, oldOwner, 'buyout', buyPrice, `${company.name} 被收購`);
+    return { success: true, buyPrice };
+  }
+
   if (path === '/api/company/ipo/start') {
     const { companyId, ipoPrice, totalShares, ipoMinutes = 60, founderRatio = 0.6 } = await request.json();
     if (!companyId) return { error: '請選擇公司' };
@@ -121,7 +172,7 @@ export async function handleCompany(env, request, path, user) {
     const existingIpo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
     if (existingIpo && existingIpo.phase !== null) return { error: '已有IPO記錄' };
     if (!ipoPrice || ipoPrice < 10) return { error: 'IPO價格至少$10' };
-    if (!totalShares || totalShares < 100 || totalShares > 5000) return { error: '發行股數需 100~5,000' };
+    if (!totalShares || totalShares < 100 || totalShares > 100000) return { error: '發行股數需 100~100,000' };
     const minutes = Math.max(5, Math.min(1440, parseInt(ipoMinutes) || 60));
     // 創辦人保留比例 (IPO發行比例 = 1 - founderRatio)
     const founderKeep = Math.min(Math.max(parseFloat(founderRatio) || 0.6, 0), 0.9);
