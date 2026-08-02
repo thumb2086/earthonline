@@ -7,19 +7,26 @@ function textResponse(text) {
   });
 }
 
+function getHeaderIgnoreCase(headers, name) {
+  // Cloudflare Workers: X-Signature-Ed25519-Timestamp 被改名為 x-signature-timestamp
+  const lower = name.toLowerCase();
+  let ts = null, sig = null;
+  headers.forEach((v, k) => {
+    const kLower = String(k).toLowerCase();
+    if (kLower.includes('timestamp')) ts = v;
+    if (kLower.includes('ed25519')) sig = v;
+  });
+  return lower.includes('timestamp') ? ts : sig;
+}
+
 async function verifySignature(request, env) {
   const publicKey = env.DISCORD_PUBLIC_KEY;
   if (!publicKey) return true; // 未設定金鑰時跳過驗證（測試模式）
-  let debugInfo = {};
   try {
-    const timestamp = request.headers.get('X-Signature-Ed25519-Timestamp') || '';
-    const signature = request.headers.get('X-Signature-Ed25519-Signature') || '';
-    debugInfo.timestamp = timestamp;
-    debugInfo.signature = signature;
-    debugInfo.signatureLen = signature.length;
-    if (!timestamp || !signature) { debugInfo.error = 'missing headers'; throw new Error('missing headers'); }
+    const timestamp = getHeaderIgnoreCase(request.headers, 'X-Signature-Ed25519-Timestamp') || '';
+    const signature = getHeaderIgnoreCase(request.headers, 'X-Signature-Ed25519-Signature') || '';
+    if (!timestamp || !signature) return false;
     const body = await request.clone().text();
-    debugInfo.body = body;
     const key = await crypto.subtle.importKey(
       'raw',
       hexToBytes(publicKey),
@@ -27,24 +34,14 @@ async function verifySignature(request, env) {
       false,
       ['verify']
     );
-    debugInfo.importOk = true;
-    const ok = await crypto.subtle.verify(
+    return await crypto.subtle.verify(
       'Ed25519',
       key,
       hexToBytes(signature),
       new TextEncoder().encode(timestamp + body)
     );
-    debugInfo.result = ok;
-    await env.DB.prepare(`INSERT INTO community_state (key, value, updated_at) VALUES ('last_verify_debug', ?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
-      .bind(JSON.stringify(debugInfo), Date.now()).run().catch(() => {});
-    return ok;
   } catch (e) {
-    debugInfo.catchError = e?.message || String(e);
-    await env.DB.prepare(`INSERT INTO community_state (key, value, updated_at) VALUES ('last_verify_debug', ?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
-      .bind(JSON.stringify(debugInfo), Date.now()).run().catch(() => {});
-    console.error('Ed25519 verify error:', debugInfo.catchError);
+    console.error('Ed25519 verify error:', e?.message || e);
     return false;
   }
 }
@@ -65,13 +62,9 @@ export async function handleInteractions(request, env) {
   if (request.method !== 'POST') return new Response('ok', { status: 200 });
 
   // 簽名驗證 (Discord 要求, 驗證失敗回 401)
-  // 暫時繞過: 測試期間先確認指令功能正常
-  const bypass = request.headers.get('x-debug-bypass') === '1';
-  if (!bypass) {
-    const valid = await verifySignature(request, env);
-    if (!valid) {
-      return new Response('invalid signature', { status: 401 });
-    }
+  const valid = await verifySignature(request, env);
+  if (!valid) {
+    return new Response('invalid signature', { status: 401 });
   }
   if (request.headers.get('content-type')?.includes('application/json')) {
     const payload = await request.json().catch(() => null);
@@ -315,6 +308,23 @@ export async function listGuildBots(env) {
   const app = appRes.ok ? await appRes.json() : null;
 
   return { ourBotId: app?.id, ourBotName: app?.name, bots };
+}
+
+// 列出應用程式目前註冊的指令
+export async function listAppCommands(env) {
+  const botToken = env.DISCORD_BOT_TOKEN;
+  if (!botToken) return { error: '缺少 DISCORD_BOT_TOKEN' };
+  const appRes = await fetch('https://discord.com/api/v10/applications/@me', {
+    headers: { Authorization: `Bot ${botToken}` },
+  });
+  if (!appRes.ok) return { error: `無法取得應用: ${appRes.status}` };
+  const app = await appRes.json();
+  const res = await fetch(`https://discord.com/api/v10/applications/${app.id}/commands`, {
+    headers: { Authorization: `Bot ${botToken}` },
+  });
+  if (!res.ok) return { error: `查詢失敗: ${res.status}` };
+  const cmds = await res.json();
+  return { appId: app.id, commands: cmds.map(c => ({ name: c.name, id: c.id, description: c.description })) };
 }
 
 // 一次性設定: 查 Public Key + 註冊 Slash Commands (+可改名)

@@ -8,7 +8,7 @@ import { handleStock, processMarginTick, finalizeIPO } from './stock.js';
 import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
-import { handleInteractions, setupDiscordBot, listGuildBots, kickGuildBot, checkCryptoSupport, checkBodyEcho } from './discord_bot.js';
+import { handleInteractions, setupDiscordBot, listGuildBots, kickGuildBot, checkCryptoSupport, checkBodyEcho, listAppCommands } from './discord_bot.js';
 import { checkVoiceBoost, weeklySettlement } from './community.js';
 import { DiscordGateway } from './gateway.js';
 
@@ -133,6 +133,12 @@ export default {
       // 列出伺服器中的 bots
       if (path === '/api/bot/guild-bots' && request.method === 'GET') {
         const result = await listGuildBots(env);
+        return json(result, headers, result.error ? 400 : 200);
+      }
+
+      // 列出應用指令
+      if (path === '/api/bot/commands' && request.method === 'GET') {
+        const result = await listAppCommands(env);
         return json(result, headers, result.error ? 400 : 200);
       }
 
