@@ -263,33 +263,42 @@ export default {
     const db = env.DB;
     const minute = Math.floor(Date.now() / 60000);
 
-    // 核心 tick: 每分鐘必跑 (income/扣費最重要)
+    // 核心 tick: 每分鐘必跑 (income/扣費/投資利息)
     try {
       await processIncomeTick(db);
       await processBankTick(db);
       await processSubscriptionTick(db);
+      await processInvestmentTick(db);
     } catch (err) {
       console.error('Scheduled core tick error:', err.message);
+    }
+
+    // 輕量波動: 每分鐘, 只更新價格 (1查詢/公司)
+    try {
+      await processPriceWave(db);
+    } catch (err) {
+      console.error('Scheduled wave error:', err.message);
     }
 
     // 輪換 tick: 每 2 分鐘跑一次 (分鐘偶數)
     if (minute % 2 === 0) {
       try {
-        await processInvestmentTick(db);
         await processEmployeeTick(db);
         await processCompanyTick(db);
+        await processStockTick(db, minute % 10 === 0); // K線+股利每10分鐘
       } catch (err) {
         console.error('Scheduled rotate tick error:', err.message);
       }
     }
 
-    // 股票 tick: 每分鐘跑 (波動需要每分鐘) — 股利每10分鐘
-    try {
-      await finalizeIPO(db);
-      await processMarginTick(db);
-      await processStockTick(db, minute % 10 === 1);
-    } catch (err) {
-      console.error('Scheduled stock tick error:', err.message);
+    // 股票關鍵 tick: 每 2 分鐘 (分鐘奇數) — IPO/槓桿
+    if (minute % 2 === 1) {
+      try {
+        await finalizeIPO(db);
+        await processMarginTick(db);
+      } catch (err) {
+        console.error('Scheduled stock tick error:', err.message);
+      }
     }
 
     // 社群維運: 語音監控每5分鐘, 週日24:00清算
@@ -316,6 +325,28 @@ export default {
 
 export { DiscordGateway };
 
+// 輕量價格波動: 每分鐘 ±1.5% + 寫入即時K線
+async function processPriceWave(db) {
+  const companies = await db.prepare('SELECT id, share_price FROM companies').all();
+  const now = Date.now();
+  const interval = 5000;
+  const block = Math.floor(now / interval) * interval;
+  for (const c of companies.results) {
+    const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(c.id).first();
+    if (!ipo || ipo.phase !== 'trading') continue;
+    let price = c.share_price || 100;
+    if (Math.random() < 0.7) {
+      const drift = (Math.random() * 2 - 1) * 0.015;
+      price = Math.max(1, Math.round(price * (1 + drift)));
+      await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(price, c.id).run();
+    }
+    // 寫入即時K線 (1筆)
+    try {
+      await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(c.id, price, price, price, price, block).run();
+    } catch (e) {}
+  }
+}
+
 async function processStockTick(db, doDividend = true) {
   const companies = await db.prepare('SELECT * FROM companies').all();
   for (const company of companies.results) {
@@ -324,10 +355,11 @@ async function processStockTick(db, doDividend = true) {
 
     const interval = 5000;
     const block = Math.floor(Date.now() / interval) * interval;
-    const trades = await db.prepare('SELECT price, quantity FROM stock_trades WHERE company_id = ? AND traded_at >= ?').bind(company.id, block).all();
+    const trades = await db.prepare('SELECT price, quantity, type FROM stock_trades WHERE company_id = ? AND traded_at >= ?').bind(company.id, block).all();
     const companyData = await db.prepare('SELECT share_price FROM companies WHERE id = ?').bind(company.id).first();
     const close = companyData?.share_price || 100;
 
+    // 有交易才寫K線 (無交易的波動由 processPriceWave 每分鐘處理)
     if (trades.results.length > 0) {
       const open = trades.results[0].price;
       const high = Math.max(...trades.results.map(t => t.price));
@@ -336,19 +368,6 @@ async function processStockTick(db, doDividend = true) {
       const buyVol = trades.results.filter(t => t.type === 'buy').reduce((s, t) => s + t.quantity, 0);
       const sellVol = trades.results.filter(t => t.type === 'sell').reduce((s, t) => s + t.quantity, 0);
       try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, buyVol, sellVol, block).run(); } catch (e) {}
-    } else {
-      // 無交易: 每分鐘自然波動 ±1.5% (模擬市場活力)
-      const prev = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 1').bind(company.id).first();
-      const prevClose = prev?.close || company.share_price || 100;
-      let kClose = prevClose;
-      const oneMinBlock = Math.floor(block / 60000) * 60000;
-      const firstTickInMin = !prev || prev.minute < oneMinBlock;
-      if (firstTickInMin && Math.random() < 0.7) {
-        const drift = (Math.random() * 2 - 1) * 0.015;
-        kClose = Math.max(1, Math.round(prevClose * (1 + drift)));
-        await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(kClose, company.id).run();
-      }
-      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(company.id, prevClose, Math.max(prevClose, kClose), Math.min(prevClose, kClose), kClose, block).run(); } catch (e) {}
     }
 
     if (!doDividend) continue;

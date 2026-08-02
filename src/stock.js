@@ -87,14 +87,18 @@ export async function handleStock(env, request, path, user) {
   }
 
   if (path === '/api/stock/pnl') {
-    // 每支股票的完整損益 (FIFO 移動平均)
-    const companies = await db.prepare('SELECT id, name FROM companies').all();
+    // 每支股票的完整損益 (FIFO 移動平均) — 包含 IPO 認購
+    const holdings = await db.prepare('SELECT sh.company_id, sh.quantity, c.name FROM stock_holdings sh JOIN companies c ON c.id = sh.company_id WHERE sh.user_id = ? AND sh.quantity > 0').bind(user.id).all();
     const results = [];
-    for (const c of companies.results) {
+    for (const h of holdings.results) {
+      const c = { id: h.company_id, name: h.name };
       const trades = await db.prepare('SELECT type, price, quantity, traded_at FROM stock_trades WHERE user_id = ? AND company_id = ? ORDER BY traded_at ASC').bind(user.id, c.id).all();
-      if (trades.results.length === 0) continue;
+      const ipoSubs = await db.prepare('SELECT COALESCE(SUM(shares),0) as qty, COALESCE(SUM(total_cost),0) as cost FROM ipo_subscriptions WHERE user_id = ? AND company_id = ?').bind(user.id, c.id).first();
 
-      let cost = 0, qty = 0, realizedPnl = 0;
+      // 先算 IPO 認購 (視為買入)
+      let cost = ipoSubs?.cost || 0;
+      let qty = ipoSubs?.qty || 0;
+      let realizedPnl = 0;
       for (const t of trades.results) {
         const total = t.price * t.quantity;
         if (t.type === 'buy') {
@@ -108,12 +112,13 @@ export async function handleStock(env, request, path, user) {
         }
       }
       const currentPrice = await getCurrentPrice(db, c.id);
-      const unrealizedPnl = (currentPrice - (qty > 0 ? cost / qty : 0)) * qty;
+      const holdingsQty = h.quantity || qty;
+      const unrealizedPnl = (currentPrice - (holdingsQty > 0 ? cost / holdingsQty : 0)) * holdingsQty;
       results.push({
         companyId: c.id,
         companyName: c.name,
-        holdings: qty,
-        avgCost: qty > 0 ? Math.round(cost / qty) : 0,
+        holdings: holdingsQty,
+        avgCost: holdingsQty > 0 ? Math.round(cost / holdingsQty) : 0,
         currentPrice,
         realizedPnl: Math.round(realizedPnl),
         unrealizedPnl: Math.round(unrealizedPnl),
