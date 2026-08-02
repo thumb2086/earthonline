@@ -250,13 +250,16 @@ export async function handleCompany(env, request, path, user) {
     await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(value, value, user.id).run();
     await logTransaction(db, user.id, 'company_liquidate', value, `清算公司「${company.name}」`);
 
-    await db.prepare('DELETE FROM companies WHERE id = ?').bind(companyId).run();
     await db.prepare('DELETE FROM ipo_state WHERE company_id = ?').bind(companyId).run();
     await db.prepare('DELETE FROM stock_inventory WHERE company_id = ?').bind(companyId).run();
     await db.prepare('DELETE FROM departments WHERE company_id = ?').bind(companyId).run();
     await db.prepare('DELETE FROM employees WHERE company_id = ?').bind(companyId).run();
     await db.prepare('DELETE FROM stock_holdings WHERE company_id = ?').bind(companyId).run();
     await db.prepare('DELETE FROM ipo_subscriptions WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM stock_trades WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM stock_klines WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM margin_positions WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM companies WHERE id = ?').bind(companyId).run();
     return { success: true, payout: value };
   }
 

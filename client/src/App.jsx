@@ -510,7 +510,7 @@ function Company({ api, toast, prompt, promptMulti }) {
         <div className="stat"><span className="stat-label">收入</span><span className="stat-value">${(c.income || 0).toLocaleString()}/分</span></div>
         <div className="stat"><span className="stat-label">成本</span><span className="stat-value">${(c.costs || 0).toLocaleString()}/分</span></div>
         <div className="stat"><span className="stat-label">淨利潤</span><span className="stat-value">${(c.profit || 0).toLocaleString()}/分</span></div>
-        <div className="stat"><span className="stat-label">清算可得</span><span className="stat-value">$${(c.liquidationValue || 0).toLocaleString()}</span></div>
+        <div className="stat"><span className="stat-label">清算可得</span><span className="stat-value">${(c.liquidationValue || 0).toLocaleString()}</span></div>
         <div className="stat"><span className="stat-label">你持股</span><span className="stat-value">{(heldOf(c.id) || 0).toLocaleString()} 股</span></div>
         <div className="flex gap-8 mt-12">
           <button className={`btn btn-sm ${selectedCompany===c.id?'btn-primary':''}`} onClick={() => setSelectedCompany(c.id)}>選擇此公司</button>
