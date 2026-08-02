@@ -845,11 +845,11 @@ function Leaderboard({ api }) {
   useEffect(() => { api('/api/leaderboard').then(d => setData(Array.isArray(d) ? d : [])) }, [])
   return (
     <div className="card">
-      <div className="card-title">🏆 排行榜</div>
+      <div className="card-title">🏆 身價排行榜</div>
       {(data || []).map((u, i) => (
         <div className="stat" key={u.username}>
           <span><span className="text-accent" style={{fontWeight:700}}>#{i+1}</span> {u.username} {u.online ? <span style={{color:'var(--accent)',fontSize:11}}>●線上</span> : <span className="text-dim" style={{fontSize:11}}>●離線</span>}</span>
-          <span className="text-dim">💰${(u.total_earned||0).toLocaleString()} 📊{u.stocks} 股</span>
+          <span className="text-dim">💎${(u.worth||0).toLocaleString()} 📊{u.stocks} 股</span>
         </div>
       ))}
       {data.length === 0 && <div className="text-dim">尚無資料</div>}
@@ -1064,7 +1064,7 @@ function AdminPanel({ api }) {
           <div className="flex justify-between items-center">
             <div>
               <span style={{fontWeight:600}}>#{u.id} {u.username} {u.role === 'admin' ? '⭐' : ''}</span>
-              <div className="text-dim text-sm">💰${(u.cash || 0).toLocaleString()} 📈${(u.total_earned || 0).toLocaleString()} ⏱${(u.incomePerMin || 0).toLocaleString()}/分</div>
+              <div className="text-dim text-sm">💰${(u.cash || 0).toLocaleString()} 📈${(u.total_earned || 0).toLocaleString()} ⏱${(u.incomePerMin || 0).toLocaleString()}/分 📊${(u.stocks || 0)}股</div>
             </div>
             <button className="btn btn-sm" onClick={() => setExpanded(expanded === u.id ? null : u.id)}>{expanded === u.id ? '收起' : '資產配置'}</button>
           </div>

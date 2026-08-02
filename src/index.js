@@ -176,14 +176,23 @@ export default {
 
       // Public leaderboard
       if (path === '/api/leaderboard') {
-        const lb = await env.DB.prepare(`
-          SELECT u.username, u.last_active, w.total_earned, w.cash,
-            (SELECT COALESCE(SUM(quantity), 0) FROM stock_holdings WHERE user_id = u.id) as stocks
+        const users = await env.DB.prepare(`
+          SELECT u.id, u.username, u.last_active, w.total_earned, w.cash, w.savings, w.bank,
+            (SELECT COALESCE(SUM(h.quantity * c.share_price), 0) FROM stock_holdings h JOIN companies c ON c.id = h.company_id WHERE h.user_id = u.id) as stock_value,
+            (SELECT COALESCE(SUM(quantity), 0) FROM stock_holdings WHERE user_id = u.id) as stocks,
+            (SELECT COALESCE(SUM(remaining), 0) FROM loans WHERE user_id = u.id AND status = 'active') as debt,
+            (SELECT COALESCE(SUM(amount), 0) FROM investments WHERE user_id = u.id) as investments
           FROM users u JOIN wallets w ON w.user_id = u.id
-          ORDER BY w.total_earned DESC LIMIT 50
         `).all();
         const now = Date.now();
-        return json(lb.results.map(u => ({ ...u, online: u.last_active && now - u.last_active < 300000 })), headers);
+        const rows = users.results.map(u => ({
+          ...u,
+          stock_value: u.stock_value || 0,
+          worth: (u.cash || 0) + (u.savings || 0) + (u.bank || 0) + (u.stock_value || 0) + (u.investments || 0) - (u.debt || 0),
+          online: u.last_active && now - u.last_active < 300000,
+        }));
+        rows.sort((a, b) => b.worth - a.worth);
+        return json(rows.slice(0, 50), headers);
       }
 
       // Static assets — no auth required
