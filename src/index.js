@@ -283,15 +283,13 @@ export default {
       }
     }
 
-    // 股票 tick: 每 2 分鐘跑一次 (分鐘奇數) — 最重
-    if (minute % 2 === 1) {
-      try {
-        await finalizeIPO(db);
-        await processMarginTick(db);
-        await processStockTick(db, minute % 10 === 1); // 股利每10分鐘
-      } catch (err) {
-        console.error('Scheduled stock tick error:', err.message);
-      }
+    // 股票 tick: 每分鐘跑 (波動需要每分鐘) — 股利每10分鐘
+    try {
+      await finalizeIPO(db);
+      await processMarginTick(db);
+      await processStockTick(db, minute % 10 === 1);
+    } catch (err) {
+      console.error('Scheduled stock tick error:', err.message);
     }
 
     // 社群維運: 語音監控每5分鐘, 週日24:00清算
@@ -339,14 +337,14 @@ async function processStockTick(db, doDividend = true) {
       const sellVol = trades.results.filter(t => t.type === 'sell').reduce((s, t) => s + t.quantity, 0);
       try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, buyVol, sellVol, block).run(); } catch (e) {}
     } else {
-      // 無交易: 每5分鐘窗口第一次tick時微幅波動(±0.5%)
+      // 無交易: 每分鐘自然波動 ±1.5% (模擬市場活力)
       const prev = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 1').bind(company.id).first();
       const prevClose = prev?.close || company.share_price || 100;
       let kClose = prevClose;
-      const fiveMinBlock = Math.floor(block / 300000) * 300000;
-      const firstTickInWindow = !prev || prev.minute < fiveMinBlock;
-      if (firstTickInWindow && Math.random() < 0.5) {
-        const drift = (Math.random() * 2 - 1) * 0.005;
+      const oneMinBlock = Math.floor(block / 60000) * 60000;
+      const firstTickInMin = !prev || prev.minute < oneMinBlock;
+      if (firstTickInMin && Math.random() < 0.7) {
+        const drift = (Math.random() * 2 - 1) * 0.015;
         kClose = Math.max(1, Math.round(prevClose * (1 + drift)));
         await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(kClose, company.id).run();
       }

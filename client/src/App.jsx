@@ -83,7 +83,7 @@ export default function App() {
           {view === 'bank' && <Bank act={act} api={api} toast={toast} />}
           {view === 'invest' && <Invest api={api} toast={toast} prompt={prompt} />}
           {view === 'company' && <Company api={api} toast={toast} prompt={prompt} promptMulti={promptMulti} />}
-          {view === 'stock' && <Stock api={api} toast={toast} prompt={prompt} />}
+          {view === 'stock' && <Stock api={api} toast={toast} prompt={prompt} user={user} />}
           {view === 'history' && <History api={api} />}
           {view === 'subscription' && <Subscription api={api} toast={toast} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}
@@ -589,7 +589,7 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
   return <canvas ref={canvasRef} style={{width:'100%',height:200,display:'block',background:'#0d1117',borderRadius:8,border:'1px solid #1e293b'}} />
 }
 
-function Stock({ api, toast, prompt }) {
+function Stock({ api, toast, prompt, user }) {
   const [q, setQ] = useState(null); const [h, setH] = useState([]); const [t, setT] = useState([]); const [myTrades, setMyTrades] = useState([]); const [ipo, setIpo] = useState(null)
   const [pnlData, setPnlData] = useState({ stocks: [], totalPnl: 0 })
   const [positions, setPositions] = useState([])
@@ -667,7 +667,18 @@ function Stock({ api, toast, prompt }) {
       return `市價 $${cur} → 預估實收：$${Math.round(cur * qty * 0.985).toLocaleString()}（扣手續費，大單另有滑點）`
     })
   }
-  const maxBuy = async () => { const n = q?.maxTrade || 0; if (n <= 0) return; const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`買入 ${n} 股 @ $${r.fillPrice}${r.limitHit ? ' ⚠️已達漲停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
+  const maxBuy = async () => {
+    // 全部買入 = 用所有現金買最多股 (含手續費)
+    const price = q?.price || 0
+    if (price <= 0) return
+    const maxByCash = Math.floor((user?.cash || 0) / (price * 1.015))
+    const maxByInv = q?.systemInventory || 0
+    const n = Math.max(0, Math.min(maxByCash, maxByInv))
+    if (n <= 0) return toast('現金或庫存不足', 'error')
+    toast(`全部買入 ${n} 股 (約 $${(price * n * 1.015).toLocaleString()} 含手續費)`, 'info')
+    const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true })
+    if (r.success) { refreshStock(); toast(`買入 ${n} 股 @ $${r.fillPrice} (含手續費 $${(r.totalCost - (r.fillPrice * n)).toLocaleString()})${r.limitHit ? ' ⚠️已達漲停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
+  }
   const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; toast(`全部賣出 ${n} 股會突破單筆上限並承受大額滑點，確定？`, 'info'); const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})${r.limitHit ? ' ⚠️已達跌停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
   const subIpo = () => prompt('認購股數', async (s) => { const r = await api('/api/stock/ipo/subscribe', { companyId: selectedStock, shares: parseInt(s) }); if (r.success) { toast(`認購 ${s} 股成功`, 'success'); refreshStock() } else toast(r.error, 'error') })
 
@@ -755,13 +766,14 @@ function Stock({ api, toast, prompt }) {
             const pnl = p.type === 'long'
               ? ((q?.price || 0) - p.entry_price) * p.quantity - p.dividend_debt
               : (p.entry_price - (q?.price || 0)) * p.quantity - p.dividend_debt;
+            const pnlPct = p.margin_amount > 0 ? (pnl / p.margin_amount) * 100 : 0;
             return (
               <div className="stat" key={p.id} style={{borderLeft: `3px solid ${p.type === 'long' ? 'var(--accent)' : 'var(--danger)'}`, paddingLeft:8}}>
                 <div>
                   <span style={{color: p.type === 'long' ? 'var(--accent)' : 'var(--danger)', fontWeight:600}}>{p.type === 'long' ? '做多' : '做空'}</span>
                   <span className="text-dim text-sm"> {p.quantity}股 ×{p.leverage} · 入場${p.entry_price}</span>
                   <div className="text-sm" style={{color: pnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>
-                    {pnl >= 0 ? '+' : ''}{pnl.toLocaleString()}
+                    {pnl >= 0 ? '+' : ''}{pnl.toLocaleString()} ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%)
                     {p.dividend_debt > 0 && <span className="text-dim"> (股利欠${p.dividend_debt.toLocaleString()})</span>}
                   </div>
                 </div>
@@ -913,6 +925,10 @@ function AdminPanel({ api }) {
     api('/api/admin/trades' + q).then(d => setTradeData(d || { trades: [], stats: [] }));
   }
   useEffect(() => { loadAll(exclude) }, [])
+  useEffect(() => {
+    const id = setInterval(() => loadAll(exclude), 30000)
+    return () => clearInterval(id)
+  }, [exclude])
   const applyExclude = () => {
     localStorage.setItem('eo_admin_exclude', exclude)
     loadAll(exclude)

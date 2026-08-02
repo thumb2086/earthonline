@@ -480,10 +480,25 @@ export async function processMarginTick(db) {
     if (pos.type === 'long') {
       const positionValue = currentPrice * pos.quantity;
       const maintenanceRate = (positionValue / pos.loan_amount) * 100;
+      // 130% 追繳
+      if (maintenanceRate < 130 && maintenanceRate >= LIQUIDATION_RATE) {
+        const lastCall = await db.prepare("SELECT id FROM margin_positions WHERE id = ? AND margin_call_at IS NULL").bind(pos.id).first();
+        if (lastCall) {
+          await db.prepare("UPDATE margin_positions SET margin_call_at = ? WHERE id = ?").bind(Date.now(), pos.id).run();
+          await logTransaction(db, pos.user_id, 'margin_call', 0, `⚠️ 維持率 ${maintenanceRate.toFixed(1)}% 低於 130%，請補保證金或平倉`);
+        }
+      }
       if (maintenanceRate < LIQUIDATION_RATE) await closePosition(db, pos);
     } else {
       const buyCost = currentPrice * pos.quantity;
       const effectiveRate = (pos.margin_amount - pos.dividend_debt + pos.loan_amount - buyCost) / pos.margin_amount * 100;
+      if (effectiveRate < 130 && effectiveRate >= LIQUIDATION_RATE) {
+        const lastCall = await db.prepare("SELECT id FROM margin_positions WHERE id = ? AND margin_call_at IS NULL").bind(pos.id).first();
+        if (lastCall) {
+          await db.prepare("UPDATE margin_positions SET margin_call_at = ? WHERE id = ?").bind(Date.now(), pos.id).run();
+          await logTransaction(db, pos.user_id, 'margin_call', 0, `⚠️ 維持率 ${effectiveRate.toFixed(1)}% 低於 130%，請補保證金或平倉`);
+        }
+      }
       if (effectiveRate < LIQUIDATION_RATE) await closePosition(db, pos);
     }
   }
