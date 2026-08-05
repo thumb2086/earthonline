@@ -109,3 +109,17 @@ export async function logHourly(db, userId, type, amount, description) {
 export async function notify(db, userId, type, message) {
   await db.prepare('INSERT INTO notifications (user_id, type, message, created_at) VALUES (?, ?, ?, ?)').bind(userId, type, message || '', Date.now()).run();
 }
+
+// 無股東接管: 上市交易中的公司若玩家持股歸零 → 歸系統管理 (owner_id = 0)
+export async function maybeSystemTakeover(db, companyId) {
+  const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
+  if (!ipo || ipo.phase !== 'trading') return false;
+  const holdings = await db.prepare('SELECT COALESCE(SUM(quantity),0) AS total FROM stock_holdings WHERE company_id = ? AND quantity > 0').bind(companyId).first();
+  if ((holdings?.total || 0) > 0) return false;
+  const company = await db.prepare('SELECT id, owner_id, name FROM companies WHERE id = ?').bind(companyId).first();
+  if (!company || (company.owner_id || 0) === 0) return false;
+  const prevOwner = company.owner_id;
+  await db.prepare('UPDATE companies SET owner_id = 0 WHERE id = ?').bind(companyId).run();
+  await notify(db, prevOwner, 'company_takeover', `🌐 你的「${company.name}」已無任何股東持股，移交由系統管理`);
+  return true;
+}

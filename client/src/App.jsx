@@ -435,13 +435,13 @@ function Company({ api, toast, prompt, promptMulti }) {
     const r = await api('/api/company/create', { name, industry: ind })
     if (r.success) { refresh(); toast('公司創建成功', 'success') } else toast(r.error, 'error')
   })
-  const diluteCompany = (c) => promptMulti(`增資 ${c.name}`, [
-    { label: '發行股數', placeholder: '例: 10000', default: '' },
-    { label: '發行價格', placeholder: `例: ${c.share_price || 10}`, default: '' },
+  const diluteCompany = (c) => promptMulti(`增資 ${c.name}（單次上限總股本5%，價格不得高於市價）`, [
+    { label: '發行股數 (≤' + (Math.max(1, Math.floor((c.total_shares || 100000) * 0.05))).toLocaleString() + ')', placeholder: '例: 1000', default: '' },
+    { label: '發行價格 (≤市價 $' + (c.share_price || 10) + ')', placeholder: `${c.share_price || 10}`, default: '' },
   ], async ([shares, price]) => {
     const qty = parseInt(shares); if (!qty || qty <= 0) return toast('請輸入股數', 'error')
     const r = await api('/api/company/dilute', { companyId: c.id, shares: qty, price: parseInt(price) })
-    if (r.success) { toast(`增資 ${qty} 股，獲得 $${r.revenue.toLocaleString()}`, 'success'); refresh() } else toast(r.error, 'error')
+    if (r.success) { toast(`增資 ${qty} 股 @ $${r.pricePerShare}，獲得 $${r.revenue.toLocaleString()}`, 'success'); refresh() } else toast(r.error, 'error')
   })
   const buyout = (c) => prompt(`收購 ${c.name}（$2${c.buyoutPrice.toLocaleString()}？）`, async (s) => {
     const r = await api('/api/company/buyout', { companyId: c.id })
@@ -492,10 +492,10 @@ function Company({ api, toast, prompt, promptMulti }) {
     if (r.success) { refresh(); toast(`公司已清算，獲得 $${r.payout.toLocaleString()}`, 'success') } else toast(r.error, 'error')
   })
   const heldOf = (companyId) => holdings.find(x => x.company_id === companyId)?.quantity || 0
-  const delist = (c) => prompt(`下市「${c.name}」？(股票將從市場移除，你持有的股份會以市價兌現，公司本身保留，輸入 yes 確認)`, async (v) => {
+  const delist = (c) => prompt(`下市「${c.name}」？(將自動以市價×1.2 強制收購其他股東持股，你的持股以市價兌現，公司本身保留，輸入 yes 確認)`, async (v) => {
     if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
     const r = await api('/api/company/delist', { companyId: c.id })
-    if (r.success) { refresh(); toast(`「${c.name}」已下市${r.payout > 0 ? `，持股兌現 $${r.payout.toLocaleString()}` : ''}`, 'success') } else toast(r.error, 'error')
+    if (r.success) { refresh(); toast(`「${c.name}」已下市${r.boughtBack > 0 ? `，強制收購 ${r.boughtBack.toLocaleString()} 股` : ''}${r.payout > 0 ? `，持股兌現 $${r.payout.toLocaleString()}` : ''}`, 'success') } else toast(r.error, 'error')
   })
   return (
     <>
@@ -595,19 +595,27 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
   const [hoverIdx, setHoverIdx] = useState(null)
   const [hoverX, setHoverX] = useState(0)
   const canvasRef = useRef(null)
+  const seqRef = useRef(0)
 
   useEffect(() => {
     setLoaded(false)
+    setKlines([])
+    const seq = ++seqRef.current
     const fetchKlines = () => {
+      const apply = (d, reversed) => {
+        if (seq !== seqRef.current) return
+        setKlines((reversed ? [...d].reverse() : d).slice(-120))
+        setLoaded(true)
+      }
       if (timeframe === 'realtime') {
-        api('/api/stock/klines?companyId=' + companyId).then(d => { setKlines((Array.isArray(d) ? [...d].reverse() : []).slice(-120)); setLoaded(true) }).catch(()=>{})
+        api('/api/stock/klines?companyId=' + companyId).then(d => { if (Array.isArray(d)) apply(d, true) }).catch(() => {})
       } else {
-        api(`/api/stock/klines/agg?interval=${timeframe === '1h' ? '3600000' : '300000'}&limit=120&companyId=${companyId}`).then(d => { setKlines(Array.isArray(d) ? d : []); setLoaded(true) }).catch(()=>{})
+        api(`/api/stock/klines/agg?interval=${timeframe === '1h' ? '3600000' : '300000'}&limit=120&companyId=${companyId}`).then(d => { if (Array.isArray(d)) apply(d, false) }).catch(() => {})
       }
     }
     fetchKlines()
-    const id = setInterval(fetchKlines, 500)
-    return () => clearInterval(id)
+    const id = setInterval(fetchKlines, 5000)
+    return () => { clearInterval(id); seqRef.current++ }
   }, [timeframe, companyId])
 
   useEffect(() => {
@@ -721,6 +729,7 @@ function Stock({ api, toast, prompt, user }) {
   const [marginQty, setMarginQty] = useState('')
   const [marginLev, setMarginLev] = useState('2')
   const [chartTimeframe, setChartTimeframe] = useState('realtime')
+  const [limitInfo, setLimitInfo] = useState(null)
   const [selectedStock, setSelectedStock] = useState(1)
   const [stockList, setStockList] = useState([])
   const [indexData, setIndexData] = useState(null)
@@ -733,6 +742,14 @@ function Stock({ api, toast, prompt, user }) {
     if (h > 0) return `${h}小時${m}分`
     return `${m}分${Math.floor((ms % 60000) / 1000)}秒`
   }
+
+  // 漲跌停固定顯示: 觸發後顯示 60 秒
+  useEffect(() => {
+    if (!limitInfo) return
+    const t = setTimeout(() => setLimitInfo(null), 60000)
+    return () => clearTimeout(t)
+  }, [limitInfo])
+  const markLimit = (r, side) => { if (r?.limitHit) setLimitInfo({ side, at: Date.now() }) }
 
   useEffect(() => {
     api('/api/company/ipo/list').then(d => {
@@ -769,7 +786,7 @@ function Stock({ api, toast, prompt, user }) {
     prompt(`買入股數 (手續費1.5%另計)`, async (n) => {
       const qty = parseInt(n); if (!qty || qty <= 0) return
       const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: qty })
-      if (r.success) { refreshStock(); toast(`買入 ${qty} 股 @ $${r.fillPrice} (含手續費 $${(r.totalCost - (r.fillPrice * qty)).toLocaleString()})${r.limitHit ? ' ⚠️已達漲停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
+      if (r.success) { refreshStock(); markLimit(r, 'up'); toast(`買入 ${qty} 股 @ $${r.fillPrice} (含手續費 $${(r.totalCost - (r.fillPrice * qty)).toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
     }, async (v) => {
       const qty = parseInt(v) || 0
       if (qty <= 0) return ''
@@ -784,7 +801,7 @@ function Stock({ api, toast, prompt, user }) {
     prompt(`賣出股數 (手續費1.5%另計 · 大單滑點)`, async (n) => {
       const qty = parseInt(n); if (!qty || qty <= 0) return
       const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: qty })
-      if (r.success) { refreshStock(); toast(`賣出 ${qty} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})${r.limitHit ? ' ⚠️已達跌停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
+      if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${qty} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
     }, async (v) => {
       const qty = parseInt(v) || 0
       if (qty <= 0) return ''
@@ -803,9 +820,9 @@ function Stock({ api, toast, prompt, user }) {
     if (n <= 0) return toast('現金或庫存不足', 'error')
     toast(`全部買入 ${n} 股`, 'info')
     const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true })
-    if (r.success) { refreshStock(); toast(`買入 ${n} 股 @ $${r.fillPrice} (含手續費 $${(r.totalCost - (r.fillPrice * n)).toLocaleString()})${r.limitHit ? ' ⚠️已達漲停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
+    if (r.success) { refreshStock(); markLimit(r, 'up'); toast(`買入 ${n} 股 @ $${r.fillPrice} (含手續費 $${(r.totalCost - (r.fillPrice * n)).toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
   }
-  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); toast(`賣出 ${n} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})${r.limitHit ? ' ⚠️已達跌停板，1分鐘後恢復' : ''}`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
+  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${n} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
   const subIpo = () => prompt('認購股數', async (s) => { const r = await api('/api/stock/ipo/subscribe', { companyId: selectedStock, shares: parseInt(s) }); if (r.success) { toast(`認購 ${s} 股成功`, 'success'); refreshStock() } else toast(r.error, 'error') })
   const registerStock = () => promptMulti('自訂加股 ($200,000) 立即上市', [
     { label: '股票名稱 (2~20字)', placeholder: '例: 天網科技', default: '' },
@@ -907,6 +924,18 @@ function Stock({ api, toast, prompt, user }) {
             ))}
           </div>
         </div>
+        {limitInfo && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 8, marginBottom: 12, fontWeight: 700, fontSize: 13,
+            background: limitInfo.side === 'up' ? 'rgba(239,68,68,0.12)' : 'rgba(0,255,65,0.12)',
+            border: `1px solid ${limitInfo.side === 'up' ? 'rgba(239,68,68,0.5)' : 'rgba(0,255,65,0.5)'}`,
+            color: limitInfo.side === 'up' ? '#ef4444' : '#00ff41',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span>⚠️ 已達{limitInfo.side === 'up' ? '漲停板' : '跌停板'}，1分鐘後恢復</span>
+            <span style={{fontWeight: 600, opacity: 0.8}}>{Math.max(0, Math.ceil(60 - (Date.now() - limitInfo.at) / 1000))}s</span>
+          </div>
+        )}
         <KLineChart api={api} timeframe={chartTimeframe} companyId={selectedStock} />
       </div>}
       {ipo?.phase !== 'ipo' && <div className="card mb-12">

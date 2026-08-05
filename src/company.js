@@ -1,4 +1,4 @@
-﻿import { logTransaction, logHourly, notify } from './utils.js';
+﻿import { logTransaction, logHourly, notify, maybeSystemTakeover } from './utils.js';
 import { getUserSubscriptions } from './subscription.js';
 
 export const INDUSTRY_MULT = { tech: 1.2, manufacturing: 1.0, finance: 1.3, service: 0.9 };
@@ -117,12 +117,16 @@ export async function handleCompany(env, request, path, user) {
   }
 
   // 自訂增資: owner 對自己公司增資發行新股 (賣給系統換現金)
+  // 限制: 單次最多總股本 5% (防無限稀釋), 價格不得高於市價 (防自訂高價印錢)
   if (path === '/api/company/dilute') {
     const { companyId, shares, price } = await request.json();
     if (!companyId || !shares || shares <= 0) return { error: '參數無效' };
     const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
     if (!company) return { error: '公司不存在或非owner' };
-    const pricePerShare = Math.max(1, parseInt(price) || company.share_price || 10);
+    const marketPrice = company.share_price || 10;
+    const maxShares = Math.max(1, Math.floor(company.total_shares * 0.05));
+    if (shares > maxShares) return { error: `單次增資上限 ${maxShares.toLocaleString()} 股（總股本 5%）` };
+    const pricePerShare = Math.max(1, Math.min(parseInt(price) || marketPrice, marketPrice));
     const revenue = shares * pricePerShare;
     // 新股進入庫存 (系統持有, 玩家可買)
     await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(shares, companyId).run();
@@ -134,7 +138,7 @@ export async function handleCompany(env, request, path, user) {
     }
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(revenue, user.id).run();
     await logTransaction(db, user.id, 'ipo_revenue', revenue, `增資 ${shares} 股 @ $${pricePerShare}`);
-    return { success: true, shares, revenue };
+    return { success: true, shares, revenue, pricePerShare };
   }
 
   if (path === '/api/company/ipo/start') {
@@ -216,8 +220,27 @@ export async function handleCompany(env, request, path, user) {
     if (!ipo || ipo.phase !== 'trading') return { error: '尚未上市或不在交易階段' };
     const marginCount = await db.prepare('SELECT COUNT(*) as cnt FROM margin_positions WHERE company_id = ?').bind(companyId).first();
     if ((marginCount?.cnt || 0) > 0) return { error: '該公司有槓桿持倉，無法下市' };
-    const otherHolders = await db.prepare('SELECT COUNT(*) as cnt, COALESCE(SUM(quantity),0) as total FROM stock_holdings WHERE company_id = ? AND user_id != ? AND quantity > 0').bind(companyId, user.id).first();
-    if ((otherHolders?.cnt || 0) > 0) return { error: `尚有 ${otherHolders.total.toLocaleString()} 股在外流通，請先使用「強制收購」買回全部股票` };
+
+    // 下市必須強制收購: 自動以市價×1.2 買回其他股東流通股
+    const otherHoldings = await db.prepare('SELECT user_id, quantity FROM stock_holdings WHERE company_id = ? AND user_id != ? AND quantity > 0').bind(companyId, user.id).all();
+    let boughtBack = 0;
+    if (otherHoldings.results.length > 0) {
+      const premium = 1.2;
+      const totalShares = otherHoldings.results.reduce((s, h) => s + h.quantity, 0);
+      const totalCost = Math.floor((company.share_price || 100) * totalShares * premium);
+      const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
+      if (!wallet || wallet.cash < totalCost) return { error: `尚有 ${totalShares.toLocaleString()} 股在外流通，下市需先強制收購：市價×1.2 = $${totalCost.toLocaleString()}（現金不足）` };
+      await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost, user.id).run();
+      for (const h of otherHoldings.results) {
+        const pay = Math.floor((company.share_price || 100) * h.quantity * premium);
+        await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(pay, pay, h.user_id).run();
+        await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(h.user_id, companyId).run();
+        await logTransaction(db, h.user_id, 'forced_sell', pay, `${company.name} 下市強制收購 ${h.quantity.toLocaleString()} 股 @ $${company.share_price}×1.2`);
+        await notify(db, h.user_id, 'forced_sell', `📉 ${user.username || user.id} 下市「${company.name}」，強制收購了你的 ${h.quantity.toLocaleString()} 股（市價×1.2，入帳 $${pay.toLocaleString()}）`);
+      }
+      await logTransaction(db, user.id, 'forcebuy', -totalCost, `下市強制收購 ${company.name} ${totalShares.toLocaleString()} 股（含20%溢價）`);
+      boughtBack = totalShares;
+    }
 
     // 創辦人持股以市價兌現（下市後無市場可交易）
     const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).first();
@@ -231,8 +254,8 @@ export async function handleCompany(env, request, path, user) {
     }
     // 下市: 移除上市狀態, 公司本身保留
     await db.prepare('DELETE FROM ipo_state WHERE company_id = ?').bind(companyId).run();
-    await logTransaction(db, user.id, 'company_delist', payout, `「${company.name}」下市${payout > 0 ? `，持股兌現 $${payout.toLocaleString()}` : ''}`);
-    return { success: true, payout };
+    await logTransaction(db, user.id, 'company_delist', payout, `「${company.name}」下市${payout > 0 ? `，持股兌現 $${payout.toLocaleString()}` : ''}${boughtBack > 0 ? `，強制收購 ${boughtBack.toLocaleString()} 股` : ''}`);
+    return { success: true, payout, boughtBack };
   }
 
   if (path === '/api/company/liquidate') {
@@ -337,6 +360,8 @@ export async function getCompanyProfit(db, company, subs) {
 export async function processCompanyTick(db) {
   const companies = await db.prepare('SELECT * FROM companies').all();
   for (const c of companies.results) {
+    // 自有公司驗傷: 上市中且玩家持股歸零 → 移交系統管理
+    await maybeSystemTakeover(db, c.id);
     const subs = await getUserSubscriptions(db, c.owner_id);
     const data = await getCompanyProfit(db, c, subs);
     const profit = data.profit;

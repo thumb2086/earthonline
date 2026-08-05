@@ -1,4 +1,4 @@
-﻿import { logTransaction, notify } from './utils.js';
+﻿import { logTransaction, notify, maybeSystemTakeover } from './utils.js';
 import { INDUSTRY_MULT } from './company.js';
 
 const SPREAD_BASE = 0.03;
@@ -273,10 +273,10 @@ export async function handleStock(env, request, path, user) {
     const companyData = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
     if (!companyData) return { error: '公司不存在' };
 
-    // 無上限自動增資: 庫存不足 → 無限擴發新股補足 (庫存永遠 ≥ 買入量 + 30% 總股數)
+    // 自動增資補庫存: 只補「本次買入 + 30% 底倉」的最小量 (不再每次灌到50%, 防指數級無限稀釋)
     const minInv = Math.floor(companyData.total_shares * 0.3);
     if (inv.stock_quantity < minInv + quantity) {
-      const topUp = Math.max(Math.floor(companyData.total_shares * 0.5) - inv.stock_quantity, quantity + minInv - inv.stock_quantity);
+      const topUp = Math.min(minInv + quantity - inv.stock_quantity, Math.floor(companyData.total_shares * 0.3));
       if (topUp > 0) {
         await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, companyId).run();
         await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, companyId).run();
@@ -285,6 +285,7 @@ export async function handleStock(env, request, path, user) {
       inv.stock_quantity = newInv.stock_quantity;
       companyData.total_shares += topUp;
     }
+    if (inv.stock_quantity < quantity) return { error: '系統庫存不足' };
 
     const circulating = companyData.total_shares - inv.stock_quantity;
 
@@ -382,6 +383,8 @@ export async function handleStock(env, request, path, user) {
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now, 'sell');
     await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${newPrice}`);
+    // 賣出後公司已無任何股東 → 移交系統管理 (不留在最後一個持有人手上)
+    await maybeSystemTakeover(db, companyId);
     return { success: true, price: newPrice, fillPrice: newPrice, quantity, netRevenue, limitHit };
   }
 
