@@ -11,8 +11,40 @@
 | 後端 | Cloudflare Workers (edge computing) |
 | 資料庫 | Cloudflare D1 (SQLite) |
 | 前端 | React + Vite |
+| 桌面版 | Electron (Windows NSIS / macOS dmg / Linux AppImage) |
 | 認證 | Discord OAuth2 + JWT |
 | 部署 | wrangler CLI |
+
+## 桌面版 (Desktop App)
+
+電腦專用版以 Electron 封裝，與網頁版共用同一份 React 前端，資料完全互通。
+
+- 🖥️ **專屬視窗** — 無邊框、無網址列，1440×900 沉浸式掛機
+- ⏱️ **Discord RPC** — 自動顯示「正在玩 地球在線」+ 掛機生存時間 + 工作列進度條
+- ⚡ **離線掛機** — 本地遊戲引擎持續運作，斷線不中斷
+- 📥 **安裝檔** — 網頁版「帳號設定」頁可下載 `EarthOnlineSetup.exe`
+
+```bash
+# 開發模式（Hot reload + Electron 視窗）
+cd client && npm run dev:electron
+
+# 打包 Windows 安裝檔（輸出至 client/release/）
+cd client && npm run build:electron
+```
+
+> Windows 圖示: `client/build/icon.ico`（由 `client/public/logo.png` 生成，多尺寸 16/32/48/256）
+
+### 安裝檔發布
+
+安裝檔約 112 MB，超過 Cloudflare Workers Assets 單檔 25 MiB 上限，**請勿放入 `client/public/downloads/` 部署**。發布流程：
+
+```bash
+git tag v1.15.0 && git push origin v1.15.0
+```
+
+`.github/workflows/desktop-release.yml` 會自動打包並上傳到 GitHub Releases，網頁端下載連結（`client/src/components/Modals/AccountInfoModal.jsx` 與 `client/public/downloads/index.html`）已指向穩定下載網址：
+
+`https://github.com/thumb2086/earthonline/releases/latest/download/EarthOnlineSetup.exe`
 
 ## 遊戲系統
 

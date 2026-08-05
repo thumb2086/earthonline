@@ -120,8 +120,7 @@ export default function DocumentationOverlay({ onClose }) {
               
               <div style={{ marginTop: '25px' }}>
                 <a 
-                  href="https://github.com/huchialun9-ctrl/earthonline" 
-                  target="_blank" 
+                  href="/downloads/" 
                   rel="noreferrer"
                   style={{
                     display: 'inline-flex',
@@ -140,7 +139,7 @@ export default function DocumentationOverlay({ onClose }) {
                   {t('前往 GitHub 下載桌面版')}
                 </a>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '10px' }}>
-                  {t('開發者請在專案根目錄下執行 <code>cd desktop && npm start</code> 啟動。')}
+                  {t('開發者請在 <code>client</code> 目錄下執行 <code>npm run dev:electron</code> 啟動。')}
                 </div>
               </div>
             </div>

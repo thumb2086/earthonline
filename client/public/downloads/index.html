@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>下載地球在線電腦版 — Earth Online Desktop</title>
+  <style>
+    :root {
+      --bg: #0a0d12;
+      --surface: #141821;
+      --surface2: #1b2130;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #e8ecf3;
+      --text2: #9aa5b5;
+      --accent: #3b82f6;
+      --accent2: #22d3ee;
+      --success: #10b981;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Microsoft JhengHei", system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, 0.15), transparent),
+        radial-gradient(ellipse 60% 40% at 90% 100%, rgba(34, 211, 238, 0.08), transparent);
+    }
+    .wrap { max-width: 860px; padding: 48px 24px 64px; width: 100%; }
+    .logo { display: flex; align-items: center; gap: 14px; margin-bottom: 36px; }
+    .logo img { width: 52px; height: 52px; border-radius: 12px; box-shadow: 0 4px 20px rgba(59,130,246,0.4); }
+    .logo h1 { font-size: 1.6rem; letter-spacing: 2px; }
+    .logo span { color: var(--text2); font-size: 0.85rem; letter-spacing: 1px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px;
+      margin-bottom: 24px;
+    }
+    .card h2 { font-size: 1.15rem; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+    .badge { display: inline-block; background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; margin-left: 8px; vertical-align: middle; }
+    .dl-btn {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; font-size: 1.1rem; font-weight: 700;
+      padding: 16px 28px; border-radius: 12px; text-decoration: none;
+      box-shadow: 0 8px 30px rgba(59,130,246,0.35);
+      transition: transform 0.15s, box-shadow 0.15s;
+      margin: 6px 0 12px;
+    }
+    .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(59,130,246,0.5); }
+    .dl-btn small { font-weight: 500; opacity: 0.85; }
+    .meta { color: var(--text2); font-size: 0.82rem; text-align: center; }
+    ul { list-style: none; }
+    li { color: var(--text2); line-height: 1.9; padding-left: 24px; position: relative; font-size: 0.95rem; }
+    li::before { content: "▸"; position: absolute; left: 4px; color: var(--accent2); }
+    .steps { counter-reset: step; }
+    .steps li { counter-increment: step; padding-left: 40px; }
+    .steps li::before { content: counter(step); position: absolute; left: 4px; top: 2px; width: 22px; height: 22px; background: rgba(59,130,246,0.2); border-radius: 50%; color: var(--accent2); font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .back { display: inline-block; margin-top: 28px; color: var(--text2); text-decoration: none; font-size: 0.9rem; }
+    .back:hover { color: var(--accent2); }
+    code { background: var(--surface2); padding: 2px 8px; border-radius: 6px; font-size: 0.85em; color: var(--accent2); }
+    .req { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 6px; }
+    .req div { background: var(--surface2); border-radius: 10px; padding: 14px; }
+    .req strong { display: block; color: var(--text); margin-bottom: 4px; font-size: 0.9rem; }
+    .req span { color: var(--text2); font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">
+      <img src="/logo.png" alt="Earth Online" />
+      <div>
+        <h1>EARTH ONLINE <span class="badge">DESKTOP</span></h1>
+        <span>地球在線 · 電腦專用版</span>
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center">
+      <h2 style="justify-content:center">🖥️ Windows 電腦版 (v1.15.0)</h2>
+      <a class="dl-btn" href="https://github.com/thumb2086/earthonline/releases/latest/download/EarthOnlineSetup.exe" target="_blank" rel="noreferrer">
+        ⬇️ 下載安裝檔 <small>EarthOnlineSetup.exe</small>
+      </a>
+      <div class="meta">安裝檔約 100 MB · NSIS 安裝程式 · Windows 10 / 11 64 位元</div>
+    </div>
+
+    <div class="card">
+      <h2>⚡ 為什麼用電腦版？</h2>
+      <ul>
+        <li><strong>Discord 自動連動</strong>：開啟即自動顯示「正在玩 地球在線」+ 掛機生存時間，無需手動設定。</li>
+        <li><strong>專屬視窗體驗</strong>：無邊框、無網址列干擾，1440×900 大視窗沉浸掛機。</li>
+        <li><strong>離線掛機不中斷</strong>：本地遊戲引擎持續運作，斷線自動切換離線模式。</li>
+        <li><strong>雙端資料互通</strong>：與網頁版完全同步，隨時切換無縫接軌。</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>📥 安裝步驟</h2>
+      <ol class="steps">
+        <li>點擊上方下載按鈕，取得 <code>EarthOnlineSetup.exe</code></li>
+        <li>執行安裝檔，選擇安裝位置（預設為使用者目錄）</li>
+        <li>安裝完成後從桌面或開始選單啟動「Earth Online」</li>
+        <li>使用原本的 Discord / Google 帳號登入，資料自動同步</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>💡 系統需求</h2>
+      <div class="req">
+        <div><strong>作業系統</strong><span>Windows 10 / 11 (64 位元)</span></div>
+        <div><strong>記憶體</strong><span>4 GB 以上</span></div>
+        <div><strong>顯示器</strong><span>1366×768 以上解析度</span></div>
+        <div><strong>網路</strong><span>可連線 Discord（首次登入）</span></div>
+      </div>
+    </div>
+
+    <a class="back" href="/">← 返回 地球在線 網頁版</a>
+  </div>
+</body>
+</html>

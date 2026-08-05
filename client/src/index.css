@@ -159,6 +159,15 @@ body {
   color: var(--warn);
   border-color: rgba(245,158,11,0.15);
 }
+.badge-desktop {
+  background: rgba(88,101,242,0.15);
+  color: #8b93ff;
+  border-color: rgba(88,101,242,0.35);
+}
+.badge-desktop:hover {
+  border-color: rgba(88,101,242,0.6);
+  box-shadow: 0 0 20px rgba(88,101,242,0.25);
+}
 
 /* ─── Body ─── */
 .body { display: flex; flex: 1; min-height: 0; }

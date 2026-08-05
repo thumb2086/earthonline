@@ -1,9 +1,11 @@
 {
   "name": "earth-online",
   "private": true,
-  "version": "1.14.0",
+  "version": "1.15.0",
   "type": "module",
   "main": "electron/main.cjs",
+  "author": "Earth Online",
+  "description": "全球節點觀測與管理中心 — 地球在線 Earth Online 電腦版",
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently \"vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development electron .\"",
@@ -14,6 +16,7 @@
   "build": {
     "appId": "com.huchialun.earthonline",
     "productName": "Earth Online",
+    "artifactName": "EarthOnlineSetup.${ext}",
     "directories": {
       "output": "release"
     },

@@ -78,6 +78,7 @@ export default function App() {
       <div className="topbar">
         <div className="topbar-left">
           <span className="logo">EARTHONLINE</span>
+          {window.electronAPI && <span className="badge badge-desktop" title="電腦版用戶端">🖥️ 電腦版</span>}
           <span className="badge">💰 現金 {(user?.cash ?? 0).toLocaleString()}</span>
           <span className="badge">🏦 活存 {(user?.savings ?? 0).toLocaleString()}</span>
           <span className="badge badge-danger">📈 累計 {(user?.total_earned ?? 0).toLocaleString()}</span>
