@@ -1,5 +1,6 @@
 import { logTransaction, logHourly, notify } from './utils.js';
 import { getUserSubscriptions } from './subscription.js';
+import { getRates } from './rates.js';
 
 const INVEST_TYPES = {
   bond: { label: '債券', rateMin: 0.0001, rateMax: 0.0001, unlockEarned: 1000, maxPerUser: 10000000, risk: 0 },
@@ -37,6 +38,7 @@ export async function handleInvestment(env, request, path, user) {
 
   if (path === '/api/investment/list') {
     const investments = await db.prepare('SELECT * FROM investments WHERE user_id = ?').bind(user.id).all();
+    const rates = await getRates(db);
     return Promise.all(investments.results.map(async (inv) => {
       if (inv.type === 'deposit') {
         const term = DEPOSIT_TERMS.find(t => t.minutes === inv.term_minutes) || DEPOSIT_TERMS[0];
@@ -44,8 +46,8 @@ export async function handleInvestment(env, request, path, user) {
           ...inv,
           label: '定存',
           termLabel: term.label,
-          rate: term.rate,
-          dailyEarn: Math.floor(inv.amount * term.rate * 1440),
+          rate: term.rate * rates.deposit_mult,
+          dailyEarn: Math.floor(inv.amount * term.rate * rates.deposit_mult * 1440),
           totalPaid: inv.total_paid || 0,
           matureIn: inv.mature_at ? Math.max(0, inv.mature_at - Date.now()) : 0,
         };
@@ -102,7 +104,8 @@ export async function handleInvestment(env, request, path, user) {
   }
 
   if (path === '/api/investment/terms') {
-    return DEPOSIT_TERMS;
+    const rates = await getRates(db);
+    return DEPOSIT_TERMS.map(t => ({ ...t, rate: t.rate * rates.deposit_mult }));
   }
 
   return null;
@@ -110,6 +113,7 @@ export async function handleInvestment(env, request, path, user) {
 
 export async function processInvestmentTick(db) {
   const investments = await db.prepare('SELECT id, user_id, type, amount, COALESCE(pending_interest, 0) as pending_interest, term_minutes, mature_at FROM investments').all();
+  const rates = await getRates(db);
   const subCache = {};
   for (const inv of investments.results) {
     // 定存: 到期自動贖回
@@ -121,7 +125,7 @@ export async function processInvestmentTick(db) {
         continue;
       }
       const term = DEPOSIT_TERMS.find(t => t.minutes === inv.term_minutes) || DEPOSIT_TERMS[0];
-      const earned = inv.amount * term.rate;
+      const earned = inv.amount * term.rate * rates.deposit_mult;
       const totalPending = (inv.pending_interest || 0) + earned;
       const payout = Math.floor(totalPending);
       if (payout > 0) {

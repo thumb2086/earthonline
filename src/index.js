@@ -5,6 +5,10 @@ import { handleInvestment, processInvestmentTick } from './investment.js';
 import { handleEmployee, processEmployeeTick } from './employee.js';
 import { handleCompany, processCompanyTick } from './company.js';
 import { handleStock, processMarginTick, finalizeIPO, matchLimitOrders } from './stock.js';
+import { handleEtf, etfTick } from './etf.js';
+import { handleFutures, settleFutures } from './futures.js';
+import { adjustInterestRates } from './rates.js';
+import { postV2Announcement, maybeResetGame } from './reset.js';
 import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
@@ -327,6 +331,8 @@ export default {
         ['/api/employee', handleEmployee],
         ['/api/company', handleCompany],
         ['/api/stock', handleStock],
+        ['/api/etf', handleEtf],
+        ['/api/futures', handleFutures],
         ['/api/subscription', handleSubscription],
         ['/api/admin', handleAdmin],
       ];
@@ -370,6 +376,31 @@ export default {
       await matchLimitOrders(db);
     } catch (err) {
       console.error('Scheduled limit orders error:', err.message);
+    }
+
+    // ETF 定價/回補 + 期貨結算: 每分鐘執行
+    try {
+      await etfTick(db);
+      await settleFutures(db);
+    } catch (err) {
+      console.error('Scheduled derivatives error:', err.message);
+    }
+
+    // 央行利率決策: 每 30 分鐘 (仿聯準會升降息)
+    if (minute % 30 === 0) {
+      try {
+        await adjustInterestRates(db);
+      } catch (err) {
+        console.error('Scheduled rate decision error:', err.message);
+      }
+    }
+
+    // 正式版公告 + 8/19 重置檢查: 每分鐘 (一次性)
+    try {
+      await postV2Announcement(db);
+      await maybeResetGame(db);
+    } catch (err) {
+      console.error('Scheduled v2 reset check error:', err.message);
     }
 
     // 輪換 tick: 每 2 分鐘跑一次 (分鐘偶數)

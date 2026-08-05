@@ -35,26 +35,42 @@
 - 下單前預估影響後成交價 + 影響幅度
 - 增資輸入框顯示剩餘發行額度
 
-## Phase 2 — 衍生性商品
+## Phase 2 — 衍生性商品 ✅
 
-### 7. ETF（封閉式）⬜
+### 7. ETF（封閉式）✅
 - `etfs` + `etf_inventory` 表；價格 = 大盤指數 × $0.01
 - 每分鐘 tick 同步；買賣規則與股票一致（0.5% 費/影響/漲跌停/issue_cap）
 
-### 8. 指數期貨 ⬜
+### 8. 指數期貨 ✅
 - `futures` 表；做多/做空；期限 1h/6h/24h
 - 權利金 = 契約值 5%（契約值 = 指數 × $1/點 × 張數）
 - cron 到期結算，損益上限 = 權利金；通知 + 歷史清單
+
+## Phase 3 — 央行利率 + 正式版重置 ✅
+
+### 9. 央行升降息（仿聯準會）✅
+- `market_rates` 表；熱度 = 近30分成交量 vs 前5.5小時平均
+- 熱(≥1.5×) → 升息 +0.005%/分；冷(≤0.5×) → 降息；每 30 分鐘決策一次
+- 活存利率同步至銀行顯示；定存利率按倍率縮放
+- 決策發系統公告
+
+### 10. 8/19 正式版公告 + 全員重置 ✅
+- 公告：一次發送，每位用戶通知 + 系統公告
+- 8/19 00:00 (UTC+8) 自動重置：清空所有玩家數值/公司/市場，改回起始現金 $100，重建系統公司與 ETF 庫存
+- 只執行一次（game_meta 標記）
 
 ## 檔案對應
 
 | 檔案 | 內容 |
 |---|---|
 | `src/db/migrate_022_market.sql` | issue_cap / last_split_at |
-| `src/db/migrate_023_derivatives.sql` | etfs / etf_inventory / futures |
-| `src/stock.js` | 影響公式、費率、影響價結算、掛單 |
+| `src/db/migrate_023_derivatives.sql` | etfs / etf_inventory / etf_holdings / etf_trades / futures |
+| `src/db/migrate_024_rates.sql` | market_rates / game_meta |
+| `src/stock.js` | 影響公式、費率、影響價結算、掛單、computeMarketIndex |
 | `src/company.js` | issue_cap 寫入、dilute 約束、拆分 API |
-| `src/index.js` | 上限回補 tick、ETF tick、期貨結算 |
+| `src/index.js` | 上限回補 tick、ETF tick、期貨結算、央行決策、重置檢查 |
 | `src/etf.js`（新） | ETF 處理 |
 | `src/futures.js`（新） | 期貨處理 |
+| `src/rates.js`（新） | 央行升降息 |
+| `src/reset.js`（新） | 8/19 公告 + 全員重置 |
 | `client/src/App.jsx` | 前端 UI |

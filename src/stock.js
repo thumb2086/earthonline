@@ -190,39 +190,7 @@ export async function handleStock(env, request, path, user) {
   }
 
   if (path === '/api/stock/index') {
-    // 大盤指數: 所有上市股票的流通市值加權 (基期 = 各股首日開盤價 × 流通股數)
-    const trading = await db.prepare(`
-      SELECT c.id, c.name, c.share_price, c.total_shares, COALESCE(inv.stock_quantity, 0) as sys_inv
-      FROM companies c
-      LEFT JOIN stock_inventory inv ON inv.company_id = c.id
-      JOIN ipo_state i ON i.company_id = c.id AND i.phase = 'trading'
-    `).all();
-    const rows = trading.results;
-    // 每支股基期市值 = 首日開盤價 × 當前流通股數 (避免增資扭曲)
-    let currentCap = 0, baseCap = 0;
-    for (const c of rows) {
-      const circulating = Math.max(c.total_shares - c.sys_inv, 1);
-      const first = await db.prepare('SELECT open FROM stock_klines WHERE company_id = ? ORDER BY minute ASC LIMIT 1').bind(c.id).first();
-      const basePrice = first?.open || c.share_price || 100;
-      currentCap += (c.share_price || 100) * circulating;
-      baseCap += basePrice * circulating;
-    }
-    const indexValue = baseCap > 0 ? Math.round((currentCap / baseCap) * 1000) : 1000;
-    // 大盤K線: 聚合所有股票每5秒block的市值
-    const blocks = {};
-    for (const c of rows) {
-      const circulating = Math.max(c.total_shares - c.sys_inv, 1);
-      const klines = await db.prepare('SELECT minute, close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 720').bind(c.id).all();
-      for (const k of klines.results) {
-        if (!blocks[k.minute]) blocks[k.minute] = { cap: 0 };
-        blocks[k.minute].cap += k.close * circulating;
-      }
-    }
-    const timeline = Object.keys(blocks).sort((a, b) => a - b).map(ms => {
-      const cap = blocks[ms].cap;
-      return { minute: parseInt(ms), value: baseCap > 0 ? Math.round((cap / baseCap) * 1000) : 1000 };
-    });
-    return { value: indexValue, change: timeline.length > 1 ? (timeline[timeline.length - 1].value - timeline[0].value) : 0, timeline: timeline.slice(-300), stocks: rows.length };
+    return await computeMarketIndex(db);
   }
 
   if (path === '/api/stock/klines') {
@@ -796,4 +764,39 @@ export async function matchLimitOrders(db) {
       console.error('matchLimitOrders error:', e.message);
     }
   }
+}
+
+// 大盤指數: 所有上市股票的流通市值加權 (基期 = 各股首日開盤價 × 流通股數)
+// 供 /api/stock/index、ETF 定價、期貨結算共用
+export async function computeMarketIndex(db) {
+  const trading = await db.prepare(`
+    SELECT c.id, c.share_price, c.total_shares, COALESCE(inv.stock_quantity, 0) as sys_inv
+    FROM companies c
+    LEFT JOIN stock_inventory inv ON inv.company_id = c.id
+    JOIN ipo_state i ON i.company_id = c.id AND i.phase = 'trading'
+  `).all();
+  const rows = trading.results;
+  let currentCap = 0, baseCap = 0;
+  for (const c of rows) {
+    const circulating = Math.max(c.total_shares - c.sys_inv, 1);
+    const first = await db.prepare('SELECT open FROM stock_klines WHERE company_id = ? ORDER BY minute ASC LIMIT 1').bind(c.id).first();
+    const basePrice = first?.open || c.share_price || 100;
+    currentCap += (c.share_price || 100) * circulating;
+    baseCap += basePrice * circulating;
+  }
+  const indexValue = baseCap > 0 ? Math.round((currentCap / baseCap) * 1000) : 1000;
+  const blocks = {};
+  for (const c of rows) {
+    const circulating = Math.max(c.total_shares - c.sys_inv, 1);
+    const klines = await db.prepare('SELECT minute, close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 720').bind(c.id).all();
+    for (const k of klines.results) {
+      if (!blocks[k.minute]) blocks[k.minute] = { cap: 0 };
+      blocks[k.minute].cap += k.close * circulating;
+    }
+  }
+  const timeline = Object.keys(blocks).sort((a, b) => a - b).map(ms => {
+    const cap = blocks[ms].cap;
+    return { minute: parseInt(ms), value: baseCap > 0 ? Math.round((cap / baseCap) * 1000) : 1000 };
+  });
+  return { value: indexValue, change: timeline.length > 1 ? (timeline[timeline.length - 1].value - timeline[0].value) : 0, timeline: timeline.slice(-300), stocks: rows.length };
 }

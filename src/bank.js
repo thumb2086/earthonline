@@ -1,6 +1,6 @@
 import { logTransaction, logHourly } from './utils.js';
+import { getRates } from './rates.js';
 
-const SAVINGS_RATE = 0.0005;
 const LOAN_BASE_RATE = 0.0015;
 
 export async function handleBank(env, request, path, user) {
@@ -10,7 +10,8 @@ export async function handleBank(env, request, path, user) {
     const loans = await db.prepare("SELECT * FROM loans WHERE user_id = ? AND status = 'active'").bind(user.id).all();
     const totalDebt = loans.results.reduce((s, l) => s + l.remaining, 0);
     const totalInterest = loans.results.reduce((s, l) => s + Math.floor(l.remaining * l.interest_rate), 0);
-    return { ...wallet, loans: loans.results, totalDebt, interestPerMin: totalInterest };
+    const rates = await getRates(db);
+    return { ...wallet, loans: loans.results, totalDebt, interestPerMin: totalInterest, savingsRate: rates.savings_rate };
   }
   if (path === '/api/bank/deposit') {
     const { amount } = await request.json();
@@ -63,10 +64,12 @@ export async function handleBank(env, request, path, user) {
 }
 
 export async function processBankTick(db) {
+  const rates = await getRates(db);
+  const savingsRate = rates.savings_rate;
   // 活存利息: 小數累積到 savings_acc, 滿 $1 才發放
   const users = await db.prepare('SELECT user_id, savings, COALESCE(savings_acc, 0) as acc FROM wallets WHERE savings > 0').all();
   for (const u of users.results) {
-    const acc = (u.acc || 0) + u.savings * SAVINGS_RATE;
+    const acc = (u.acc || 0) + u.savings * savingsRate;
     const payout = Math.floor(acc);
     if (payout > 0) {
       await db.prepare('UPDATE wallets SET cash = cash + ?, savings_acc = ? WHERE user_id = ?').bind(payout, acc - payout, u.user_id).run();

@@ -62,6 +62,7 @@ export default function App() {
     { id: 'invest', label: '💼 投資' },
     { id: 'company', label: '🏢 公司' },
     { id: 'stock', label: '📈 股票' },
+    { id: 'deriv', label: '📉 衍生' },
     { id: 'subscription', label: '📦 訂閱' },
     { id: 'history', label: '💰 明細' },
     { id: 'leaderboard', label: '🏆 排行' },
@@ -120,6 +121,7 @@ export default function App() {
           {view === 'invest' && <Invest api={api} toast={toast} prompt={prompt} />}
           {view === 'company' && <Company api={api} toast={toast} prompt={prompt} promptMulti={promptMulti} />}
           {view === 'stock' && <Stock api={api} toast={toast} prompt={prompt} user={user} />}
+          {view === 'deriv' && <Deriv api={api} toast={toast} />}
           {view === 'history' && <History api={api} />}
           {view === 'subscription' && <Subscription api={api} toast={toast} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}
@@ -284,8 +286,8 @@ function Bank({ act, api, toast }) {
       </div>
       <div className="grid-2">
         <div className="card card-accent">
-          <div className="card-title">活期存款 0.05%/分</div>
-          <div className="text-dim text-sm" style={{marginTop:4}}>利息 <span className="text-accent">${((info?.savings || 0) * 0.0005).toFixed(2)}/分</span>（每天約 ${Math.floor((info?.savings || 0) * 0.0005 * 1440).toLocaleString()}）</div>
+          <div className="card-title">活期存款 {(info?.savingsRate || 0.0005) * 100}%/分 <span className="text-dim text-sm">（央行依市場熱度升降息）</span></div>
+          <div className="text-dim text-sm" style={{marginTop:4}}>利息 <span className="text-accent">${((info?.savings || 0) * (info?.savingsRate || 0.0005)).toFixed(2)}/分</span>（每天約 ${Math.floor((info?.savings || 0) * (info?.savingsRate || 0.0005) * 1440).toLocaleString()}）</div>
           <form onSubmit={e => { act(e, '/api/bank/deposit'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
             <input name="amount" type="number" placeholder="存入金額" /><button className="btn btn-primary btn-sm">存入</button></form>
           <form onSubmit={e => { act(e, '/api/bank/withdraw'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
@@ -729,6 +731,122 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
         </div>
       )}
     </div>
+  )
+}
+
+function Deriv({ api, toast }) {
+  const [etfs, setEtfs] = useState([])
+  const [index, setIndex] = useState(null)
+  const [futData, setFutData] = useState({ currentIndex: 0, items: [] })
+  const [etfQty, setEtfQty] = useState('')
+  const [futDir, setFutDir] = useState('long')
+  const [futTerm, setFutTerm] = useState('60')
+  const [futContracts, setFutContracts] = useState('1')
+
+  const refresh = () => {
+    api('/api/etf/list').then(d => setEtfs(Array.isArray(d) ? d : []));
+    api('/api/stock/index').then(d => { if (d) setIndex(d) }).catch(() => {});
+    api('/api/futures/list').then(d => { if (d) setFutData(d) }).catch(() => {});
+  }
+  useEffect(() => { refresh() }, [])
+  useEffect(() => {
+    const id = setInterval(refresh, 5000)
+    return () => clearInterval(id)
+  }, [])
+
+  const etfBuy = async (e) => {
+    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
+    const r = await api('/api/etf/buy', { etfId: e.id, quantity: qty })
+    if (r.success) { toast(`買入 ${e.name} ${qty} 單位 @ $${r.fillPrice}`, 'success'); setEtfQty(''); refresh() } else toast(r.error, 'error')
+  }
+  const etfSell = async (e) => {
+    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
+    const r = await api('/api/etf/sell', { etfId: e.id, quantity: qty })
+    if (r.success) { toast(`賣出 ${e.name} ${qty} 單位 @ $${r.fillPrice}（實收 $${r.netRevenue.toLocaleString()}）`, 'success'); setEtfQty(''); refresh() } else toast(r.error, 'error')
+  }
+  const openFuture = async () => {
+    const n = parseInt(futContracts)
+    if (!n || n <= 0) return toast('請輸入張數', 'error')
+    const r = await api('/api/futures/open', { direction: futDir, termMinutes: parseInt(futTerm), contracts: n })
+    if (r.success) { toast(r.message || '已進場', 'success'); refresh() } else toast(r.error, 'error')
+  }
+  const fmtCountdown = (settleAt) => {
+    const ms = settleAt - Date.now()
+    if (ms <= 0) return '結算中'
+    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000)
+    return h > 0 ? `${h}時${m}分` : `${m}分${s}秒`
+  }
+  const futPremium = (futData.currentIndex || 1000) * 1 * (parseInt(futContracts) || 0) * 0.05
+
+  return (
+    <>
+      {index && <div className="card mb-12">
+        <div className="flex justify-between items-center">
+          <div className="card-title" style={{margin:0}}>📊 大盤指數（{index.stocks} 檔上市）</div>
+          <div style={{fontSize:20, fontWeight:700}} className={index.change >= 0 ? 'text-danger' : 'text-accent'}>
+            {index.value.toLocaleString()} <span style={{fontSize:13}}>{index.change >= 0 ? '▲' : '▼'} {Math.abs(index.change)}</span>
+          </div>
+        </div>
+      </div>}
+
+      <div className="card mb-12">
+        <div className="card-title">📦 ETF（封閉式 · 追蹤大盤指數）</div>
+        <div className="text-dim text-sm mb-12">單位價 = 指數 × $0.01（指數 1000 → $10）· 手續費 0.5% · 與系統交易</div>
+        {etfs.length === 0 && <div className="text-dim text-sm">載入中...</div>}
+        {etfs.map(e => (
+          <div className="stat" key={e.id}>
+            <span>
+              <span className="text-accent" style={{fontWeight:600}}>{e.name}（{e.symbol}）</span> · 單位價 <strong>${e.price}</strong>（指數 {e.index.toLocaleString()}）
+              <div className="text-dim text-sm">庫存 {e.inventory.toLocaleString()} · 流通 {e.circulating.toLocaleString()} · 單筆上限 {e.maxTrade.toLocaleString()} · 你持有 <span className="text-accent">{e.myHolding.toLocaleString()}</span> 單位</div>
+            </span>
+            <span style={{display:'flex', gap:6, alignItems:'center'}}>
+              <input type="number" placeholder="數量" value={etfQty} onChange={ev => setEtfQty(ev.target.value)} style={{width:90}} />
+              <button className="btn btn-primary btn-sm" onClick={() => etfBuy(e)}>買入</button>
+              <button className="btn btn-sm" onClick={() => etfSell(e)}>賣出</button>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="card mb-12">
+        <div className="card-title">⏳ 指數期貨（做多/做空大盤）</div>
+        <div className="text-dim text-sm mb-12">權利金 = 契約值 5%（契約值 = 指數 × $1/點 × 張數）· 最大虧損 = 權利金 · 到期自動結算</div>
+        <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}} className="mb-12">
+          <select value={futDir} onChange={e => setFutDir(e.target.value)} className="select-sm">
+            <option value="long">🟢 做多（賭指數漲）</option>
+            <option value="short">🔴 做空（賭指數跌）</option>
+          </select>
+          <select value={futTerm} onChange={e => setFutTerm(e.target.value)} className="select-sm">
+            <option value="60">1 小時</option>
+            <option value="360">6 小時</option>
+            <option value="1440">24 小時</option>
+          </select>
+          <input type="number" placeholder="張數" value={futContracts} onChange={e => setFutContracts(e.target.value)} style={{width:80}} />
+          <button className="btn btn-primary btn-sm" onClick={openFuture}>進場</button>
+          <span className="text-dim text-sm">預估權利金：<strong className="text-accent">${Math.round(futPremium).toLocaleString()}</strong></span>
+        </div>
+        {futData.items?.filter(f => f.status === 'open').length > 0 && <>
+          <div className="divider" />
+          <div className="text-sm text-accent" style={{fontWeight:600, marginBottom:6}}>持有中</div>
+          {futData.items.filter(f => f.status === 'open').map(f => (
+            <div className="stat" key={f.id}>
+              <span>{f.direction === 'long' ? '🟢 做多' : '🔴 做空'} {f.contracts} 張 · 進場指數 {f.entry_index} · 權利金 ${f.premium.toLocaleString()}</span>
+              <span className="text-dim text-sm">剩餘 {fmtCountdown(f.settle_at)}</span>
+            </div>
+          ))}
+        </>}
+        {futData.items?.filter(f => f.status === 'settled').length > 0 && <>
+          <div className="divider" />
+          <div className="text-sm text-accent" style={{fontWeight:600, marginBottom:6}}>已結算</div>
+          {futData.items.filter(f => f.status === 'settled').slice(0, 10).map(f => (
+            <div className="stat" key={f.id}>
+              <span>{f.direction === 'long' ? '🟢 做多' : '🔴 做空'} {f.contracts} 張 · 指數 {f.entry_index} → {f.settle_index}</span>
+              <span className={f.pnl > 0 ? 'text-danger' : 'text-dim'} style={{fontWeight:600}}>{f.pnl > 0 ? `+$${f.pnl.toLocaleString()}` : '虧損（權利金損失）'}</span>
+            </div>
+          ))}
+        </>}
+      </div>
+    </>
   )
 }
 
