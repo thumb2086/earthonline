@@ -62,7 +62,6 @@ export default function App() {
     { id: 'invest', label: '💼 投資' },
     { id: 'company', label: '🏢 公司' },
     { id: 'stock', label: '📈 股票' },
-    { id: 'deriv', label: '📉 衍生' },
     { id: 'subscription', label: '📦 訂閱' },
     { id: 'history', label: '💰 明細' },
     { id: 'leaderboard', label: '🏆 排行' },
@@ -121,7 +120,6 @@ export default function App() {
           {view === 'invest' && <Invest api={api} toast={toast} prompt={prompt} />}
           {view === 'company' && <Company api={api} toast={toast} prompt={prompt} promptMulti={promptMulti} />}
           {view === 'stock' && <Stock api={api} toast={toast} prompt={prompt} user={user} />}
-          {view === 'deriv' && <Deriv api={api} toast={toast} />}
           {view === 'history' && <History api={api} />}
           {view === 'subscription' && <Subscription api={api} toast={toast} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}
@@ -734,122 +732,6 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
   )
 }
 
-function Deriv({ api, toast }) {
-  const [etfs, setEtfs] = useState([])
-  const [index, setIndex] = useState(null)
-  const [futData, setFutData] = useState({ currentIndex: 0, items: [] })
-  const [etfQty, setEtfQty] = useState('')
-  const [futDir, setFutDir] = useState('long')
-  const [futTerm, setFutTerm] = useState('60')
-  const [futContracts, setFutContracts] = useState('1')
-
-  const refresh = () => {
-    api('/api/etf/list').then(d => setEtfs(Array.isArray(d) ? d : []));
-    api('/api/stock/index').then(d => { if (d) setIndex(d) }).catch(() => {});
-    api('/api/futures/list').then(d => { if (d) setFutData(d) }).catch(() => {});
-  }
-  useEffect(() => { refresh() }, [])
-  useEffect(() => {
-    const id = setInterval(refresh, 5000)
-    return () => clearInterval(id)
-  }, [])
-
-  const etfBuy = async (e) => {
-    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
-    const r = await api('/api/etf/buy', { etfId: e.id, quantity: qty })
-    if (r.success) { toast(`買入 ${e.name} ${qty} 單位 @ $${r.fillPrice}`, 'success'); setEtfQty(''); refresh() } else toast(r.error, 'error')
-  }
-  const etfSell = async (e) => {
-    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
-    const r = await api('/api/etf/sell', { etfId: e.id, quantity: qty })
-    if (r.success) { toast(`賣出 ${e.name} ${qty} 單位 @ $${r.fillPrice}（實收 $${r.netRevenue.toLocaleString()}）`, 'success'); setEtfQty(''); refresh() } else toast(r.error, 'error')
-  }
-  const openFuture = async () => {
-    const n = parseInt(futContracts)
-    if (!n || n <= 0) return toast('請輸入張數', 'error')
-    const r = await api('/api/futures/open', { direction: futDir, termMinutes: parseInt(futTerm), contracts: n })
-    if (r.success) { toast(r.message || '已進場', 'success'); refresh() } else toast(r.error, 'error')
-  }
-  const fmtCountdown = (settleAt) => {
-    const ms = settleAt - Date.now()
-    if (ms <= 0) return '結算中'
-    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000)
-    return h > 0 ? `${h}時${m}分` : `${m}分${s}秒`
-  }
-  const futPremium = (futData.currentIndex || 1000) * 1 * (parseInt(futContracts) || 0) * 0.05
-
-  return (
-    <>
-      {index && <div className="card mb-12">
-        <div className="flex justify-between items-center">
-          <div className="card-title" style={{margin:0}}>📊 大盤指數（{index.stocks} 檔上市）</div>
-          <div style={{fontSize:20, fontWeight:700}} className={index.change >= 0 ? 'text-danger' : 'text-accent'}>
-            {index.value.toLocaleString()} <span style={{fontSize:13}}>{index.change >= 0 ? '▲' : '▼'} {Math.abs(index.change)}</span>
-          </div>
-        </div>
-      </div>}
-
-      <div className="card mb-12">
-        <div className="card-title">📦 ETF（封閉式 · 追蹤大盤指數）</div>
-        <div className="text-dim text-sm mb-12">單位價 = 指數 × $0.01（指數 1000 → $10）· 手續費 0.5% · 與系統交易</div>
-        {etfs.length === 0 && <div className="text-dim text-sm">載入中...</div>}
-        {etfs.map(e => (
-          <div className="stat" key={e.id}>
-            <span>
-              <span className="text-accent" style={{fontWeight:600}}>{e.name}（{e.symbol}）</span> · 單位價 <strong>${e.price}</strong>（指數 {e.index.toLocaleString()}）
-              <div className="text-dim text-sm">庫存 {e.inventory.toLocaleString()} · 流通 {e.circulating.toLocaleString()} · 單筆上限 {e.maxTrade.toLocaleString()} · 你持有 <span className="text-accent">{e.myHolding.toLocaleString()}</span> 單位</div>
-            </span>
-            <span style={{display:'flex', gap:6, alignItems:'center'}}>
-              <input type="number" placeholder="數量" value={etfQty} onChange={ev => setEtfQty(ev.target.value)} style={{width:90}} />
-              <button className="btn btn-primary btn-sm" onClick={() => etfBuy(e)}>買入</button>
-              <button className="btn btn-sm" onClick={() => etfSell(e)}>賣出</button>
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="card mb-12">
-        <div className="card-title">⏳ 指數期貨（做多/做空大盤）</div>
-        <div className="text-dim text-sm mb-12">權利金 = 契約值 5%（契約值 = 指數 × $1/點 × 張數）· 最大虧損 = 權利金 · 到期自動結算</div>
-        <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}} className="mb-12">
-          <select value={futDir} onChange={e => setFutDir(e.target.value)} className="select-sm">
-            <option value="long">🟢 做多（賭指數漲）</option>
-            <option value="short">🔴 做空（賭指數跌）</option>
-          </select>
-          <select value={futTerm} onChange={e => setFutTerm(e.target.value)} className="select-sm">
-            <option value="60">1 小時</option>
-            <option value="360">6 小時</option>
-            <option value="1440">24 小時</option>
-          </select>
-          <input type="number" placeholder="張數" value={futContracts} onChange={e => setFutContracts(e.target.value)} style={{width:80}} />
-          <button className="btn btn-primary btn-sm" onClick={openFuture}>進場</button>
-          <span className="text-dim text-sm">預估權利金：<strong className="text-accent">${Math.round(futPremium).toLocaleString()}</strong></span>
-        </div>
-        {futData.items?.filter(f => f.status === 'open').length > 0 && <>
-          <div className="divider" />
-          <div className="text-sm text-accent" style={{fontWeight:600, marginBottom:6}}>持有中</div>
-          {futData.items.filter(f => f.status === 'open').map(f => (
-            <div className="stat" key={f.id}>
-              <span>{f.direction === 'long' ? '🟢 做多' : '🔴 做空'} {f.contracts} 張 · 進場指數 {f.entry_index} · 權利金 ${f.premium.toLocaleString()}</span>
-              <span className="text-dim text-sm">剩餘 {fmtCountdown(f.settle_at)}</span>
-            </div>
-          ))}
-        </>}
-        {futData.items?.filter(f => f.status === 'settled').length > 0 && <>
-          <div className="divider" />
-          <div className="text-sm text-accent" style={{fontWeight:600, marginBottom:6}}>已結算</div>
-          {futData.items.filter(f => f.status === 'settled').slice(0, 10).map(f => (
-            <div className="stat" key={f.id}>
-              <span>{f.direction === 'long' ? '🟢 做多' : '🔴 做空'} {f.contracts} 張 · 指數 {f.entry_index} → {f.settle_index}</span>
-              <span className={f.pnl > 0 ? 'text-danger' : 'text-dim'} style={{fontWeight:600}}>{f.pnl > 0 ? `+$${f.pnl.toLocaleString()}` : '虧損（權利金損失）'}</span>
-            </div>
-          ))}
-        </>}
-      </div>
-    </>
-  )
-}
-
 function Stock({ api, toast, prompt, user }) {
   const [q, setQ] = useState(null); const [h, setH] = useState([]); const [t, setT] = useState([]); const [myTrades, setMyTrades] = useState([]); const [ipo, setIpo] = useState(null)
   const [pnlData, setPnlData] = useState({ stocks: [], totalPnl: 0 })
@@ -866,6 +748,12 @@ function Stock({ api, toast, prompt, user }) {
   const [selectedStock, setSelectedStock] = useState(1)
   const [stockList, setStockList] = useState([])
   const [indexData, setIndexData] = useState(null)
+  const [etfs, setEtfs] = useState([])
+  const [futData, setFutData] = useState({ currentIndex: 0, items: [] })
+  const [etfQty, setEtfQty] = useState('')
+  const [futDir, setFutDir] = useState('long')
+  const [futTerm, setFutTerm] = useState('60')
+  const [futContracts, setFutContracts] = useState('1')
 
   const stockNames = { 1: '地球互動科技 001', 10: '深海科技 002', 12: '銀河金融 003', 13: '星雲生技 004', 14: '黑洞能源 005', 15: '元界科技 006' }
 
@@ -884,6 +772,30 @@ function Stock({ api, toast, prompt, user }) {
   }, [limitInfo])
   const markLimit = (r, side) => { if (r?.limitHit) setLimitInfo({ side, at: Date.now() }) }
 
+  const etfBuy = async (e) => {
+    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
+    const r = await api('/api/etf/buy', { etfId: e.id, quantity: qty })
+    if (r.success) { toast(`買入 ${e.name} ${qty} 單位 @ $${r.fillPrice}`, 'success'); setEtfQty(''); refreshStock() } else toast(r.error, 'error')
+  }
+  const etfSell = async (e) => {
+    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
+    const r = await api('/api/etf/sell', { etfId: e.id, quantity: qty })
+    if (r.success) { toast(`賣出 ${e.name} ${qty} 單位 @ $${r.fillPrice}（實收 $${r.netRevenue.toLocaleString()}）`, 'success'); setEtfQty(''); refreshStock() } else toast(r.error, 'error')
+  }
+  const openFuture = async () => {
+    const n = parseInt(futContracts)
+    if (!n || n <= 0) return toast('請輸入張數', 'error')
+    const r = await api('/api/futures/open', { direction: futDir, termMinutes: parseInt(futTerm), contracts: n })
+    if (r.success) { toast(r.message || '已進場', 'success'); refreshStock() } else toast(r.error, 'error')
+  }
+  const fmtCountdown = (settleAt) => {
+    const ms = settleAt - Date.now()
+    if (ms <= 0) return '結算中'
+    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000)
+    return h > 0 ? `${h}時${m}分` : `${m}分${s}秒`
+  }
+  const futPremium = (futData.currentIndex || 1000) * 1 * (parseInt(futContracts) || 0) * 0.05
+
   useEffect(() => {
     api('/api/company/ipo/list').then(d => {
       if (!Array.isArray(d)) return
@@ -901,6 +813,8 @@ function Stock({ api, toast, prompt, user }) {
   const refreshStock = () => {
     api('/api/stock/quote?companyId=' + selectedStock).then(setQ);
     api('/api/stock/index').then(d => { if (d) setIndexData(d) }).catch(()=>{});
+    api('/api/etf/list').then(d => setEtfs(Array.isArray(d) ? d : []));
+    api('/api/futures/list').then(d => { if (d) setFutData(d) }).catch(() => {});
     api('/api/stock/holdings').then(d => setH(Array.isArray(d)?d:[]));
     api('/api/stock/trades?companyId=' + selectedStock).then(d => setT(Array.isArray(d)?d:[]));
     api('/api/stock/trades?companyId=' + selectedStock + '&mine=1').then(d => setMyTrades(Array.isArray(d)?d:[]));
@@ -965,26 +879,6 @@ function Stock({ api, toast, prompt, user }) {
   }
   const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const cap = q?.maxTrade || 0; const n = Math.min(held?.quantity || 0, cap); if (n <= 0) return; toast(`賣出 ${n.toLocaleString()} 股（單筆上限 ${cap.toLocaleString()} 股）`, 'info'); const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${n} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
   const subIpo = () => prompt('認購股數', async (s) => { const r = await api('/api/stock/ipo/subscribe', { companyId: selectedStock, shares: parseInt(s) }); if (r.success) { toast(`認購 ${s} 股成功`, 'success'); refreshStock() } else toast(r.error, 'error') })
-  const registerStock = () => promptMulti('自訂加股 ($200,000) 立即上市', [
-    { label: '股票名稱 (2~20字)', placeholder: '例: 天網科技', default: '' },
-    { label: '產業', options: [
-      { value: 'tech', label: '🔧 科技 (tech)' },
-      { value: 'manufacturing', label: '🏭 製造 (manufacturing)' },
-      { value: 'finance', label: '💰 金融 (finance)' },
-      { value: 'service', label: '🛒 服務 (service)' },
-    ], default: 'tech' },
-    { label: '發行價 $10~$100', placeholder: '50', default: '50' },
-    { label: '發行股數 1,000~100,000', placeholder: '10000', default: '10000' },
-  ], async ([name, industry, price, shares]) => {
-    const ind = (industry || 'tech').trim().toLowerCase()
-    const p = parseInt(price); const sh = parseInt(shares)
-    if (!name || !p || !sh) return toast('請填完整', 'error')
-    if (sh * p > 2000000) return toast('發行規模過大（股數 × 價格 ≤ $2,000,000）', 'error')
-    const r = await api('/api/stock/register', { name: name.trim(), industry: ind, price: p, shares: sh })
-    if (r.success) { toast(`新股票 ${r.name} 已上市！（創辦人持有 ${(r.totalShares - r.floatShares).toLocaleString()} 股）`, 'success'); refreshStock() }
-    else toast(r.error, 'error')
-  })
-
   const openMargin = async () => {
     const qty = parseInt(marginQty); const lev = parseInt(marginLev)
     if (!qty || qty <= 0) return toast('請輸入股數', 'error')
@@ -1033,11 +927,28 @@ function Stock({ api, toast, prompt, user }) {
         </div>
         {indexData.timeline?.length > 1 && <IndexSparkline data={indexData.timeline} />}
       </div>}
+      <div className="card mb-12">
+        <div className="card-title">📦 ETF（封閉式 · 追蹤大盤指數）</div>
+        <div className="text-dim text-sm mb-12">單位價 = 指數 × $0.01（指數 1000 → $10）· 手續費 0.5% · 與系統交易</div>
+        {etfs.length === 0 && <div className="text-dim text-sm">載入中...</div>}
+        {etfs.map(e => (
+          <div className="stat" key={e.id}>
+            <span>
+              <span className="text-accent" style={{fontWeight:600}}>{e.name}（{e.symbol}）</span> · 單位價 <strong>${e.price}</strong>（指數 {e.index.toLocaleString()}）
+              <div className="text-dim text-sm">庫存 {e.inventory.toLocaleString()} · 流通 {e.circulating.toLocaleString()} · 單筆上限 {e.maxTrade.toLocaleString()} · 你持有 <span className="text-accent">{e.myHolding.toLocaleString()}</span> 單位</div>
+            </span>
+            <span style={{display:'flex', gap:6, alignItems:'center'}}>
+              <input type="number" placeholder="數量" value={etfQty} onChange={ev => setEtfQty(ev.target.value)} style={{width:90}} />
+              <button className="btn btn-primary btn-sm" onClick={() => etfBuy(e)}>買入</button>
+              <button className="btn btn-sm" onClick={() => etfSell(e)}>賣出</button>
+            </span>
+          </div>
+        ))}
+      </div>
       <div className="flex gap-8 mb-12">
         {stockList.map(s => (
           <button key={s.id} className={`btn ${selectedStock === s.id ? 'btn-primary' : ''}`} onClick={() => setSelectedStock(s.id)}>{s.name}</button>
         ))}
-        <button className="btn btn-sm btn-warn" onClick={registerStock}>＋ 自訂加股</button>
       </div>
       {ipo?.phase === 'ipo' && <div className="card mb-12" style={{borderColor:'var(--warn)'}}>
         <div className="card-title" style={{color:'var(--warn)'}}>🚀 IPO 認購中 — {stockNames[selectedStock] || '股票'}</div>
@@ -1208,6 +1119,44 @@ function Stock({ api, toast, prompt, user }) {
             <span className="stat-value">{x.quantity} 股</span></div>
           )}</div>
       </div>}
+      <div className="card mb-12">
+        <div className="card-title">⏳ 指數期貨（做多/做空大盤）</div>
+        <div className="text-dim text-sm mb-12">權利金 = 契約值 5%（契約值 = 指數 × $1/點 × 張數）· 最大虧損 = 權利金 · 到期自動結算</div>
+        <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}} className="mb-12">
+          <select value={futDir} onChange={e => setFutDir(e.target.value)} className="select-sm">
+            <option value="long">🟢 做多（賭指數漲）</option>
+            <option value="short">🔴 做空（賭指數跌）</option>
+          </select>
+          <select value={futTerm} onChange={e => setFutTerm(e.target.value)} className="select-sm">
+            <option value="60">1 小時</option>
+            <option value="360">6 小時</option>
+            <option value="1440">24 小時</option>
+          </select>
+          <input type="number" placeholder="張數" value={futContracts} onChange={e => setFutContracts(e.target.value)} style={{width:80}} />
+          <button className="btn btn-primary btn-sm" onClick={openFuture}>進場</button>
+          <span className="text-dim text-sm">預估權利金：<strong className="text-accent">${Math.round(futPremium).toLocaleString()}</strong></span>
+        </div>
+        {futData.items?.filter(f => f.status === 'open').length > 0 && <>
+          <div className="divider" />
+          <div className="text-sm text-accent" style={{fontWeight:600, marginBottom:6}}>持有中</div>
+          {futData.items.filter(f => f.status === 'open').map(f => (
+            <div className="stat" key={f.id}>
+              <span>{f.direction === 'long' ? '🟢 做多' : '🔴 做空'} {f.contracts} 張 · 進場指數 {f.entry_index} · 權利金 ${f.premium.toLocaleString()}</span>
+              <span className="text-dim text-sm">剩餘 {fmtCountdown(f.settle_at)}</span>
+            </div>
+          ))}
+        </>}
+        {futData.items?.filter(f => f.status === 'settled').length > 0 && <>
+          <div className="divider" />
+          <div className="text-sm text-accent" style={{fontWeight:600, marginBottom:6}}>已結算</div>
+          {futData.items.filter(f => f.status === 'settled').slice(0, 10).map(f => (
+            <div className="stat" key={f.id}>
+              <span>{f.direction === 'long' ? '🟢 做多' : '🔴 做空'} {f.contracts} 張 · 指數 {f.entry_index} → {f.settle_index}</span>
+              <span className={f.pnl > 0 ? 'text-danger' : 'text-dim'} style={{fontWeight:600}}>{f.pnl > 0 ? `+$${f.pnl.toLocaleString()}` : '虧損（權利金損失）'}</span>
+            </div>
+          ))}
+        </>}
+      </div>
       {ipo?.phase !== 'ipo' && <div className="card mt-12"><div className="card-title">我的成交紀錄</div>
         {(myTrades || []).length === 0 && <div className="text-dim">暫無交易</div>}
         {(myTrades || []).slice(0,20).map(x => {
@@ -1605,9 +1554,10 @@ function Help() {
       '離線時收入減半（訂閱雲端備份可提升到 80%）',
     ]},
     { title: '🏦 銀行', items: [
-      '活存：隨時存取，0.05%/分利息',
-      '定存：選擇期限（1hr/6hr/24hr/7天），利率更高（0.08~0.3%/分），到期自動贖回，提前贖回損失利息',
+      '活存：隨時存取，利率由央行依市場熱度調整（0.01~0.3%/分，基準 0.05%）',
+      '定存：選擇期限（1hr/6hr/24hr/7天），利率隨央行升降息同步調整，到期自動贖回',
       '貸款：可借總收入 50% 額度，0.15%/分利息（利息滾入欠款）',
+      '🏦 央行：每 30 分鐘依市場成交量決策升/降息，熱→升息吸金降溫，冷→降息刺激投資（發系統公告）',
     ]},
     { title: '💼 投資', items: [
       '債券/指數基金/房地產/新創：依累計收入解鎖',
@@ -1625,11 +1575,25 @@ function Help() {
     ]},
     { title: '📈 股票', items: [
       '系統做市商：買入向系統買，賣出賣回系統',
-      '成交價 = 市場價（無價差），手續費 0.5% 另計',
-      '大單影響價格：買1股約影響 0.8%，大量買賣影響可達 10% 上限',
-      '單筆上限 = 流通量 5%（全部買入按鈕可突破）',
-      '槓桿：做多/做空 2x/3x/5x，維持率 130% 追繳，100% 強制平倉',
-      '股利：上市公司每分鐘配發股利給持股者',
+      '成交價 = 影響後價格（大單會推高買價/壓低賣價），手續費 0.5% 另計',
+      '影響公式：0.15 × √(單量/供應量)，上限 5%；小單影響約 0.5%',
+      '單筆上限 = 可交易供應量（流通+可賣庫存）的 20%，全部買入/賣出以單筆上限為準',
+      '漲跌停：價格 1 分鐘內最多 ±20%，觸及即停止交易（漲停不能買、跌停不能賣）',
+      '掛單交易（自動條件）：掛買單市價跌到目標自動買入；掛賣單漲過目標自動賣出；每分鐘撮合、成交自動通知',
+      '槓桿：做多/做空 2x/3x/5x，維持率 115% 追繳，100% 強制平倉',
+      '公司 owner 可：增資（單次上限總股本5%，價格≤市價，受發行上限約束）、強制收購（市價×1.2）、下市（自動強制收購）、拆分（×2/×5/×10，$50,000，24h冷卻）、清算',
+      '發行上限：總股本最多長到發行量 × 2（系統限量回補庫存，不再無限增資稀釋股東）',
+    ]},
+    { title: '📦 ETF（封閉式）', items: [
+      '追蹤大盤指數：單位價 = 指數 × $0.01（指數 1000 → $10）',
+      '與系統交易，手續費 0.5%，單筆上限 20%，影響價結算',
+      '系統庫存買完即停止賣出（限量回補至發行上限）',
+    ]},
+    { title: '⏳ 指數期貨', items: [
+      '做多/做空大盤指數，期限 1hr / 6hr / 24hr',
+      '權利金 = 契約值 5%（契約值 = 指數 × $1/點 × 張數）',
+      '到期自動結算：payout = max(0, 指數差 × 乘數 × 張數)，最大虧損 = 權利金',
+      '結算結果自動通知，歷史損益可查',
     ]},
     { title: '🚀 IPO', items: [
       '公司 owner 可設定 IPO 價格/發行股數/認購時間',

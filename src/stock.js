@@ -57,42 +57,6 @@ export async function handleStock(env, request, path, user) {
   const db = env.DB;
   const method = request.method;
 
-  // ===== 自訂加股: 玩家支付費用直接發行一支新股票 (立即上市) =====
-  if (path === '/api/stock/register') {
-    const { name, industry, price, shares } = await request.json();
-    if (!INDUSTRY_MULT[industry]) return { error: '無效產業' };
-    const stockName = (name || '').toString().trim();
-    if (stockName.length < 2 || stockName.length > 20) return { error: '股票名稱需 2~20 字' };
-    const stockPrice = parseInt(price);
-    if (!stockPrice || stockPrice < 10 || stockPrice > 100) return { error: '發行價需 $10~$100' };
-    const totalShares = parseInt(shares);
-    if (!totalShares || totalShares < 1000 || totalShares > 100000) return { error: '股數需 1,000~100,000' };
-    if (totalShares * stockPrice > 2000000) return { error: '發行規模過大（股數 × 價格 ≤ $2,000,000）' };
-
-    const dup = await db.prepare('SELECT id FROM companies WHERE name = ?').bind(stockName).first();
-    if (dup) return { error: '同名公司已存在' };
-
-    const fee = 200000;
-    const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
-    if (!wallet || wallet.cash < fee) return { error: '需要 $200,000' };
-
-    const now = Date.now();
-    const floatShares = Math.floor(totalShares * 0.5);
-    const founderShares = totalShares - floatShares;
-
-    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(fee, user.id).run();
-    const info = await db.prepare('INSERT INTO companies (owner_id, name, industry, total_shares, share_price, base_income, issue_cap, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(user.id, stockName, industry, totalShares, stockPrice, stockPrice * 2, totalShares * 2, now).run();
-    const companyId = info.meta.last_row_id;
-    await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at) VALUES (?, ?, ?)').bind(companyId, 'trading', now).run();
-    await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, 0, ?)').bind(companyId, floatShares).run();
-    if (founderShares > 0) {
-      await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(user.id, companyId, founderShares).run();
-    }
-    await logTransaction(db, user.id, 'custom_stock_list', -fee, `加股「${stockName}」發行 ${totalShares.toLocaleString()} 股 @ $${stockPrice}`);
-    return { success: true, id: companyId, name: stockName, price: stockPrice, totalShares, floatShares };
-  }
-
   if (path === '/api/stock/quote') {    const reqUrl = new URL(request.url);
     const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
     const price = await getCurrentPrice(db, companyId);
