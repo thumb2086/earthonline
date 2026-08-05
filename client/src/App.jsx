@@ -732,6 +732,10 @@ function Stock({ api, toast, prompt, user }) {
   const [marginLev, setMarginLev] = useState('2')
   const [chartTimeframe, setChartTimeframe] = useState('realtime')
   const [limitInfo, setLimitInfo] = useState(null)
+  const [orders, setOrders] = useState([])
+  const [ordType, setOrdType] = useState('buy')
+  const [ordPrice, setOrdPrice] = useState('')
+  const [ordQty, setOrdQty] = useState('')
   const [selectedStock, setSelectedStock] = useState(1)
   const [stockList, setStockList] = useState([])
   const [indexData, setIndexData] = useState(null)
@@ -775,6 +779,7 @@ function Stock({ api, toast, prompt, user }) {
     api('/api/stock/trades?companyId=' + selectedStock + '&mine=1').then(d => setMyTrades(Array.isArray(d)?d:[]));
     api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[]));
     api('/api/stock/ipo/info?companyId=' + selectedStock).then(setIpo);
+    api('/api/stock/order/list').then(d => setOrders(Array.isArray(d) ? d : []));
     api('/api/stock/pnl').then(d => setPnlData(d || { stocks: [], totalPnl: 0 })).catch(()=>{});
   }
   useEffect(() => { refreshStock() }, [selectedStock])
@@ -785,10 +790,10 @@ function Stock({ api, toast, prompt, user }) {
   const buy = async () => {
     const fresh = await api('/api/stock/quote?companyId=' + selectedStock)
     if (fresh?.price) setQ(fresh)
-    prompt(`買入股數 (手續費1.5%另計)`, async (n) => {
+    prompt(`買入股數 (手續費1.5%另計 · 單筆上限 ${(q?.maxTrade || 0).toLocaleString()} 股)`, async (n) => {
       const qty = parseInt(n); if (!qty || qty <= 0) return
       const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: qty })
-      if (r.success) { refreshStock(); markLimit(r, 'up'); toast(`買入 ${qty} 股 @ $${r.fillPrice} (含手續費 $${(r.totalCost - (r.fillPrice * qty)).toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
+      if (r.success) { refreshStock(); markLimit(r, 'up'); toast(`買入 ${qty} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (含手續費 $${(r.totalCost - (r.fillPrice * qty)).toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
     }, async (v) => {
       const qty = parseInt(v) || 0
       if (qty <= 0) return ''
@@ -800,10 +805,10 @@ function Stock({ api, toast, prompt, user }) {
   const sell = async () => {
     const fresh = await api('/api/stock/quote?companyId=' + selectedStock)
     if (fresh?.price) setQ(fresh)
-    prompt(`賣出股數 (手續費1.5%另計 · 大單滑點)`, async (n) => {
+    prompt(`賣出股數 (手續費1.5%另計 · 大單滑點 · 單筆上限 ${(q?.maxTrade || 0).toLocaleString()} 股)`, async (n) => {
       const qty = parseInt(n); if (!qty || qty <= 0) return
       const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: qty })
-      if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${qty} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
+      if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${qty} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
     }, async (v) => {
       const qty = parseInt(v) || 0
       if (qty <= 0) return ''
@@ -822,9 +827,9 @@ function Stock({ api, toast, prompt, user }) {
     if (n <= 0) return toast('現金或庫存不足', 'error')
     toast(`全部買入 ${n} 股`, 'info')
     const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true })
-    if (r.success) { refreshStock(); markLimit(r, 'up'); toast(`買入 ${n} 股 @ $${r.fillPrice} (含手續費 $${(r.totalCost - (r.fillPrice * n)).toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
+    if (r.success) { refreshStock(); markLimit(r, 'up'); toast(`買入 ${n} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (含手續費 $${(r.totalCost - (r.fillPrice * n)).toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
   }
-  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${n} 股 @ $${r.fillPrice} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
+  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${n} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
   const subIpo = () => prompt('認購股數', async (s) => { const r = await api('/api/stock/ipo/subscribe', { companyId: selectedStock, shares: parseInt(s) }); if (r.success) { toast(`認購 ${s} 股成功`, 'success'); refreshStock() } else toast(r.error, 'error') })
   const registerStock = () => promptMulti('自訂加股 ($200,000) 立即上市', [
     { label: '股票名稱 (2~20字)', placeholder: '例: 天網科技', default: '' },
@@ -869,6 +874,19 @@ function Stock({ api, toast, prompt, user }) {
     if (r.success) { toast(`自動補繳 $${amount.toLocaleString()}！維持率 → ${r.maintenanceRate}%`, 'success'); api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[])) }
     else toast(r.error, 'error')
   }
+  const placeOrder = async () => {
+    const p = parseFloat(ordPrice); const n = parseInt(ordQty)
+    if (!p || p <= 0) return toast('請輸入掛單價格', 'error')
+    if (!n || n <= 0) return toast('請輸入股數', 'error')
+    const r = await api('/api/stock/order/place', { companyId: selectedStock, type: ordType, price: p, quantity: n })
+    if (r.success) { toast(r.message || '掛單成功', 'success'); setOrdPrice(''); setOrdQty(''); api('/api/stock/order/list').then(d => setOrders(Array.isArray(d) ? d : [])) }
+    else toast(r.error, 'error')
+  }
+  const cancelOrder = async (id) => {
+    const r = await api('/api/stock/order/cancel/' + id)
+    if (r.success) { toast('掛單已取消', 'success'); api('/api/stock/order/list').then(d => setOrders(Array.isArray(d) ? d : [])) }
+    else toast(r.error, 'error')
+  }
 
   return (
     <>
@@ -904,17 +922,22 @@ function Stock({ api, toast, prompt, user }) {
         <button className="btn btn-sm mt-12" onClick={subIpo} disabled={ipo.isFull} style={ipo.isFull ? {opacity:0.5, cursor:'not-allowed'} : {}}>{ipo.isFull ? '已滿' : '認購'}</button>
       </div>}
         {ipo?.phase !== 'ipo' && q && <><div className="grid-2 mt-12">
-          <div><div className="stat"><span className="stat-label">價格</span><span className="stat-value" style={{fontSize:20}}>${q.price}</span></div>
+          <div><div className="stat"><span className="stat-label">價格</span><span className="stat-value" style={{fontSize:20}}>${q.price}
+            {q.limit === 'up' && <span style={{fontSize:11, marginLeft:8, color:'#ef4444', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.5)', padding:'2px 8px', borderRadius:99, fontWeight:700}}>⚠️ 漲停</span>}
+            {q.limit === 'down' && <span style={{fontSize:11, marginLeft:8, color:'#00ff41', background:'rgba(0,255,65,0.12)', border:'1px solid rgba(0,255,65,0.5)', padding:'2px 8px', borderRadius:99, fontWeight:700}}>⚠️ 跌停</span>}
+          </span></div>
             <div className="stat"><span className="stat-label">手續費</span><span className="stat-value">1.5%</span></div>
             <div className="stat"><span className="stat-label">流通</span><span className="stat-value">{(q.circulating||0).toLocaleString()}</span></div></div>
           <div><div className="stat"><span className="stat-label">庫存</span><span className="stat-value">{(q.systemInventory||0).toLocaleString()}</span></div>
-            <div className="stat"><span className="stat-label">可買量</span><span className="stat-value">{(Math.max(0,(q.systemInventory||0)-(q.minInventory||0))).toLocaleString()}</span></div></div>
+            <div className="stat"><span className="stat-label">可買量</span><span className="stat-value">{(Math.max(0,(q.systemInventory||0)-(q.minInventory||0))).toLocaleString()}</span></div>
+            <div className="stat"><span className="stat-label">單筆上限</span><span className="stat-value">{(q.maxTrade||0).toLocaleString()} 股</span></div></div>
         </div>
+        {q.limit && <div className="text-sm mt-12" style={{fontWeight:600, color: q.limit === 'up' ? '#ef4444' : '#00ff41'}}>⚠️ 已達{q.limit === 'up' ? '漲停板' : '跌停板'}，交易暫停，1分鐘後恢復</div>}
         <div className="flex gap-8 mt-12">
-          <button className="btn btn-primary btn-sm" onClick={buy}>買入</button>
-          <button className="btn btn-primary btn-sm" onClick={maxBuy}>全部買入</button>
-          <button className="btn btn-sm" onClick={sell}>賣出</button>
-          <button className="btn btn-sm" onClick={maxSell}>全部賣出</button>
+          <button className="btn btn-primary btn-sm" onClick={buy} disabled={q.limit === 'up'} style={q.limit === 'up' ? {opacity:0.5, cursor:'not-allowed'} : {}}>買入</button>
+          <button className="btn btn-primary btn-sm" onClick={maxBuy} disabled={q.limit === 'up'} style={q.limit === 'up' ? {opacity:0.5, cursor:'not-allowed'} : {}}>全部買入</button>
+          <button className="btn btn-sm" onClick={sell} disabled={q.limit === 'down'} style={q.limit === 'down' ? {opacity:0.5, cursor:'not-allowed'} : {}}>賣出</button>
+          <button className="btn btn-sm" onClick={maxSell} disabled={q.limit === 'down'} style={q.limit === 'down' ? {opacity:0.5, cursor:'not-allowed'} : {}}>全部賣出</button>
         </div>
         </>}
       {ipo?.phase !== 'ipo' && <div className="card mb-12">
@@ -939,6 +962,30 @@ function Stock({ api, toast, prompt, user }) {
           </div>
         )}
         <KLineChart api={api} timeframe={chartTimeframe} companyId={selectedStock} />
+      </div>}
+      {ipo?.phase !== 'ipo' && <div className="card mb-12">
+        <div className="card-title">📋 掛單交易（自動條件交易）</div>
+        <div className="text-dim text-sm mb-12">買單：市價跌到掛單價以下自動買入；賣單：市價漲到掛單價以上自動賣出（每分鐘撮合，成交自動通知）</div>
+        <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}} className="mt-12 mb-12">
+          <select value={ordType} onChange={e => setOrdType(e.target.value)} className="select-sm">
+            <option value="buy">🟢 條件買入</option>
+            <option value="sell">🔴 條件賣出</option>
+          </select>
+          <input type="number" placeholder="掛單價 $" value={ordPrice} onChange={e => setOrdPrice(e.target.value)} style={{width:110}} />
+          <input type="number" placeholder={`股數 (≤${(q?.maxTrade || 0).toLocaleString()})`} value={ordQty} onChange={e => setOrdQty(e.target.value)} style={{width:130}} />
+          <button className="btn btn-primary btn-sm" onClick={placeOrder}>掛單</button>
+        </div>
+        {orders.filter(o => o.company_id === selectedStock).length === 0 && <div className="text-dim text-sm">尚無掛單</div>}
+        {orders.filter(o => o.company_id === selectedStock).map(o => (
+          <div className="stat" key={o.id}>
+            <span><span className={o.type === 'buy' ? 'text-danger' : 'text-accent'} style={{fontWeight:600}}>{o.type === 'buy' ? '買' : '賣'}</span> @ ${o.price} × {o.quantity.toLocaleString()} 股
+              <div className="text-dim text-sm">市價 ${o.current_price} · {o.status === 'open' ? '⏳ 等待成交' : o.status === 'filled' ? '✅ 已成交' : '❌ 已取消'}</div>
+            </span>
+            {o.status === 'open' && <button className="btn btn-sm" onClick={() => cancelOrder(o.id)}>取消</button>}
+          </div>
+        ))}
+        <div className="divider" />
+        <div className="text-dim text-sm">全部掛單：{orders.filter(o => o.status === 'open').length} 筆等待中（上限 20 筆）</div>
       </div>}
       {ipo?.phase !== 'ipo' && <div className="card mb-12">
         <div className="card-title">⚡ 槓桿交易</div>
@@ -1122,6 +1169,7 @@ function AdminPanel({ api }) {
   const [ipoList, setIpoList] = useState([])
   const [ipoCollapsed, setIpoCollapsed] = useState(false)
   const [tradesCollapsed, setTradesCollapsed] = useState(false)
+  const [annCollapsed, setAnnCollapsed] = useState(false)
   const [tradeData, setTradeData] = useState({ trades: [], stats: [] })
   const [marginData, setMarginData] = useState({ positions: [], byUser: [], byCompany: [] })
   const [announcements, setAnnouncements] = useState([])
@@ -1219,8 +1267,10 @@ function AdminPanel({ api }) {
       </div>}
 
       {announcements.length > 0 && <div className="card mb-12">
-        <div className="card-title">📢 系統公告</div>
-        {announcements.map(a => (
+        <div className="card-title" style={{display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', margin:0}} onClick={() => setAnnCollapsed(c => !c)}>
+          📢 系統公告（{announcements.length}）<span className="text-dim text-sm">{annCollapsed ? '▸ 展開' : '▾ 收起'}</span>
+        </div>
+        {!annCollapsed && announcements.map(a => (
           <div className="stat" key={a.id}>
             <span className="text-dim text-sm">⏱{new Date(a.created_at).toLocaleString('zh-TW')}</span>
             <span>{a.message}</span>

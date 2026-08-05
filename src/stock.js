@@ -92,6 +92,15 @@ export async function handleStock(env, request, path, user) {
     const company = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
     const circulating = (company?.total_shares || 1000000) - (inv?.stock_quantity || 0);
     const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
+    // 漲跌停狀態: 以近1分鐘第一筆成交為基準, 目前價貼住 ±20% 邊界即為漲/跌停
+    let limit = null;
+    const refTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, Date.now() - 60000).first();
+    if (refTrade) {
+      const maxP = Math.ceil(refTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
+      const minP = Math.floor(refTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
+      if (price >= maxP) limit = 'up';
+      else if (price <= minP) limit = 'down';
+    }
     return {
       price,
       buyPrice: Math.round(price),
@@ -101,6 +110,7 @@ export async function handleStock(env, request, path, user) {
       systemInventory: inv?.stock_quantity || 0,
       circulating,
       maxTrade,
+      limit,
       minInventory: Math.floor((company?.total_shares || 0) * 0.03),
     };
   }
@@ -270,24 +280,16 @@ export async function handleStock(env, request, path, user) {
     const inv = await db.prepare('SELECT cash, stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
     if (!inv) return { error: '系統庫存不足' };
 
-    const companyData = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
+    const companyData = await db.prepare('SELECT total_shares, share_price FROM companies WHERE id = ?').bind(companyId).first();
     if (!companyData) return { error: '公司不存在' };
 
-    // 自動增資補庫存: 只補「本次買入 + 30% 底倉」的最小量 (不再每次灌到50%, 防指數級無限稀釋)
-    const minInv = Math.floor(companyData.total_shares * 0.3);
-    if (inv.stock_quantity < minInv + quantity) {
-      const topUp = Math.min(minInv + quantity - inv.stock_quantity, Math.floor(companyData.total_shares * 0.3));
-      if (topUp > 0) {
-        await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, companyId).run();
-        await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, companyId).run();
-      }
-      const newInv = await db.prepare('SELECT cash, stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
-      inv.stock_quantity = newInv.stock_quantity;
-      companyData.total_shares += topUp;
-    }
-    if (inv.stock_quantity < quantity) return { error: '系統庫存不足' };
+    // 庫存不足: 不再自動增資發新股稀釋股東, 直接拒絕
+    if (inv.stock_quantity < quantity) return { error: `系統庫存不足（僅剩 ${inv.stock_quantity.toLocaleString()} 股）` };
 
+    // 交易上限: 單筆最多 20% 流通量
     const circulating = companyData.total_shares - inv.stock_quantity;
+    const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
+    if (quantity > maxTrade) return { error: `單筆交易上限 ${maxTrade.toLocaleString()} 股（流通量的 ${(MAX_TRADE_RATIO * 100).toFixed(0)}%），本次 ${quantity.toLocaleString()} 股超出限制` };
 
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet) return { error: '錢包不存在' };
@@ -305,12 +307,12 @@ export async function handleStock(env, request, path, user) {
     let newPrice = Math.round(price * (1 + impact));
     let limitHit = false;
 
-    // Price change limit: ±20% per minute
+    // Price change limit: ±20% per minute — 達限價即停止交易 (不擠價成交)
     const recentTrades = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
     if (recentTrades) {
       const minPrice = Math.floor(recentTrades.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
       const maxPrice = Math.ceil(recentTrades.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-      if (newPrice > maxPrice) limitHit = true;
+      if (newPrice > maxPrice) return { error: '⚠️ 已達漲停板，交易暫停，1分鐘後恢復' };
       newPrice = Math.max(minPrice, Math.min(maxPrice, newPrice));
     }
 
@@ -330,7 +332,7 @@ export async function handleStock(env, request, path, user) {
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', newPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now, 'buy');
     await logTransaction(db, user.id, 'stock_buy', -(totalCost + fee), `買入 ${quantity} 股 @ $${newPrice}`);
-    return { success: true, price: newPrice, fillPrice: buyPrice, quantity, totalCost: totalCost + fee, limitHit };
+    return { success: true, price: newPrice, fillPrice: buyPrice, afterPrice: newPrice, quantity, totalCost: totalCost + fee, limitHit: false };
   }
 
   if (path === '/api/stock/sell') {
@@ -345,6 +347,10 @@ export async function handleStock(env, request, path, user) {
 
     const companyS = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
     const circulatingS = companyS.total_shares - inv.stock_quantity;
+
+    // 交易上限: 單筆最多 20% 流通量
+    const maxTradeS = Math.max(1, Math.floor(circulatingS * MAX_TRADE_RATIO));
+    if (quantity > maxTradeS) return { error: `單筆交易上限 ${maxTradeS.toLocaleString()} 股（流通量的 ${(MAX_TRADE_RATIO * 100).toFixed(0)}%），本次 ${quantity.toLocaleString()} 股超出限制` };
 
     const price = await getCurrentPrice(db, companyId);
     const sellPrice = Math.round(price);
@@ -363,7 +369,7 @@ export async function handleStock(env, request, path, user) {
     if (recentTrade) {
       const minP = Math.floor(recentTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
       const maxP = Math.ceil(recentTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-      if (newPrice < minP) limitHit = true;
+      if (newPrice < minP) return { error: '⚠️ 已達跌停板，交易暫停，1分鐘後恢復' };
       newPrice = Math.max(minP, Math.min(maxP, newPrice));
     }
     const now = Date.now();
@@ -385,7 +391,47 @@ export async function handleStock(env, request, path, user) {
     await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${newPrice}`);
     // 賣出後公司已無任何股東 → 移交系統管理 (不留在最後一個持有人手上)
     await maybeSystemTakeover(db, companyId);
-    return { success: true, price: newPrice, fillPrice: newPrice, quantity, netRevenue, limitHit };
+    return { success: true, price: newPrice, fillPrice: sellPrice, afterPrice: newPrice, quantity, netRevenue, limitHit };
+  }
+
+  // ===== 掛單交易 (自動條件交易) =====
+  if (path === '/api/stock/order/place') {
+    const { companyId, type, price, quantity } = await request.json();
+    if (!companyId || !['buy', 'sell'].includes(type)) return { error: '參數無效' };
+    const qty = parseInt(quantity);
+    const p = parseFloat(price);
+    if (!Number.isInteger(qty) || qty <= 0) return { error: '股數必須為正整數' };
+    if (!Number.isFinite(p) || p <= 0) return { error: '價格無效' };
+    const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
+    if (!ipo || ipo.phase !== 'trading') return { error: '尚未上市' };
+    const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
+    const comp = await db.prepare('SELECT total_shares, share_price FROM companies WHERE id = ?').bind(companyId).first();
+    if (!comp) return { error: '公司不存在' };
+    const circulating = comp.total_shares - (inv?.stock_quantity || 0);
+    const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
+    if (qty > maxTrade) return { error: `單筆上限 ${maxTrade.toLocaleString()} 股` };
+    const openCount = await db.prepare("SELECT COUNT(*) as cnt FROM stock_limit_orders WHERE user_id = ? AND status = 'open'").bind(user.id).first();
+    if ((openCount?.cnt || 0) >= 20) return { error: '掛單上限 20 筆，請先取消舊掛單' };
+    await db.prepare('INSERT INTO stock_limit_orders (user_id, company_id, type, price, quantity, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(user.id, companyId, type, p, qty, Date.now()).run();
+    return { success: true, message: `${type === 'buy' ? '買' : '賣'}單掛出 @ $${p} × ${qty.toLocaleString()} 股（成交後自動通知）` };
+  }
+
+  if (path === '/api/stock/order/list') {
+    const rows = await db.prepare(`
+      SELECT o.*, c.name as company_name, c.share_price as current_price
+      FROM stock_limit_orders o JOIN companies c ON c.id = o.company_id
+      WHERE o.user_id = ?
+      ORDER BY (o.status = 'open') DESC, o.id DESC LIMIT 100
+    `).bind(user.id).all();
+    return rows.results;
+  }
+
+  if (path.startsWith('/api/stock/order/cancel/')) {
+    const orderId = parseInt(path.split('/').pop());
+    const row = await db.prepare("SELECT id FROM stock_limit_orders WHERE id = ? AND user_id = ? AND status = 'open'").bind(orderId, user.id).first();
+    if (!row) return { error: '掛單不存在或已成交' };
+    await db.prepare("UPDATE stock_limit_orders SET status = 'cancelled' WHERE id = ?").bind(orderId).run();
+    return { success: true };
   }
 
   if (path === '/api/stock/ipo/mine') {
@@ -475,7 +521,13 @@ export async function handleStock(env, request, path, user) {
     if (recentTrade) {
       const minP = Math.floor(recentTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
       const maxP = Math.ceil(recentTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
+      if (newPrice > maxP) return { error: '⚠️ 已達漲停板，交易暫停，1分鐘後恢復' };
+      if (newPrice < minP) return { error: '⚠️ 已達跌停板，交易暫停，1分鐘後恢復' };
       newPrice = Math.max(minP, Math.min(maxP, newPrice));
+    }
+    // 交易上限: 單筆最多 20% 流通量
+    if (quantity > Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO))) {
+      return { error: `單筆交易上限 ${Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO)).toLocaleString()} 股` };
     }
 
     if (type === 'long') {
@@ -656,6 +708,86 @@ export async function finalizeIPO(db) {
     const owner = await db.prepare('SELECT owner_id FROM companies WHERE id = ?').bind(ipo.company_id).first();
     if (owner && owner.owner_id > 0) {
       await notify(db, owner.owner_id, 'ipo_listed', `🚀 你的公司「${companyName?.name || ''}」已完成 IPO 上市！`);
+    }
+  }
+}
+
+// ===== 掛單撮合 (每分鐘執行): 市價到達掛單門檻自動成交 =====
+export async function matchLimitOrders(db) {
+  const orders = await db.prepare("SELECT * FROM stock_limit_orders WHERE status = 'open' ORDER BY id ASC").all();
+  for (const o of orders.results) {
+    try {
+      const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(o.company_id).first();
+      if (!ipo || ipo.phase !== 'trading') continue;
+      const price = await getCurrentPrice(db, o.company_id);
+      if (!price) continue;
+      // 條件: 買單 → 市價 ≤ 掛單價; 賣單 → 市價 ≥ 掛單價
+      if (o.type === 'buy' && price > o.price) continue;
+      if (o.type === 'sell' && price < o.price) continue;
+
+      // 漲跌停檢查: 成交不破限價, 貼邊則暫緩
+      const refTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(o.company_id, Date.now() - 60000).first();
+      if (refTrade) {
+        const maxP = Math.ceil(refTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
+        const minP = Math.floor(refTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
+        if (o.type === 'buy' && price >= maxP) continue;
+        if (o.type === 'sell' && price <= minP) continue;
+      }
+
+      const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(o.company_id).first();
+      const comp = await db.prepare('SELECT total_shares, name FROM companies WHERE id = ?').bind(o.company_id).first();
+      if (!inv || !comp) continue;
+      const circulating = comp.total_shares - inv.stock_quantity;
+      const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
+      if (o.quantity > maxTrade) continue;
+      const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(o.user_id).first();
+      if (!wallet) continue;
+      const now = Date.now();
+      const fillPrice = Math.round(price);
+      let ok = false;
+
+      if (o.type === 'buy') {
+        if (inv.stock_quantity < o.quantity) continue;
+        const cost = fillPrice * o.quantity;
+        const fee = Math.floor(cost * FEE_RATE);
+        if (wallet.cash < cost + fee) continue;
+        await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(cost + fee, o.user_id).run();
+        await db.prepare('UPDATE stock_inventory SET cash = cash + ?, stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(cost + fee, o.quantity, o.company_id).run();
+        const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(o.user_id, o.company_id).first();
+        if (holding) {
+          await db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(o.quantity, o.user_id, o.company_id).run();
+        } else {
+          await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(o.user_id, o.company_id, o.quantity).run();
+        }
+        await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(o.company_id, o.user_id, 'buy', fillPrice, o.quantity, now).run();
+        await updateKline(db, o.company_id, fillPrice, o.quantity, now, 'buy');
+        await logTransaction(db, o.user_id, 'stock_buy', -(cost + fee), `掛單買入 ${o.quantity} 股 @ $${fillPrice} (限價 $${o.price})`);
+        await notify(db, o.user_id, 'limit_order', `✅ 掛單買入「${comp.name}」成交 ${o.quantity.toLocaleString()} 股 @ $${fillPrice}（掛單價 $${o.price}）`);
+        ok = true;
+      } else {
+        const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(o.user_id, o.company_id).first();
+        if (!holding || holding.quantity < o.quantity) continue;
+        const revenue = fillPrice * o.quantity;
+        const fee = Math.floor(revenue * FEE_RATE);
+        const net = revenue - fee;
+        await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(net, o.user_id).run();
+        await db.prepare('UPDATE stock_inventory SET cash = cash - ?, stock_quantity = MIN(stock_quantity + ?, ?) WHERE company_id = ?').bind(revenue, o.quantity, comp.total_shares, o.company_id).run();
+        if (holding.quantity === o.quantity) {
+          await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(o.user_id, o.company_id).run();
+        } else {
+          await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(o.quantity, o.user_id, o.company_id).run();
+        }
+        await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(o.company_id, o.user_id, 'sell', fillPrice, o.quantity, now).run();
+        await updateKline(db, o.company_id, fillPrice, o.quantity, now, 'sell');
+        await logTransaction(db, o.user_id, 'stock_sell', net, `掛單賣出 ${o.quantity} 股 @ $${fillPrice} (限價 $${o.price})`);
+        await notify(db, o.user_id, 'limit_order', `✅ 掛單賣出「${comp.name}」成交 ${o.quantity.toLocaleString()} 股 @ $${fillPrice}（掛單價 $${o.price}）`);
+        ok = true;
+      }
+      if (ok) {
+        await db.prepare("UPDATE stock_limit_orders SET status = 'filled', filled_quantity = ?, filled_at = ? WHERE id = ?").bind(o.quantity, now, o.id).run();
+      }
+    } catch (e) {
+      console.error('matchLimitOrders error:', e.message);
     }
   }
 }

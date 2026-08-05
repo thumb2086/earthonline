@@ -4,7 +4,7 @@ import { handleBank, processBankTick } from './bank.js';
 import { handleInvestment, processInvestmentTick } from './investment.js';
 import { handleEmployee, processEmployeeTick } from './employee.js';
 import { handleCompany, processCompanyTick } from './company.js';
-import { handleStock, processMarginTick, finalizeIPO } from './stock.js';
+import { handleStock, processMarginTick, finalizeIPO, matchLimitOrders } from './stock.js';
 import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
@@ -365,6 +365,13 @@ export default {
       console.error('Scheduled wave error:', err.message);
     }
 
+    // 掛單撮合: 每分鐘執行
+    try {
+      await matchLimitOrders(db);
+    } catch (err) {
+      console.error('Scheduled limit orders error:', err.message);
+    }
+
     // 輪換 tick: 每 2 分鐘跑一次 (分鐘偶數)
     if (minute % 2 === 0) {
       try {
@@ -420,19 +427,6 @@ async function processPriceWave(db) {
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(c.id).first();
     if (!ipo || ipo.phase !== 'trading') continue;
 
-    // 自動增資 (每分鐘檢查): 庫存 < 35% 總股本 → 補足到 45%
-    const invRow = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(c.id).first();
-    if (invRow) {
-      const invMin = Math.floor(c.total_shares * 0.35);
-      if (invRow.stock_quantity < invMin) {
-        const topUp = Math.floor(c.total_shares * 0.45) - invRow.stock_quantity;
-        if (topUp > 0) {
-          await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, c.id).run();
-          await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, c.id).run();
-          await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${c.name} 庫存不足，自動增資發行 ${topUp.toLocaleString()} 股新股`, Date.now()).run();
-        }
-      }
-    }
     // 基準 = 近60分鐘均價 (最後120根5秒K線)
     const klines = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(c.id).all();
     const closes = klines.results.map(k => k.close);
@@ -482,17 +476,7 @@ async function processStockTick(db, doDividend = true) {
       await notify(db, topHolder.user_id, 'takeover', `🎉 你持股超過 50%，奪得「${company.name}」控制權，成為新 owner！`);
     }
 
-    // 自動增資 (每2分鐘檢查, 與 processPriceWave 每分鐘檢查互補): 庫存 < 35% → 補到 45%
-    const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(company.id).first();
-    const minInv = Math.floor(company.total_shares * 0.35);
-    if (inv && inv.stock_quantity < minInv) {
-      const topUp = Math.floor(company.total_shares * 0.45) - inv.stock_quantity;
-      if (topUp > 0) {
-        await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, company.id).run();
-        await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, company.id).run();
-        await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${company.name} 庫存不足，自動增資發行 ${topUp.toLocaleString()} 股新股`, Date.now()).run();
-      }
-    }
+    // 自動增資已移除: 系統庫存有限, 不再發新股稀釋現有股東 (庫存買完即停止賣出)
 
     const interval = 5000;
     const block = Math.floor(Date.now() / interval) * interval;
