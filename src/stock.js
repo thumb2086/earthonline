@@ -2,22 +2,23 @@
 import { INDUSTRY_MULT } from './company.js';
 
 const SPREAD_BASE = 0.03;
-const FEE_RATE = 0.015;
+const FEE_RATE = 0.005; // 交易手續費 0.5%/邊 (分鐘沖可跑)
 const LEVERAGE_OPTIONS = [2, 3, 5];
 const LIQUIDATION_RATE = 100;
 const MAX_TRADE_RATIO = 0.20; // max 20% of circulating per trade
 const MAX_PRICE_CHANGE_PER_MIN = 0.20; // ±20% per minute (防炒作但允許較大波動)
 
-const MAX_PRICE_IMPACT = 0.10;
+const MAX_PRICE_IMPACT = 0.05; // 影響上限 5%
 const MIN_CIRCULATING_RATIO = 0.10;
 
 function roundPrice(p) { return Math.round(p * 100) / 100; }
 
 function getPriceImpact(quantity, circulating, totalShares) {
   // 分母 = 流通 + 本筆量; 流通為 0 (庫存=總股本) 時改用總股本為基準, 避免影響歸零
+  // 曲線已調軟: 0.15 × √ratio (小單影響 ~0.5%, 大單對倒仍虧)
   const denom = (circulating > 0 ? circulating : totalShares) + quantity;
   const ratio = quantity / denom;
-  const rawImpact = Math.sqrt(ratio) * 0.5;
+  const rawImpact = Math.sqrt(ratio) * 0.15;
   return Math.min(rawImpact, MAX_PRICE_IMPACT);
 }
 
@@ -73,8 +74,8 @@ export async function handleStock(env, request, path, user) {
     const founderShares = totalShares - floatShares;
 
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(fee, user.id).run();
-    const info = await db.prepare('INSERT INTO companies (owner_id, name, industry, total_shares, share_price, base_income, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(user.id, stockName, industry, totalShares, stockPrice, stockPrice * 2, now).run();
+    const info = await db.prepare('INSERT INTO companies (owner_id, name, industry, total_shares, share_price, base_income, issue_cap, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(user.id, stockName, industry, totalShares, stockPrice, stockPrice * 2, totalShares * 2, now).run();
     const companyId = info.meta.last_row_id;
     await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at) VALUES (?, ?, ?)').bind(companyId, 'trading', now).run();
     await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, 0, ?)').bind(companyId, floatShares).run();
@@ -294,11 +295,8 @@ export async function handleStock(env, request, path, user) {
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet) return { error: '錢包不存在' };
 
-    const price = await getCurrentPrice(db, companyId);
+const price = await getCurrentPrice(db, companyId);
     const buyPrice = Math.round(price);
-    const totalCost = buyPrice * quantity;
-    const fee = Math.floor(totalCost * FEE_RATE);
-    if (wallet.cash < totalCost + fee) return { error: `餘額不足` };
 
     // 影響基於近1分鐘累計買入量: 分次買與一次買效果一致 (防拆單套利)
     const oneMinAgo = Date.now() - 60000;
@@ -316,6 +314,11 @@ export async function handleStock(env, request, path, user) {
       newPrice = Math.max(minPrice, Math.min(maxPrice, newPrice));
     }
 
+    // 影響價結算: 以影響後價格計價 (大買不再白嫖價格波動)
+    const totalCost = newPrice * quantity;
+    const fee = Math.floor(totalCost * FEE_RATE);
+    if (wallet.cash < totalCost + fee) return { error: `餘額不足` };
+
     const now = Date.now();
 
     await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost + fee, user.id).run();
@@ -332,7 +335,7 @@ export async function handleStock(env, request, path, user) {
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'buy', newPrice, quantity, now).run();
     await updateKline(db, companyId, newPrice, quantity, now, 'buy');
     await logTransaction(db, user.id, 'stock_buy', -(totalCost + fee), `買入 ${quantity} 股 @ $${newPrice}`);
-    return { success: true, price: newPrice, fillPrice: buyPrice, afterPrice: newPrice, quantity, totalCost: totalCost + fee, limitHit: false };
+    return { success: true, price: newPrice, fillPrice: newPrice, afterPrice: newPrice, quantity, totalCost: totalCost + fee, limitHit: false };
   }
 
   if (path === '/api/stock/sell') {
@@ -354,9 +357,6 @@ export async function handleStock(env, request, path, user) {
 
     const price = await getCurrentPrice(db, companyId);
     const sellPrice = Math.round(price);
-    const totalRevenue = sellPrice * quantity;
-    const fee = Math.floor(totalRevenue * FEE_RATE);
-    const netRevenue = totalRevenue - fee;
 
     // 影響基於近1分鐘累計賣出量 (防拆單套利, 與買入對稱)
     const oneMinAgo = Date.now() - 60000;
@@ -372,6 +372,10 @@ export async function handleStock(env, request, path, user) {
       if (newPrice < minP) return { error: '⚠️ 已達跌停板，交易暫停，1分鐘後恢復' };
       newPrice = Math.max(minP, Math.min(maxP, newPrice));
     }
+    // 影響價結算: 以影響後價格計價 (大賣不再白嫖價格波動)
+    const totalRevenue = newPrice * quantity;
+    const fee = Math.floor(totalRevenue * FEE_RATE);
+    const netRevenue = totalRevenue - fee;
     const now = Date.now();
 
     // 賣出: 庫存增加但上限 = total_shares (超過部分視為系統銷毀, 維持 庫存+持股 = total 恆等式)
@@ -391,7 +395,7 @@ export async function handleStock(env, request, path, user) {
     await logTransaction(db, user.id, 'stock_sell', netRevenue, `賣出 ${quantity} 股 @ $${newPrice}`);
     // 賣出後公司已無任何股東 → 移交系統管理 (不留在最後一個持有人手上)
     await maybeSystemTakeover(db, companyId);
-    return { success: true, price: newPrice, fillPrice: sellPrice, afterPrice: newPrice, quantity, netRevenue, limitHit };
+    return { success: true, price: newPrice, fillPrice: newPrice, afterPrice: newPrice, quantity, netRevenue, limitHit };
   }
 
   // ===== 掛單交易 (自動條件交易) =====
@@ -506,15 +510,10 @@ export async function handleStock(env, request, path, user) {
     const circulating = companyData.total_shares - inv.stock_quantity;
 
     const price = await getCurrentPrice(db, companyId);
-    const totalValue = price * quantity;
-    const marginAmount = Math.floor(totalValue / leverage);
-    const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
-    if (!wallet || wallet.cash < marginAmount) return { error: '保證金不足' };
-
-    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(marginAmount, user.id).run();
 
     const impact = getPriceImpact(quantity, circulating, companyData.total_shares);
     const now = Date.now();
+    // 影響價結算: 以影響後價作為建倉價 (做多較貴/做空收回較少)
     let newPrice = Math.round(price * (1 + (type === 'long' ? impact : -impact)));
     const oneMinAgo = now - 60000;
     const recentTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
@@ -529,6 +528,13 @@ export async function handleStock(env, request, path, user) {
     if (quantity > Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO))) {
       return { error: `單筆交易上限 ${Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO)).toLocaleString()} 股` };
     }
+
+    // 依影響後價計算倉位價值與保證金 (先檢查後扣款)
+    const totalValue = newPrice * quantity;
+    const marginAmount = Math.floor(totalValue / leverage);
+    const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
+    if (!wallet || wallet.cash < marginAmount) return { error: '保證金不足' };
+    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(marginAmount, user.id).run();
 
     if (type === 'long') {
       if (!inv || inv.stock_quantity < quantity) return { error: '系統庫存不足' };

@@ -419,13 +419,28 @@ export { DiscordGateway };
 
 // 輕量價格波動: 每分鐘 ±0.5% + 回歸力(基準=近60分鐘移動平均, 純波動被抑制但買賣趨勢不被拉回)
 async function processPriceWave(db) {
-  const companies = await db.prepare('SELECT id, share_price FROM companies').all();
+  const companies = await db.prepare('SELECT id, share_price, total_shares, issue_cap FROM companies').all();
   const now = Date.now();
   const interval = 5000;
   const block = Math.floor(now / interval) * interval;
   for (const c of companies.results) {
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(c.id).first();
     if (!ipo || ipo.phase !== 'trading') continue;
+
+    // 有上限溫和回補: 庫存 < 10% → 補到 20%, 總股本不得超過 issue_cap (稀釋有硬頂)
+    const invRow = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(c.id).first();
+    const issueCap = c.issue_cap || (c.total_shares * 2);
+    if (invRow) {
+      const floor = Math.floor(c.total_shares * 0.1);
+      if (invRow.stock_quantity < floor && c.total_shares < issueCap) {
+        const topUp = Math.min(Math.floor(c.total_shares * 0.2) - invRow.stock_quantity, issueCap - c.total_shares);
+        if (topUp > 0) {
+          await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, c.id).run();
+          await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, c.id).run();
+          await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${c.name} 庫存不足，系統限量回補 ${topUp.toLocaleString()} 股（發行上限內）`, Date.now()).run();
+        }
+      }
+    }
 
     // 基準 = 近60分鐘均價 (最後120根5秒K線)
     const klines = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(c.id).all();

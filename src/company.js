@@ -28,7 +28,7 @@ export async function handleCompany(env, request, path, user) {
     if (!wallet || wallet.cash < 200000) return { error: '需要 $200,000' };
 
     await db.prepare('UPDATE wallets SET cash = cash - 200000 WHERE user_id = ?').bind(user.id).run();
-    const info = await db.prepare('INSERT INTO companies (owner_id, name, industry, total_shares, share_price, base_income, created_at) VALUES (?, ?, ?, 100000, 10, ?, ?)').bind(user.id, name, industry, 40, Date.now()).run();
+    const info = await db.prepare('INSERT INTO companies (owner_id, name, industry, total_shares, share_price, base_income, issue_cap, created_at) VALUES (?, ?, ?, 100000, 10, ?, 200000, ?)').bind(user.id, name, industry, 40, Date.now()).run();
     await logTransaction(db, user.id, 'company_create', -200000, `創建公司「${name}」`);
     return { success: true, id: info.meta.last_row_id };
   }
@@ -126,6 +126,9 @@ export async function handleCompany(env, request, path, user) {
     const marketPrice = company.share_price || 10;
     const maxShares = Math.max(1, Math.floor(company.total_shares * 0.05));
     if (shares > maxShares) return { error: `單次增資上限 ${maxShares.toLocaleString()} 股（總股本 5%）` };
+    // 發行上限: 總股本不得超過 issue_cap (回補與增資共用額度)
+    const cap = company.issue_cap || (company.total_shares * 2);
+    if (company.total_shares + shares > cap) return { error: `已達發行上限 ${cap.toLocaleString()} 股，無法再增資` };
     const pricePerShare = Math.max(1, Math.min(parseInt(price) || marketPrice, marketPrice));
     const revenue = shares * pricePerShare;
     // 新股進入庫存 (系統持有, 玩家可買)
@@ -154,7 +157,7 @@ export async function handleCompany(env, request, path, user) {
     // 創辦人保留比例 (IPO發行比例 = 1 - founderRatio)
     const founderKeep = Math.min(Math.max(parseFloat(founderRatio) || 0.6, 0), 0.9);
 
-    await db.prepare('UPDATE companies SET total_shares = ?, share_price = ? WHERE id = ?').bind(totalShares, ipoPrice, companyId).run();
+    await db.prepare('UPDATE companies SET total_shares = ?, share_price = ?, issue_cap = ? WHERE id = ?').bind(totalShares, ipoPrice, totalShares * 2, companyId).run();
     const ipoShares = Math.floor(totalShares * (1 - founderKeep));
     await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'ipo', Date.now(), minutes).run();
     await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, 0, ?)').bind(companyId, ipoShares).run();
@@ -256,6 +259,42 @@ export async function handleCompany(env, request, path, user) {
     await db.prepare('DELETE FROM ipo_state WHERE company_id = ?').bind(companyId).run();
     await logTransaction(db, user.id, 'company_delist', payout, `「${company.name}」下市${payout > 0 ? `，持股兌現 $${payout.toLocaleString()}` : ''}${boughtBack > 0 ? `，強制收購 ${boughtBack.toLocaleString()} 股` : ''}`);
     return { success: true, payout, boughtBack };
+  }
+
+  // 拆分股票: owner 限定, ×2/×5/×10, 費用 $50,000, 24h 冷卻
+  if (path === '/api/company/split') {
+    const { companyId, ratio } = await request.json();
+    const n = parseInt(ratio);
+    if (!companyId || ![2, 5, 10].includes(n)) return { error: '拆分倍率需為 ×2 / ×5 / ×10' };
+    const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
+    if (!company) return { error: '公司不存在' };
+    const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
+    if (!ipo || ipo.phase !== 'trading') return { error: '僅上市交易中可拆分' };
+    const marginCount = await db.prepare('SELECT COUNT(*) as cnt FROM margin_positions WHERE company_id = ?').bind(companyId).first();
+    if ((marginCount?.cnt || 0) > 0) return { error: '該公司有槓桿持倉，無法拆分' };
+    const cooldownMs = 24 * 3600000;
+    if (company.last_split_at && Date.now() - company.last_split_at < cooldownMs) {
+      const remain = Math.ceil((cooldownMs - (Date.now() - company.last_split_at)) / 3600000);
+      return { error: `拆分冷卻中，還需 ${remain} 小時` };
+    }
+    const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
+    if (!wallet || wallet.cash < 50000) return { error: '拆分需要 $50,000' };
+
+    // 全部原子更新 (市值不變: 股本×N, 股價÷N)
+    const newPrice = Math.max(1, Math.round((company.share_price || 100) / n));
+    await db.prepare('UPDATE wallets SET cash = cash - 50000 WHERE user_id = ?').bind(user.id).run();
+    await db.prepare('UPDATE companies SET total_shares = total_shares * ?, share_price = ?, issue_cap = issue_cap * ?, last_split_at = ? WHERE id = ?')
+      .bind(n, newPrice, n, Date.now(), companyId).run();
+    await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity * ? WHERE company_id = ?').bind(n, companyId).run();
+    await db.prepare('UPDATE stock_holdings SET quantity = quantity * ? WHERE company_id = ?').bind(n, companyId).run();
+    // 歷史成交與K線: 價÷N、量×N (avgCost/損益與走勢圖自動正確)
+    await db.prepare('UPDATE stock_trades SET price = MAX(1, ROUND(price / ?)), quantity = quantity * ? WHERE company_id = ?').bind(n, n, companyId).run();
+    await db.prepare('UPDATE stock_klines SET open = MAX(1, ROUND(open / ?)), high = MAX(1, ROUND(high / ?)), low = MAX(1, ROUND(low / ?)), close = MAX(1, ROUND(close / ?)), volume = volume * ?, buy_volume = buy_volume * ?, sell_volume = sell_volume * ? WHERE company_id = ?').bind(n, n, n, n, n, n, n, companyId).run();
+    // 取消該公司所有掛單 (避免殘價混亂)
+    await db.prepare("UPDATE stock_limit_orders SET status = 'cancelled' WHERE company_id = ? AND status = 'open'").bind(companyId).run();
+    await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${company.name} 進行 ${n}:1 股票拆分！股價 $${company.share_price} → $${newPrice}，持股自動 ×${n}`, Date.now()).run();
+    await logTransaction(db, user.id, 'company_split', -50000, `${company.name} 拆分 ${n}:1（股價 $${newPrice}）`);
+    return { success: true, ratio: n, newPrice, message: `${company.name} 已 ${n}:1 拆分，持股自動 ×${n}` };
   }
 
   if (path === '/api/company/liquidate') {

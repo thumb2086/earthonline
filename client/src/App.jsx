@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import LoginGateway from './components/LoginGateway'
 import Watermark from './components/Watermark'
 import { useToast } from './components/Toast.jsx'
@@ -437,13 +437,21 @@ function Company({ api, toast, prompt, promptMulti }) {
     const r = await api('/api/company/create', { name, industry: ind })
     if (r.success) { refresh(); toast('公司創建成功', 'success') } else toast(r.error, 'error')
   })
-  const diluteCompany = (c) => promptMulti(`增資 ${c.name}（單次上限總股本5%，價格不得高於市價）`, [
+  const diluteCompany = (c) => {
+    const remaining = Math.max(0, ((c.issue_cap || (c.total_shares || 0) * 2) - (c.total_shares || 0)))
+    promptMulti(`增資 ${c.name}（單次上限總股本5%，價格不得高於市價，剩餘發行額度 ${remaining.toLocaleString()} 股）`, [
     { label: '發行股數 (≤' + (Math.max(1, Math.floor((c.total_shares || 100000) * 0.05))).toLocaleString() + ')', placeholder: '例: 1000', default: '' },
     { label: '發行價格 (≤市價 $' + (c.share_price || 10) + ')', placeholder: `${c.share_price || 10}`, default: '' },
   ], async ([shares, price]) => {
     const qty = parseInt(shares); if (!qty || qty <= 0) return toast('請輸入股數', 'error')
     const r = await api('/api/company/dilute', { companyId: c.id, shares: qty, price: parseInt(price) })
     if (r.success) { toast(`增資 ${qty} 股 @ $${r.pricePerShare}，獲得 $${r.revenue.toLocaleString()}`, 'success'); refresh() } else toast(r.error, 'error')
+  })
+}
+const splitCompany = (c) => prompt(`拆分「${c.name}」？(股價÷N、持股自動×N、市值不變；費用 $50,000、24h 冷卻) 輸入 2/5/10`, async (v) => {
+    const n = parseInt(v); if (![2, 5, 10].includes(n)) return toast('請輸入 2 / 5 / 10', 'error')
+    const r = await api('/api/company/split', { companyId: c.id, ratio: n })
+    if (r.success) { refresh(); toast(r.message || '拆分成功', 'success') } else toast(r.error, 'error')
   })
   const buyout = (c) => prompt(`收購 ${c.name}（$2${c.buyoutPrice.toLocaleString()}？）`, async (s) => {
     const r = await api('/api/company/buyout', { companyId: c.id })
@@ -520,6 +528,7 @@ function Company({ api, toast, prompt, promptMulti }) {
           {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => diluteCompany(c)}>＋ 增資</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => forceBuy(c)}>💼 強制收購</button>}
+          {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => splitCompany(c)}>✂️ 拆分</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => delist(c)}>📉 下市</button>}
           <button className="btn btn-sm btn-danger" onClick={() => liquidate(c)}>🗑️ 清算</button>
         </div>
@@ -790,7 +799,7 @@ function Stock({ api, toast, prompt, user }) {
   const buy = async () => {
     const fresh = await api('/api/stock/quote?companyId=' + selectedStock)
     if (fresh?.price) setQ(fresh)
-    prompt(`買入股數 (手續費1.5%另計 · 單筆上限 ${(q?.maxTrade || 0).toLocaleString()} 股)`, async (n) => {
+    prompt(`買入股數 (手續費0.5%另計 · 單筆上限 ${(q?.maxTrade || 0).toLocaleString()} 股)`, async (n) => {
       const qty = parseInt(n); if (!qty || qty <= 0) return
       const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: qty })
       if (r.success) { refreshStock(); markLimit(r, 'up'); toast(`買入 ${qty} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (含手續費 $${(r.totalCost - (r.fillPrice * qty)).toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
@@ -799,13 +808,16 @@ function Stock({ api, toast, prompt, user }) {
       if (qty <= 0) return ''
       const live = await api('/api/stock/quote?companyId=' + selectedStock).catch(() => null)
       const cur = live?.price || q?.price || 0
-      return `市價 $${cur} → 預估總額：$${(cur * qty).toLocaleString()} + 手續費 $${Math.round(cur * qty * 0.015).toLocaleString()} = $${Math.round(cur * qty * 1.015).toLocaleString()}`
+      const ratio = qty / ((q?.circulating || 0) + qty)
+      const imp = Math.min(Math.sqrt(ratio) * 0.15, 0.05)
+      const afterP = Math.round(cur * (1 + imp))
+      return `市價 $${cur} → 影響約 +${(imp * 100).toFixed(1)}% → 成交價約 $${afterP}；預估總額：$${(afterP * qty).toLocaleString()} + 手續費 $${Math.round(afterP * qty * 0.005).toLocaleString()}`
     })
   }
   const sell = async () => {
     const fresh = await api('/api/stock/quote?companyId=' + selectedStock)
     if (fresh?.price) setQ(fresh)
-    prompt(`賣出股數 (手續費1.5%另計 · 大單滑點 · 單筆上限 ${(q?.maxTrade || 0).toLocaleString()} 股)`, async (n) => {
+    prompt(`賣出股數 (手續費0.5%另計 · 大單滑點 · 單筆上限 ${(q?.maxTrade || 0).toLocaleString()} 股)`, async (n) => {
       const qty = parseInt(n); if (!qty || qty <= 0) return
       const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: qty })
       if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${qty} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
@@ -814,14 +826,17 @@ function Stock({ api, toast, prompt, user }) {
       if (qty <= 0) return ''
       const live = await api('/api/stock/quote?companyId=' + selectedStock).catch(() => null)
       const cur = live?.price || q?.price || 0
-      return `市價 $${cur} → 預估實收：$${Math.round(cur * qty * 0.985).toLocaleString()}（扣手續費，大單另有滑點）`
+      const ratio = qty / ((q?.circulating || 0) + qty)
+      const imp = Math.min(Math.sqrt(ratio) * 0.15, 0.05)
+      const afterP = Math.max(1, Math.round(cur * (1 - imp)))
+      return `市價 $${cur} → 影響約 -${(imp * 100).toFixed(1)}% → 成交價約 $${afterP}；預估實收：$${Math.round(afterP * qty * 0.995).toLocaleString()}（扣手續費）`
     })
   }
   const maxBuy = async () => {
     // 全部買入 = 用所有現金買最多股 (含手續費, 受單筆上限限制)
     const price = q?.price || 0
     if (price <= 0) return
-    const maxByCash = Math.floor((user?.cash || 0) / (price * 1.015))
+    const maxByCash = Math.floor((user?.cash || 0) / (price * 1.005))
     const maxByInv = Math.max(0, (q?.systemInventory || 0) - (q?.minInventory || 0))
     const n = Math.max(0, Math.min(maxByCash, maxByInv))
     if (n <= 0) return toast('現金或庫存不足', 'error')
@@ -926,7 +941,7 @@ function Stock({ api, toast, prompt, user }) {
             {q.limit === 'up' && <span style={{fontSize:11, marginLeft:8, color:'#ef4444', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.5)', padding:'2px 8px', borderRadius:99, fontWeight:700}}>⚠️ 漲停</span>}
             {q.limit === 'down' && <span style={{fontSize:11, marginLeft:8, color:'#00ff41', background:'rgba(0,255,65,0.12)', border:'1px solid rgba(0,255,65,0.5)', padding:'2px 8px', borderRadius:99, fontWeight:700}}>⚠️ 跌停</span>}
           </span></div>
-            <div className="stat"><span className="stat-label">手續費</span><span className="stat-value">1.5%</span></div>
+            <div className="stat"><span className="stat-label">手續費</span><span className="stat-value">0.5%</span></div>
             <div className="stat"><span className="stat-label">流通</span><span className="stat-value">{(q.circulating||0).toLocaleString()}</span></div></div>
           <div><div className="stat"><span className="stat-label">庫存</span><span className="stat-value">{(q.systemInventory||0).toLocaleString()}</span></div>
             <div className="stat"><span className="stat-label">可買量</span><span className="stat-value">{(Math.max(0,(q.systemInventory||0)-(q.minInventory||0))).toLocaleString()}</span></div>
@@ -1078,7 +1093,7 @@ function Stock({ api, toast, prompt, user }) {
         {(myTrades || []).length === 0 && <div className="text-dim">暫無交易</div>}
         {(myTrades || []).slice(0,20).map(x => {
           const gross = x.price * x.quantity
-          const fee = Math.floor(gross * 0.015)
+          const fee = Math.floor(gross * 0.005)
           const amount = x.type === 'buy' ? -(gross + fee) : (gross - fee)
           return (
             <div className="stat" key={x.id}>
@@ -1491,7 +1506,7 @@ function Help() {
     ]},
     { title: '📈 股票', items: [
       '系統做市商：買入向系統買，賣出賣回系統',
-      '成交價 = 市場價（無價差），手續費 1.5% 另計',
+      '成交價 = 市場價（無價差），手續費 0.5% 另計',
       '大單影響價格：買1股約影響 0.8%，大量買賣影響可達 10% 上限',
       '單筆上限 = 流通量 5%（全部買入按鈕可突破）',
       '槓桿：做多/做空 2x/3x/5x，維持率 130% 追繳，100% 強制平倉',
