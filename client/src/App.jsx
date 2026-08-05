@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import LoginGateway from './components/LoginGateway'
+import Watermark from './components/Watermark'
 import { useToast } from './components/Toast.jsx'
 
 export default function App() {
@@ -52,7 +53,7 @@ export default function App() {
   const handleLogin = (t) => { localStorage.setItem('eo_token', t); setToken(t) }
   const logout = () => { localStorage.removeItem('eo_token'); setToken(null); setUser(null) }
 
-  if (!token) return <LoginGateway onLogin={handleLogin} />
+  if (!token) return <><LoginGateway onLogin={handleLogin} /><Watermark /></>
 
   const tabs = [
     { id: 'dashboard', label: '📊 儀表板' },
@@ -126,6 +127,7 @@ export default function App() {
           {view === 'admin' && <AdminPanel api={api} />}
         </div>
       </div>
+      <Watermark />
     </div>
   )
 }
