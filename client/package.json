@@ -6,6 +6,10 @@
   "main": "electron/main.cjs",
   "author": "Earth Online",
   "description": "全球節點觀測與管理中心 — 地球在線 Earth Online 電腦版",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thumb2086/earthonline.git"
+  },
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently \"vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development electron .\"",
