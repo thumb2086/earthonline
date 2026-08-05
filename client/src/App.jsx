@@ -951,18 +951,19 @@ function Stock({ api, toast, prompt, user }) {
     })
   }
   const maxBuy = async () => {
-    // 全部買入 = 用所有現金買最多股 (含手續費, 受單筆上限限制)
+    // 全部買入 = 買到單筆上限 (受現金/庫存/單筆上限三者限制)
     const price = q?.price || 0
     if (price <= 0) return
     const maxByCash = Math.floor((user?.cash || 0) / (price * 1.005))
     const maxByInv = Math.max(0, (q?.systemInventory || 0) - (q?.minInventory || 0))
-    const n = Math.max(0, Math.min(maxByCash, maxByInv))
+    const cap = q?.maxTrade || 0
+    const n = Math.max(0, Math.min(maxByCash, maxByInv, cap))
     if (n <= 0) return toast('現金或庫存不足', 'error')
-    toast(`全部買入 ${n} 股`, 'info')
+    toast(`買入 ${n.toLocaleString()} 股（單筆上限 ${cap.toLocaleString()} 股）`, 'info')
     const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true })
     if (r.success) { refreshStock(); markLimit(r, 'up'); toast(`買入 ${n} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (含手續費 $${(r.totalCost - (r.fillPrice * n)).toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
   }
-  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const n = held?.quantity || 0; if (n <= 0) return; const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${n} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
+  const maxSell = async () => { const held = h.find(x => x.company_id === selectedStock); const cap = q?.maxTrade || 0; const n = Math.min(held?.quantity || 0, cap); if (n <= 0) return; toast(`賣出 ${n.toLocaleString()} 股（單筆上限 ${cap.toLocaleString()} 股）`, 'info'); const r = await api('/api/stock/sell', { companyId: selectedStock, quantity: n, force: true }); if (r.success) { refreshStock(); markLimit(r, 'down'); toast(`賣出 ${n} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (實收 $${r.netRevenue.toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error') }
   const subIpo = () => prompt('認購股數', async (s) => { const r = await api('/api/stock/ipo/subscribe', { companyId: selectedStock, shares: parseInt(s) }); if (r.success) { toast(`認購 ${s} 股成功`, 'success'); refreshStock() } else toast(r.error, 'error') })
   const registerStock = () => promptMulti('自訂加股 ($200,000) 立即上市', [
     { label: '股票名稱 (2~20字)', placeholder: '例: 天網科技', default: '' },

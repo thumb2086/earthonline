@@ -11,6 +11,13 @@ const MAX_PRICE_CHANGE_PER_MIN = 0.20; // ±20% per minute (防炒作但允許�
 const MAX_PRICE_IMPACT = 0.05; // 影響上限 5%
 const MIN_CIRCULATING_RATIO = 0.10;
 
+// 單筆上限 = 可交易供應量 (流通 + 系統可賣庫存) 的 20%
+// 系統 100% 持股時流通=0 若只用流通量會鎖死市場, 故納入系統庫存
+function getMaxTrade(circulating, inventory, minInventory) {
+  const available = circulating + Math.max(0, (inventory || 0) - (minInventory || 0));
+  return Math.max(1, Math.floor(available * MAX_TRADE_RATIO));
+}
+
 function roundPrice(p) { return Math.round(p * 100) / 100; }
 
 function getPriceImpact(quantity, circulating, totalShares) {
@@ -92,7 +99,7 @@ export async function handleStock(env, request, path, user) {
     const inv = await db.prepare('SELECT cash, stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
     const company = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
     const circulating = (company?.total_shares || 1000000) - (inv?.stock_quantity || 0);
-    const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
+    const maxTrade = getMaxTrade(circulating, inv?.stock_quantity || 0, Math.floor((company?.total_shares || 0) * 0.03));
     // 漲跌停狀態: 以近1分鐘第一筆成交為基準, 目前價貼住 ±20% 邊界即為漲/跌停
     let limit = null;
     const refTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, Date.now() - 60000).first();
@@ -255,9 +262,9 @@ export async function handleStock(env, request, path, user) {
     // 庫存不足: 不再自動增資發新股稀釋股東, 直接拒絕
     if (inv.stock_quantity < quantity) return { error: `系統庫存不足（僅剩 ${inv.stock_quantity.toLocaleString()} 股）` };
 
-    // 交易上限: 單筆最多 20% 流通量
+    // 交易上限: 單筆最多 20% 可交易供應量
     const circulating = companyData.total_shares - inv.stock_quantity;
-    const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
+    const maxTrade = getMaxTrade(circulating, inv.stock_quantity, Math.floor(companyData.total_shares * 0.03));
     if (quantity > maxTrade) return { error: `單筆交易上限 ${maxTrade.toLocaleString()} 股（流通量的 ${(MAX_TRADE_RATIO * 100).toFixed(0)}%），本次 ${quantity.toLocaleString()} 股超出限制` };
 
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
@@ -319,9 +326,9 @@ const price = await getCurrentPrice(db, companyId);
     const companyS = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
     const circulatingS = companyS.total_shares - inv.stock_quantity;
 
-    // 交易上限: 單筆最多 20% 流通量
-    const maxTradeS = Math.max(1, Math.floor(circulatingS * MAX_TRADE_RATIO));
-    if (quantity > maxTradeS) return { error: `單筆交易上限 ${maxTradeS.toLocaleString()} 股（流通量的 ${(MAX_TRADE_RATIO * 100).toFixed(0)}%），本次 ${quantity.toLocaleString()} 股超出限制` };
+    // 交易上限: 單筆最多 20% 可交易供應量
+    const maxTradeS = getMaxTrade(circulatingS, inv.stock_quantity, Math.floor(companyS.total_shares * 0.03));
+    if (quantity > maxTradeS) return { error: `單筆交易上限 ${maxTradeS.toLocaleString()} 股（可交易供應量的 ${(MAX_TRADE_RATIO * 100).toFixed(0)}%），本次 ${quantity.toLocaleString()} 股超出限制` };
 
     const price = await getCurrentPrice(db, companyId);
     const sellPrice = Math.round(price);
@@ -492,9 +499,10 @@ const price = await getCurrentPrice(db, companyId);
       if (newPrice < minP) return { error: '⚠️ 已達跌停板，交易暫停，1分鐘後恢復' };
       newPrice = Math.max(minP, Math.min(maxP, newPrice));
     }
-    // 交易上限: 單筆最多 20% 流通量
-    if (quantity > Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO))) {
-      return { error: `單筆交易上限 ${Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO)).toLocaleString()} 股` };
+    // 交易上限: 單筆最多 20% 可交易供應量
+    const maxTradeM = getMaxTrade(circulating, inv?.stock_quantity || 0, Math.floor(companyData.total_shares * 0.03));
+    if (quantity > maxTradeM) {
+      return { error: `單筆交易上限 ${maxTradeM.toLocaleString()} 股` };
     }
 
     // 依影響後價計算倉位價值與保證金 (先檢查後扣款)
@@ -712,7 +720,7 @@ export async function matchLimitOrders(db) {
       const comp = await db.prepare('SELECT total_shares, name FROM companies WHERE id = ?').bind(o.company_id).first();
       if (!inv || !comp) continue;
       const circulating = comp.total_shares - inv.stock_quantity;
-      const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
+      const maxTrade = getMaxTrade(circulating, inv.stock_quantity, Math.floor(comp.total_shares * 0.03));
       if (o.quantity > maxTrade) continue;
       const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(o.user_id).first();
       if (!wallet) continue;
