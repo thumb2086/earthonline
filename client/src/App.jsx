@@ -742,6 +742,7 @@ function Stock({ api, toast, prompt, user }) {
   const [chartTimeframe, setChartTimeframe] = useState('realtime')
   const [limitInfo, setLimitInfo] = useState(null)
   const [orders, setOrders] = useState([])
+  const [report, setReport] = useState(null)
   const [ordType, setOrdType] = useState('buy')
   const [ordPrice, setOrdPrice] = useState('')
   const [ordQty, setOrdQty] = useState('')
@@ -812,6 +813,7 @@ function Stock({ api, toast, prompt, user }) {
 
   const refreshStock = () => {
     api('/api/stock/quote?companyId=' + selectedStock).then(setQ);
+    api('/api/stock/report?companyId=' + selectedStock).then(d => { if (d && !d.error) setReport(d) }).catch(() => {});
     api('/api/stock/index').then(d => { if (d) setIndexData(d) }).catch(()=>{});
     api('/api/etf/list').then(d => setEtfs(Array.isArray(d) ? d : []));
     api('/api/futures/list').then(d => { if (d) setFutData(d) }).catch(() => {});
@@ -1007,6 +1009,40 @@ function Stock({ api, toast, prompt, user }) {
           </div>
         )}
         <KLineChart api={api} timeframe={chartTimeframe} companyId={selectedStock} />
+      </div>}
+      {report && <div className="card mb-12">
+        <div className="card-title">📋 財報與基本面分析 — {report.name}</div>
+        {report.rating && <span style={{display:'inline-block', marginLeft:8, padding:'2px 10px', borderRadius:99, fontSize:12, fontWeight:700, color:'#fff', background: report.rating === 'S' ? '#dc2626' : report.rating === 'A' ? '#ea580c' : report.rating === 'B' ? '#ca8a04' : report.rating === 'C' ? '#64748b' : '#1d4ed8'}}>{report.rating} · {report.ratingLabel}</span>}
+        <div className="grid-2 mt-12">
+          <div><div className="stat"><span className="stat-label">收入</span><span className="stat-value">${(report.incomeRate || 0).toLocaleString()}/分</span></div>
+            <div className="stat"><span className="stat-label">成本</span><span className="stat-value">${(report.costRate || 0).toLocaleString()}/分</span></div>
+            <div className="stat"><span className="stat-label">淨利潤</span><span className="stat-value" style={{color: report.profitRate >= 0 ? 'var(--accent)' : 'var(--danger)'}}>${(report.profitRate || 0).toLocaleString()}/分</span></div></div>
+          <div><div className="stat"><span className="stat-label">本益比(日)</span><span className="stat-value">{report.pe !== null && report.pe !== undefined ? report.pe.toFixed(1) : '虧損'}</span></div>
+            <div className="stat"><span className="stat-label">每股日盈餘</span><span className="stat-value">${report.epsDay ? report.epsDay.toFixed(2) : '0.00'}</span></div>
+            <div className="stat"><span className="stat-label">獲利率</span><span className="stat-value">{report.margin === -1 ? '虧損' : (report.margin * 100).toFixed(1) + '%'}</span></div></div>
+        </div>
+        <div className="flex gap-8 flex-wrap mt-12">
+          <span className="text-dim text-sm">市值 <strong style={{color:'var(--text2)'}}>${report.marketCap ? report.marketCap.toLocaleString() : 0}</strong></span>
+          <span className="text-dim text-sm">流通市值 <strong style={{color:'var(--text2)'}}>${report.floatCap ? report.floatCap.toLocaleString() : 0}</strong></span>
+          <span className="text-dim text-sm">庫存市值 <strong style={{color:'var(--text2)'}}>${report.inventoryValue ? report.inventoryValue.toLocaleString() : 0}</strong></span>
+          <span className="text-dim text-sm">日殖利率 <strong style={{color: report.yieldPctDaily > 0.002 ? 'var(--accent)' : 'var(--text2)'}}>{(report.yieldPctDaily * 100).toFixed(2)}%</strong></span>
+          <span className="text-dim text-sm">24h獲利成長 <strong style={{color: report.growthPct >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{report.growthPct !== null && report.growthPct !== undefined ? (report.growthPct >= 0 ? '+' : '') + (report.growthPct * 100).toFixed(1) + '%' : '—'}</strong></span>
+          <span className="text-dim text-sm">現價 vs 60分均線 <strong style={{color: report.trend === 'up' ? 'var(--danger)' : 'var(--accent)'}}>{report.trend === 'up' ? '▲強勢' : '▼弱勢'}</strong>（${report.ma60 ? Math.round(report.ma60) : '—'}）</span>
+          <span className="text-dim text-sm">24h成交量 <strong style={{color:'var(--text2)'}}>{(report.volume24h || 0).toLocaleString()}</strong></span>
+        </div>
+        {report.analysis && <div className="text-sm mt-12" style={{color:'var(--text2)', lineHeight:1.8, background:'rgba(255,255,255,0.03)', padding:'10px 14px', borderRadius:8}}>🔍 {report.analysis}</div>}
+        {report.history?.length > 1 && <>
+          <div className="divider" />
+          <div className="text-sm text-accent" style={{fontWeight:600, marginBottom:6}}>歷史財報（每小時）</div>
+          {report.history.slice(0, 8).map((h, i) => (
+            <div className="stat" key={i}>
+              <span className="text-dim text-sm">{(h.periodStart ? new Date(h.periodStart).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—')}</span>
+              <span className="text-dim text-sm">收入 ${h.incomeRate.toLocaleString()}/分</span>
+              <span className="text-dim text-sm">淨利潤 <span style={{color: h.profitRate >= 0 ? 'var(--accent)' : 'var(--danger)'}}>${h.profitRate.toLocaleString()}</span></span>
+              <span className="text-dim text-sm">收盤 $${h.price}</span>
+            </div>
+          ))}
+        </>}
       </div>}
       {ipo?.phase !== 'ipo' && <div className="card mb-12">
         <div className="card-title">📋 掛單交易（自動條件交易）</div>
@@ -1583,6 +1619,7 @@ function Help() {
       '槓桿：做多/做空 2x/3x/5x，維持率 115% 追繳，100% 強制平倉',
       '公司 owner 可：增資（單次上限總股本5%，價格≤市價，受發行上限約束）、強制收購（市價×1.2）、下市（自動強制收購）、拆分（×2/×5/×10，$50,000，24h冷卻）、清算',
       '發行上限：總股本最多長到發行量 × 2（系統限量回補庫存，不再無限增資稀釋股東）',
+      '財報與基本面：每家公司有即時財報（收入/成本/淨利潤/本益比/殖利率/市值/成長率/60分均線），系統自動給出 S~E 評價與分析文字，並保留每小時歷史財報',
     ]},
     { title: '📦 ETF（封閉式）', items: [
       '追蹤大盤指數：單位價 = 指數 × $0.01（指數 1000 → $10）',
@@ -1600,6 +1637,7 @@ function Help() {
       '玩家公司 IPO 募集資金歸 owner；系統公司 IPO 資金銷毀（回收經濟）',
       '認購滿 30% 立即上市；未滿等期限到期自動上市',
       '上市後認購的股票入帳到持股，剩餘留系統庫存',
+      '🔔 IPO 啟動與結束都會全體廣播（系統公告 + 每位玩家通知）',
     ]},
     { title: '🏠 生活費 & 📦 訂閱', items: [
       '生活費：每分收入越高扣越多（10~25%），現金為 0 不懲罰',

@@ -9,6 +9,7 @@ import { handleEtf, etfTick } from './etf.js';
 import { handleFutures, settleFutures } from './futures.js';
 import { adjustInterestRates } from './rates.js';
 import { postV2Announcement, maybeResetGame } from './reset.js';
+import { snapshotCompanyReports } from './reports.js';
 import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
@@ -392,6 +393,15 @@ export default {
         await adjustInterestRates(db);
       } catch (err) {
         console.error('Scheduled rate decision error:', err.message);
+      }
+    }
+
+    // 財報快照: 每小時 (基本面分析資料源)
+    if (minute % 60 === 0) {
+      try {
+        await snapshotCompanyReports(db);
+      } catch (err) {
+        console.error('Scheduled report snapshot error:', err.message);
       }
     }
 

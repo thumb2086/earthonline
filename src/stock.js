@@ -1,5 +1,6 @@
-﻿import { logTransaction, notify, maybeSystemTakeover } from './utils.js';
+﻿import { logTransaction, notify, maybeSystemTakeover, broadcast } from './utils.js';
 import { INDUSTRY_MULT } from './company.js';
+import { getCompanyReport } from './reports.js';
 
 const SPREAD_BASE = 0.03;
 const FEE_RATE = 0.005; // 交易手續費 0.5%/邊 (分鐘沖可跑)
@@ -162,6 +163,13 @@ export async function handleStock(env, request, path, user) {
 
   if (path === '/api/stock/index') {
     return await computeMarketIndex(db);
+  }
+
+  if (path === '/api/stock/report') {
+    const reqUrl = new URL(request.url);
+    const companyId = parseInt(reqUrl.searchParams.get('companyId') || '0');
+    if (!companyId) return { error: '請選擇公司' };
+    return await getCompanyReport(db, companyId);
   }
 
   if (path === '/api/stock/klines') {
@@ -651,10 +659,11 @@ export async function finalizeIPO(db) {
       await notify(db, sub.user_id, 'ipo_listed', `🚀 「${companyName?.name || '公司'}」已上市！你認購的 ${sub.shares.toLocaleString()} 股已入帳。`);
     }
     await db.prepare("UPDATE ipo_state SET phase = 'trading' WHERE company_id = ?").bind(ipo.company_id).run();
-    const owner = await db.prepare('SELECT owner_id FROM companies WHERE id = ?').bind(ipo.company_id).first();
+    const owner = await db.prepare('SELECT owner_id, share_price FROM companies WHERE id = ?').bind(ipo.company_id).first();
     if (owner && owner.owner_id > 0) {
       await notify(db, owner.owner_id, 'ipo_listed', `🚀 你的公司「${companyName?.name || ''}」已完成 IPO 上市！`);
     }
+    await broadcast(db, `🎉 「${companyName?.name || '公司'}」IPO 結束，正式上市！發行價 $${owner?.share_price || 100}，${subTotal?.t || 0 ? `全體認購 ${(subTotal?.t || 0).toLocaleString()} 股` : '認購未滿額'}，開始掛牌交易`);
   }
 }
 

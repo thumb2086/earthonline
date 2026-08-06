@@ -1,4 +1,4 @@
-﻿import { logTransaction, logHourly, notify, maybeSystemTakeover } from './utils.js';
+﻿import { logTransaction, logHourly, notify, maybeSystemTakeover, broadcast } from './utils.js';
 import { getUserSubscriptions } from './subscription.js';
 
 export const INDUSTRY_MULT = { tech: 1.2, manufacturing: 1.0, finance: 1.3, service: 0.9 };
@@ -170,6 +170,7 @@ export async function handleCompany(env, request, path, user) {
       await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(company.owner_id, companyId, founderShares).run();
     }
     await logTransaction(db, company.owner_id, 'ipo_revenue', 0, `創辦人持有 ${founderShares.toLocaleString()} 股 (IPO發行 ${ipoShares.toLocaleString()} 股)`);
+    await broadcast(db, `🚀 ${company.name} 啟動 IPO！發行價 $${ipoPrice} · 對外發行 ${ipoShares.toLocaleString()} 股 · 認購期 ${minutes} 分鐘（滿額立即上市）`);
     return { success: true, message: `IPO已啟動，${minutes}分鐘後自動上市（創辦人保留 ${(founderKeep*100).toFixed(0)}%）` };
   }
 
