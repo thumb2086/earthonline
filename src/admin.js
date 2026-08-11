@@ -2,6 +2,7 @@ import { getUserSubscriptions } from './subscription.js';
 import { getIncomePerMin, getLivingCostRate } from './income.js';
 import { getCompanyProfit } from './company.js';
 import { forceResetGame } from './reset.js';
+import { weeklySettlement } from './community.js';
 
 const UPGRADE_INCOME = {
   computer: [0, 5, 12, 30, 75, 180, 450, 1200],
@@ -382,6 +383,13 @@ export async function handleAdmin(env, request, path, user) {
     const incomeLevels = await db.prepare('SELECT * FROM income_levels WHERE user_id = ?').bind(targetId).first();
 
     return { ...target, holdings: holdings.results, loans: loans.results, investments: investments.results, employees: employees.results, marginPositions: positions.results, companies: companies.results, departments: depts.results, subscriptions: subs, incomeLevels };
+  }
+
+  // 立即執行每週階級清算 (手動觸發身分組分發)
+  if (path === '/api/admin/rank-settle') {
+    const result = await weeklySettlement(db, env);
+    if (result?.errors?.length && !result.applied) return { error: `清算失敗：${result.errors.join('；')}` };
+    return { success: true, applied: result?.applied || 0, log: result?.log || [], errors: result?.errors || [] };
   }
 
   // 重置系統: 正式版前單人可重置, 正式版後需3位管理員簽署

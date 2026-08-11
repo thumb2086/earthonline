@@ -1443,6 +1443,7 @@ function AdminPanel({ api }) {
   const [exclude, setExclude] = useState(() => localStorage.getItem('eo_admin_exclude') || '')
   const [resetReq, setResetReq] = useState(null)
   const [ipoSchedule, setIpoSchedule] = useState([])
+  const [settleLog, setSettleLog] = useState([])
   const loadAll = (ex) => {
     const q = ex ? '?exclude=' + encodeURIComponent(ex) : ''
     api('/api/admin/users' + q).then(d => setUsers(Array.isArray(d) ? d : []));
@@ -1717,6 +1718,20 @@ function AdminPanel({ api }) {
       {/* 危險區域 */}
       <div className="card" style={{borderColor:'var(--danger)', marginTop:12}}>
         <div style={{fontWeight:600, fontSize:13, color:'var(--danger)', marginBottom:8}}>⚠️ 危險區域</div>
+
+        <div style={{display:'flex', gap:8, marginBottom:12}}>
+          <button className="btn btn-sm" onClick={async () => {
+            toast('🎭 正在清算身份組...', 'info')
+            const r = await api('/api/admin/rank-settle')
+            if (r.success) { toast(`✅ 已分發 ${r.applied} 人`, 'success'); setSettleLog(r.log || []) }
+            else if (r.error) toast(r.error, 'error')
+            else toast('清算完成（0 人）', 'info')
+          }}>🎭 立即清算身份組</button>
+          {settleLog.length > 0 && <button className="btn btn-sm" onClick={() => setSettleLog([])}>清除紀錄</button>}
+        </div>
+        {settleLog.length > 0 && <div className="card" style={{padding:10, marginBottom:12}}>
+          {settleLog.map((l, i) => <div key={i} className="text-dim text-sm">{l}</div>)}
+        </div>}
 
         {resetReq && !resetReq.executed && <div style={{background:'rgba(239,68,68,0.1)', border:'1px solid var(--danger)', borderRadius:8, padding:12, marginBottom:12}}>
           <div style={{fontWeight:600, fontSize:13, marginBottom:6}}>📋 重置請求進行中</div>

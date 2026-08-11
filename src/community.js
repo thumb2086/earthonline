@@ -113,6 +113,7 @@ export async function weeklySettlement(db, env) {
 
     const total = users.results.length || 1;
     let log = [];
+    let errors = [];
     for (let i = 0; i < users.results.length; i++) {
       const u = users.results[i];
       const pct = (i + 1) / total;
@@ -134,9 +135,20 @@ export async function weeklySettlement(db, env) {
         headers: { Authorization: `Bot ${token}` },
       });
       if (setRes.ok) log.push(`${u.username} → ${RANK_LABELS[rankIdx]}`);
+      else errors.push(`${u.username} → 失敗 HTTP ${setRes.status}`);
     }
+    const summary = { time: Date.now(), applied: log.length, log, errors };
     await db.prepare(`INSERT INTO community_state (key, value, updated_at) VALUES ('last_settlement', ?, ?)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
-      .bind(JSON.stringify({ time: Date.now(), applied: log.length }), Date.now()).run();
-  } catch (e) {}
+      .bind(JSON.stringify(summary), Date.now()).run();
+    return summary;
+  } catch (e) {
+    const err = { time: Date.now(), applied: 0, errors: [`exception: ${e.message || e}`] };
+    try {
+      await db.prepare(`INSERT INTO community_state (key, value, updated_at) VALUES ('last_settlement', ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
+        .bind(JSON.stringify(err), Date.now()).run();
+    } catch {}
+    return err;
+  }
 }
