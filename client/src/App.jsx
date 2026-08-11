@@ -308,7 +308,7 @@ function Bank({ act, api, toast }) {
           <div className="flex gap-8 flex-wrap mt-12">
             {(terms || []).map(t => (
               <button key={t.minutes} className={`btn btn-sm ${termMinutes === t.minutes ? 'btn-primary' : ''}`} onClick={() => setTermMinutes(t.minutes)}>
-                {t.label} ({(t.rate * 100).toFixed(2)}%/分)
+                {t.label} ({(t.rate * 100).toFixed(3)}%/分)
               </button>
             ))}
           </div>
