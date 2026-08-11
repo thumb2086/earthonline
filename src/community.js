@@ -12,8 +12,14 @@ export const RANK_ROLE_NAMES = [
 const RANK_ROLES = ['DISCORD_ROLE_RANK1', 'DISCORD_ROLE_RANK2', 'DISCORD_ROLE_RANK3', 'DISCORD_ROLE_RANK4', 'DISCORD_ROLE_RANK5'];
 export const RANK_LABELS = ['👑 傳奇', '💎 菁英', '🥇 高級', '🥈 中級', '🥉 平民'];
 
-function normRoleName(name) {
-  return String(name || '').replace(/[【】\s]/g, '').toLowerCase();
+export function normRoleName(name) {
+  return String(name || '').replace(/[【】()（）\[\]{}、\s]/g, '').toLowerCase();
+}
+
+async function recordSettlement(db, summary) {
+  await db.prepare(`INSERT INTO community_state (key, value, updated_at) VALUES ('last_settlement', ?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
+    .bind(JSON.stringify(summary), Date.now()).run();
 }
 
 // 依名稱解析身分組 ID (優先 env 覆寫, 否則查公會內同名身分組)
@@ -30,7 +36,7 @@ async function resolveRankRoleIds(env) {
   if (!res.ok) return null;
   const roles = await res.json();
   const byName = new Map(roles.map(r => [normRoleName(r.name), r.id]));
-  return RANK_ROLE_NAMES.map(n => (overrides.length ? null : byName.get(normRoleName(n)) || null));
+  return RANK_ROLE_NAMES.map(n => byName.get(normRoleName(n)) || null);
 }
 
 // 依排名百分位 (0.0~1.0, 越小越前面) 取得階級索引 — 與排行榜顯示共用同一套標準

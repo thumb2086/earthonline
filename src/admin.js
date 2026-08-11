@@ -2,7 +2,7 @@ import { getUserSubscriptions } from './subscription.js';
 import { getIncomePerMin, getLivingCostRate } from './income.js';
 import { getCompanyProfit } from './company.js';
 import { forceResetGame } from './reset.js';
-import { weeklySettlement } from './community.js';
+import { weeklySettlement, resolveRankRoleIds, normRoleName, RANK_ROLE_NAMES, RANK_LABELS } from './community.js';
 
 const UPGRADE_INCOME = {
   computer: [0, 5, 12, 30, 75, 180, 450, 1200],
@@ -390,6 +390,46 @@ export async function handleAdmin(env, request, path, user) {
     const result = await weeklySettlement(db, env);
     if (result?.errors?.length && !result.applied) return { error: `清算失敗：${result.errors.join('；')}` };
     return { success: true, applied: result?.applied || 0, log: result?.log || [], errors: result?.errors || [] };
+  }
+
+  // 身分組除錯: 檢查 bot 資訊/權限 + 公會角色清單 + 名稱比對結果
+  if (path === '/api/admin/rank-debug') {
+    const guildId = env.DISCORD_GUILD_ID;
+    const token = env.DISCORD_BOT_TOKEN;
+    const out = { ok: false, error: null, bot: null, guildName: null, roles: [], matched: {}, unmatched: [] };
+    if (!guildId || !token) { out.error = '缺少 DISCORD_GUILD_ID 或 DISCORD_BOT_TOKEN'; return out; }
+    try {
+      const meRes = await fetch('https://discord.com/api/v10/users/@me', { headers: { Authorization: `Bot ${token}` } });
+      if (!meRes.ok) { out.error = `bot token 無效 (HTTP ${meRes.status})`; return out; }
+      const me = await meRes.json();
+      const gRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}`, { headers: { Authorization: `Bot ${token}` } });
+      const guild = gRes.ok ? await gRes.json() : null;
+      const memberRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${me.id}`, { headers: { Authorization: `Bot ${token}` } });
+      const member = memberRes.ok ? await memberRes.json() : null;
+      const rolesRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, { headers: { Authorization: `Bot ${token}` } });
+      const roles = rolesRes.ok ? await rolesRes.json() : [];
+
+      out.ok = true;
+      out.bot = { id: me.id, username: me.username, isInGuild: !!member, memberRoles: member?.roles || [] };
+      out.guildName = guild?.name || '?';
+      const byId = new Map(roles.map(r => [r.id, r]));
+      out.bot.roleNames = (member?.roles || []).map(id => byId.get(id)?.name || id);
+
+      // 排序角色清單 (Discord 顯示順序 = position 由高到低, @everyone 最低)
+      out.roles = roles
+        .filter(r => !r.managed)
+        .sort((a, b) => b.position - a.position)
+        .map(r => ({ id: r.id, name: r.name, position: r.position, hoist: !!r.hoist }));
+
+      const byName = new Map(roles.map(r => [normRoleName(r.name), r]));
+      RANK_ROLE_NAMES.forEach((n, idx) => {
+        const r = byName.get(normRoleName(n));
+        if (r) out.matched[`${RANK_LABELS[idx]} (${n})`] = `${r.name} (${r.id})`;
+        else out.unmatched.push(`${RANK_LABELS[idx]} → ${n}`);
+      });
+      out.resolvedIds = await resolveRankRoleIds(env);
+    } catch (e) { out.error = e.message || String(e); }
+    return out;
   }
 
   // 重置系統: 正式版前單人可重置, 正式版後需3位管理員簽署

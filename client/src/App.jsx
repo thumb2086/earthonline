@@ -1727,6 +1727,20 @@ function AdminPanel({ api }) {
             else if (r.error) toast(r.error, 'error')
             else toast('清算完成（0 人）', 'info')
           }}>🎭 立即清算身份組</button>
+          <button className="btn btn-sm" onClick={async () => {
+            const d = await api('/api/admin/rank-debug')
+            if (d?.error) { toast(d.error, 'error'); setSettleLog([`錯誤：${d.error}`]); return }
+            const lines = [`🛠️ bot: ${d.bot.username} (${d.bot.id}) ${d.bot.isInGuild ? '在公會內' : '❌ 不在公會'}`, `🎭 公會: ${d.guildName}`]
+            lines.push(`🔧 bot 身分組: ${(d.bot.roleNames || []).join(', ') || '無'}`, '')
+            lines.push('📋 公會角色 (由高到低):')
+            d.roles.forEach(r => lines.push(`  ${r.name} [${r.id}] pos=${r.position}`))
+            lines.push('', '✅ 比對成功:')
+            Object.entries(d.matched || {}).forEach(([k, v]) => lines.push(`  ${k} → ${v}`))
+            lines.push('', '❌ 比對失敗:')
+            ;(d.unmatched || []).forEach(u => lines.push(`  ${u}`))
+            if (d.resolvedIds?.length) lines.push('', `解析結果: ${d.resolvedIds.join(', ')}`)
+            setSettleLog(lines)
+          }}>🔍 身分組除錯</button>
           {settleLog.length > 0 && <button className="btn btn-sm" onClick={() => setSettleLog([])}>清除紀錄</button>}
         </div>
         {settleLog.length > 0 && <div className="card" style={{padding:10, marginBottom:12}}>
