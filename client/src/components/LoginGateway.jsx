@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 
-const DISCORD_AUTH_URL = 'https://discord.com/api/oauth2/authorize?client_id=1513563333985304596&redirect_uri=https%3A%2F%2Ftwonline.dpdns.org%2Fapi%2Fauth%2Fcb&response_type=code&scope=identify&state=login';
+const DISCORD_AUTH_URL = '/api/auth/discord';
 const GOOGLE_AUTH_URL = 'https://twonline.dpdns.org/api/auth/google';
 
 export default function LoginGateway({ onLogin }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    const token = params.get('token') || window.location.hash.match(/[#&]token=([^&]+)/)?.[1];
     if (token) {
       window.history.replaceState({}, '', window.location.pathname);
       onLogin(token);

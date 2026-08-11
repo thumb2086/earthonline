@@ -6,7 +6,11 @@ import { useToast } from './components/Toast.jsx'
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('eo_token'))
   const [user, setUser] = useState(null)
-  const [view, setView] = useState('dashboard')
+  const [view, setView] = useState(() => {
+    const saved = localStorage.getItem('eo_view')
+    const valid = ['dashboard', 'income', 'bank', 'invest', 'company', 'trading', 'subscription', 'history', 'leaderboard', 'help', 'admin']
+    return valid.includes(saved) ? saved : 'dashboard'
+  })
   const [rev, setRev] = useState(0)
   const [notifs, setNotifs] = useState({ items: [], unread: 0 })
   const [notifOpen, setNotifOpen] = useState(false)
@@ -15,8 +19,8 @@ export default function App() {
   useEffect(() => {
     if (!token) return
     fetch('/api/notifications', { headers: { Authorization: 'Bearer ' + token } })
-      .then(r => r.json())
-      .then(d => setNotifs(d || { items: [], unread: 0 }))
+      .then(r => { if (!r.ok) throw new Error('notif_err'); return r.json() })
+      .then(d => setNotifs(Array.isArray(d?.items) ? d : { items: [], unread: 0 }))
       .catch(() => {})
   }, [token, rev])
 
@@ -30,9 +34,12 @@ export default function App() {
   useEffect(() => {
     if (!token) return
     fetch('/api/me', { headers: { Authorization: 'Bearer ' + token } })
-      .then(r => { if (!r.ok) throw new Error('unauth'); return r.json() })
+      .then(r => {
+        if (r.status === 401) { localStorage.removeItem('eo_token'); setToken(null); throw new Error('stop') }
+        return r.json()
+      })
       .then(d => setUser(d))
-      .catch(() => { localStorage.removeItem('eo_token'); setToken(null) })
+      .catch(() => {})
   }, [token, rev])
 
   useEffect(() => {
@@ -41,13 +48,17 @@ export default function App() {
     return () => clearInterval(id)
   }, [token])
 
+  useEffect(() => { localStorage.setItem('eo_view', view) }, [view])
+
   async function api(path, body) {
     const opts = { headers: { Authorization: 'Bearer ' + token } }
     if (body) { opts.method = 'POST'; opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json' }
-    return fetch(path, opts).then(r => {
-      if (body) setTimeout(() => setRev(r => r + 1), 500)
-      return r.json()
-    })
+    try {
+      const r = await fetch(path, opts)
+      if (r.status === 401) { localStorage.removeItem('eo_token'); setToken(null); return { error: '請重新登入' } }
+      if (body) setTimeout(() => setRev(r2 => r2 + 1), 500)
+      return await r.json()
+    } catch { return { error: '網路錯誤' } }
   }
 
   const handleLogin = (t) => { localStorage.setItem('eo_token', t); setToken(t) }
@@ -61,8 +72,7 @@ export default function App() {
     { id: 'bank', label: '🏦 銀行' },
     { id: 'invest', label: '💼 投資' },
     { id: 'company', label: '🏢 公司' },
-    { id: 'stock', label: '📈 股票' },
-    { id: 'futures', label: '⏳ 期貨' },
+    { id: 'trading', label: '📈 交易' },
     { id: 'subscription', label: '📦 訂閱' },
     { id: 'history', label: '💰 明細' },
     { id: 'leaderboard', label: '🏆 排行' },
@@ -120,8 +130,7 @@ export default function App() {
           {view === 'bank' && <Bank act={act} api={api} toast={toast} />}
           {view === 'invest' && <Invest api={api} toast={toast} prompt={prompt} />}
           {view === 'company' && <Company api={api} toast={toast} prompt={prompt} promptMulti={promptMulti} />}
-          {view === 'stock' && <Stock api={api} toast={toast} prompt={prompt} user={user} />}
-          {view === 'futures' && <Futures api={api} toast={toast} />}
+          {view === 'trading' && <Trading api={api} toast={toast} prompt={prompt} user={user} />}
           {view === 'history' && <History api={api} />}
           {view === 'subscription' && <Subscription api={api} toast={toast} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}
@@ -340,47 +349,124 @@ function Invest({ api, toast, prompt }) {
   const [types, setTypes] = useState([])
   const [investments, setInvestments] = useState([])
   const [amounts, setAmounts] = useState({})
-  const labels = { deposit: '定存', bond: '債券', index_fund: '指數基金', real_estate: '房地產', startup: '新創投資' }
-  useEffect(() => { api('/api/investment/types').then(setTypes); api('/api/investment/list').then(d => setInvestments(Array.isArray(d)?d:[])) }, [])
+  const [tab, setTab] = useState('overview')
+  const labels = { bond: '債券', index_fund: '指數基金', real_estate: '房地產', startup: '新創投資' }
+  const icons = { bond: '📜', index_fund: '📊', real_estate: '🏠', startup: '🚀' }
+  const colors = { bond: '#3b82f6', index_fund: '#8b5cf6', real_estate: '#f59e0b', startup: '#ef4444' }
+
+  const refresh = () => {
+    api('/api/investment/types').then(d => setTypes(Array.isArray(d) ? d : []))
+    api('/api/investment/list').then(d => setInvestments(Array.isArray(d) ? d : []))
+  }
+  useEffect(() => { refresh() }, [])
+
   const inv = async (type) => {
     const a = parseInt(amounts[type]); if (!a || a <= 0) return
     const r = await api('/api/investment/invest', { type, amount: a })
-    if (r.success) { setAmounts(p => ({...p, [type]: ''})); api('/api/investment/types').then(setTypes); api('/api/investment/list').then(d => setInvestments(Array.isArray(d)?d:[])); toast('投資成功', 'success') }
+    if (r.success) { setAmounts(p => ({...p, [type]: ''})); refresh(); toast('投資成功', 'success') }
     else toast(r.error, 'error')
   }
   const withdraw = async (id) => {
     const r = await api('/api/investment/withdraw', { investmentId: id })
-    if (r.success) { api('/api/investment/list').then(d => setInvestments(Array.isArray(d)?d:[])); toast(`已贖回 $${r.refund}`, 'success') }
+    if (r.success) { refresh(); toast(`已贖回 $${r.refund}`, 'success') }
     else toast(r.error, 'error')
   }
+
+  const totalInvested = (investments || []).reduce((s, i) => s + (i.amount || 0), 0)
+  const totalDaily = (investments || []).reduce((s, i) => s + (i.dailyEarn || 0), 0)
+  const totalPaid = (investments || []).reduce((s, i) => s + (i.totalPaid || 0), 0)
+  const totalPending = (investments || []).reduce((s, i) => s + (i.amount || 0) + (i.pending_interest || 0), 0)
+
+  const pieData = []
+  const pieLabels = []
+  const pieColors = []
+  const byType = {}
+  for (const inv of (investments || [])) { byType[inv.type] = (byType[inv.type] || 0) + (inv.amount || 0) }
+  for (const [t, amt] of Object.entries(byType)) {
+    if (amt > 0) { pieData.push(amt); pieLabels.push(labels[t] || t); pieColors.push(colors[t] || '#64748b') }
+  }
+
   return (
     <>
-      <div className="grid-2 mb-12">
-        {(types || []).filter(t => t.type !== 'deposit').map(t => (
-          <div className="card card-accent" key={t.type}>
-            <div className="flex justify-between items-center">
-              <div><div className="text-accent font-bold">{t.label}</div>
-              <div className="text-dim text-sm" style={{marginTop:4}}>{t.rateMin*100}~{t.rateMax*100}% / 分</div></div>
-              {t.unlocked
-                ? <div className="flex gap-8 items-center">
-                    <input type="number" placeholder="金額" value={amounts[t.type] || ''} onChange={e => setAmounts(p => ({...p, [t.type]: e.target.value}))} style={{minWidth:120}} />
-                    <button className="btn btn-primary btn-sm" onClick={() => inv(t.type)}>投資</button>
-                  </div>
-                : <span className="text-dim text-sm">需賺 ${(t.unlockEarned || 0).toLocaleString()}</span>}
-            </div>
-          </div>
+      <div style={{display:'flex', gap:6, marginBottom:12}}>
+        {[['overview', '📊 總覽'], ['invest', '💰 投資']].map(([k, v]) => (
+          <button key={k} className={`btn btn-sm ${tab === k ? 'btn-primary' : ''}`} onClick={() => setTab(k)}>{v}</button>
         ))}
       </div>
-      {investments.filter(i => i.type !== 'deposit').length > 0 && <div className="card"><div className="card-title">我的投資</div>
-        {(investments || []).filter(i => i.type !== 'deposit').map(inv => (
-          <div className="stat" key={inv.id}>
-            <span><span className="text-accent">{inv.label || labels[inv.type] || inv.type}</span> · ${(inv.amount||0).toLocaleString()}
-              <div className="text-dim text-sm">每日約 <span className="text-accent">${(inv.dailyEarn||0).toLocaleString()}</span> · 累計已領 <span className="text-accent">${(inv.totalPaid||0).toLocaleString()}</span></div>
-            </span>
-            <button className="btn btn-sm" onClick={() => withdraw(inv.id)}>贖回</button>
+
+      {tab === 'overview' && <>
+        <div className="grid-3 mb-12">
+          <div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
+            <div className="text-dim text-sm">總投入</div>
+            <div style={{fontSize:22, fontWeight:700, color:'var(--text)', marginTop:4}}>${totalInvested.toLocaleString()}</div>
           </div>
-        ))}
-      </div>}
+          <div className="card" style={{borderLeft:'3px solid #10b981'}}>
+            <div className="text-dim text-sm">每日收益</div>
+            <div style={{fontSize:22, fontWeight:700, color:'#10b981', marginTop:4}}>+${totalDaily.toLocaleString()}</div>
+          </div>
+          <div className="card" style={{borderLeft:'3px solid #f59e0b'}}>
+            <div className="text-dim text-sm">累計已領</div>
+            <div style={{fontSize:22, fontWeight:700, color:'#f59e0b', marginTop:4}}>${totalPaid.toLocaleString()}</div>
+          </div>
+        </div>
+        {pieData.length > 0 && <div className="card mb-12">
+          <div className="card-title">📊 資產配置</div>
+          <div style={{display:'flex', alignItems:'center', gap:20, flexWrap:'wrap'}}>
+            <PieChart data={pieData} labels={pieLabels} colors={pieColors} size={160} />
+            <div style={{flex:1, minWidth:200}}>
+              <div className="text-dim text-sm mb-12">資產總值（含待領利息）</div>
+              <div style={{fontSize:28, fontWeight:700, color:'var(--accent)'}}>${totalPending.toLocaleString()}</div>
+              <div className="text-dim text-sm" style={{marginTop:4}}>待領利息 ${(totalPending - totalInvested).toLocaleString()}</div>
+            </div>
+          </div>
+        </div>}
+        {investments.length === 0 && <div className="card"><div className="text-dim" style={{textAlign:'center', padding:40}}>尚無投資，點擊「投資」開始配置資產</div></div>}
+        {investments.length > 0 && <div className="card mb-12"><div className="card-title">💼 投資組合</div>
+          {investments.map(inv => (
+            <div className="stat" key={inv.id} style={{borderLeft:`3px solid ${colors[inv.type] || '#64748b'}`, paddingLeft:8, marginBottom:8}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                <div>
+                  <span style={{fontWeight:600, color: colors[inv.type] || 'var(--text)'}}>{icons[inv.type] || '💰'} {inv.label || labels[inv.type]}</span>
+                  <span className="text-dim text-sm" style={{marginLeft:8}}>${(inv.amount||0).toLocaleString()}</span>
+                </div>
+                <button className="btn btn-sm" onClick={() => withdraw(inv.id)}>贖回</button>
+              </div>
+              <div style={{display:'flex', gap:16, marginTop:4}}>
+                <span className="text-dim text-sm">日收益 <span style={{color:'#10b981', fontWeight:600}}>${(inv.dailyEarn||0).toLocaleString()}</span></span>
+                <span className="text-dim text-sm">已領 <span style={{color:'#f59e0b', fontWeight:600}}>${(inv.totalPaid||0).toLocaleString()}</span></span>
+              </div>
+            </div>
+          ))}
+        </div>}
+      </>}
+
+      {tab === 'invest' && <>
+        <div className="grid-2 mb-12">
+          {(types || []).filter(t => t.type !== 'deposit').map(t => (
+            <div className="card" key={t.type} style={{borderLeft:`3px solid ${colors[t.type] || '#64748b'}`, opacity: t.unlocked ? 1 : 0.5}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                <div>
+                  <div style={{fontWeight:700, fontSize:15, color: colors[t.type] || 'var(--text)'}}>{icons[t.type]} {t.label}</div>
+                  <div className="text-dim text-sm" style={{marginTop:4}}>每日 {(t.rateMin*1440*100).toFixed(2)}~{(t.rateMax*1440*100).toFixed(2)}%</div>
+                  <div className="text-dim text-sm">風險 {t.type === 'startup' ? '⚡ 高' : '🛡️ 低'}</div>
+                </div>
+                {t.unlocked
+                  ? <div style={{display:'flex', gap:6, alignItems:'center'}}>
+                      <input type="number" placeholder="金額" value={amounts[t.type] || ''} onChange={e => setAmounts(p => ({...p, [t.type]: e.target.value}))} style={{width:120}} />
+                      <button className="btn btn-primary btn-sm" onClick={() => inv(t.type)}>投資</button>
+                    </div>
+                  : <div className="text-dim text-sm" style={{textAlign:'right'}}>
+                      <div>🔒 需累計</div>
+                      <div style={{fontWeight:600, color:'var(--warn)'}}>${(t.unlockEarned || 0).toLocaleString()}</div>
+                    </div>}
+              </div>
+              {investments.filter(i => i.type === t.type).length > 0 && <div style={{marginTop:8, paddingTop:8, borderTop:'1px solid var(--border)'}}>
+                <span className="text-dim text-sm">持有 <span style={{color:'var(--accent)', fontWeight:600}}>${investments.filter(i => i.type === t.type).reduce((s, i) => s + (i.amount||0), 0).toLocaleString()}</span></span>
+              </div>}
+            </div>
+          ))}
+        </div>
+      </>}
     </>
   )
 }
@@ -454,10 +540,6 @@ const splitCompany = (c) => prompt(`拆分「${c.name}」？(股價÷N、持股�
     const n = parseInt(v); if (![2, 5, 10].includes(n)) return toast('請輸入 2 / 5 / 10', 'error')
     const r = await api('/api/company/split', { companyId: c.id, ratio: n })
     if (r.success) { refresh(); toast(r.message || '拆分成功', 'success') } else toast(r.error, 'error')
-  })
-  const buyout = (c) => prompt(`收購 ${c.name}（$2${c.buyoutPrice.toLocaleString()}？）`, async (s) => {
-    const r = await api('/api/company/buyout', { companyId: c.id })
-    if (r.success) { toast(`收購成功！支付 $${r.buyPrice.toLocaleString()}`, 'success'); refresh() } else toast(r.error, 'error')
   })
   const forceBuy = (c) => prompt(`強制收購 ${c.name} 其他股東的流通股？(市價×1.2 溢價) 輸入 yes 確認`, async (v) => {
     if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
@@ -734,6 +816,62 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
   )
 }
 
+function ETF({ api, toast }) {
+  const [etfs, setEtfs] = useState([])
+  const [etfQty, setEtfQty] = useState('')
+  const [indexData, setIndexData] = useState(null)
+
+  const refresh = () => {
+    api('/api/etf/list').then(d => setEtfs(Array.isArray(d) ? d : []))
+    api('/api/stock/index').then(d => { if (d) setIndexData(d) }).catch(() => {})
+  }
+  useEffect(() => { refresh() }, [])
+  useEffect(() => { const id = setInterval(refresh, 5000); return () => clearInterval(id) }, [])
+
+  const etfBuy = async (e) => {
+    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
+    const r = await api('/api/etf/buy', { etfId: e.id, quantity: qty })
+    if (r.success) { toast(`買入 ${e.name} ${qty} 單位 @ $${r.fillPrice}`, 'success'); setEtfQty(''); refresh() } else toast(r.error, 'error')
+  }
+  const etfSell = async (e) => {
+    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
+    const r = await api('/api/etf/sell', { etfId: e.id, quantity: qty })
+    if (r.success) { toast(`賣出 ${e.name} ${qty} 單位 @ $${r.fillPrice}（實收 $${r.netRevenue.toLocaleString()}）`, 'success'); setEtfQty(''); refresh() } else toast(r.error, 'error')
+  }
+
+  return (
+    <>
+      {indexData && <div className="card mb-12">
+        <div className="flex justify-between items-center">
+          <div className="card-title" style={{margin:0}}>📊 大盤指數（{indexData.stocks} 檔上市）</div>
+          <div style={{fontSize:20, fontWeight:700}} className={indexData.change >= 0 ? 'text-danger' : 'text-accent'}>
+            {indexData.value.toLocaleString()} <span style={{fontSize:13}}>{indexData.change >= 0 ? '▲' : '▼'} {Math.abs(indexData.change)}（{(indexData.value > 0 ? (indexData.change / (indexData.value - indexData.change) * 100) : 0).toFixed(2)}%）</span>
+          </div>
+        </div>
+        {indexData.timeline?.length > 1 && <IndexSparkline data={indexData.timeline} />}
+      </div>}
+      <div className="card mb-12">
+        <div className="card-title">📦 ETF（封閉式 · 追蹤大盤指數）</div>
+        <div className="text-dim text-sm mb-12">單位價 = 指數 × $0.01（指數 1000 → $10）· 手續費 0.5% · 與系統交易</div>
+        {etfs.length === 0 && <div className="text-dim text-sm">載入中...</div>}
+        {etfs.map(e => (
+          <div className="stat" key={e.id}>
+            <span>
+              <span className="text-accent" style={{fontWeight:600}}>{e.name}（{e.symbol}）</span> · 單位價 <strong>${e.price}</strong>（指數 {e.index.toLocaleString()}）
+              <div className="text-dim text-sm">庫存 {e.inventory.toLocaleString()} · 流通 {e.circulating.toLocaleString()} · 單筆上限 {e.maxTrade.toLocaleString()} · 你持有 <span className="text-accent">{e.myHolding.toLocaleString()}</span> 單位</div>
+            </span>
+            <span style={{display:'flex', gap:6, alignItems:'center'}}>
+              <input type="number" placeholder="數量" value={etfQty} onChange={ev => setEtfQty(ev.target.value)} style={{width:90}} />
+              <button className="btn btn-primary btn-sm" onClick={() => etfBuy(e)}>買入</button>
+              <button className="btn btn-sm" onClick={() => etfSell(e)}>賣出</button>
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function Futures({ api, toast }) {
   const [index, setIndex] = useState(null)
   const [futData, setFutData] = useState({ currentIndex: 0, items: [] })
@@ -820,6 +958,23 @@ function Futures({ api, toast }) {
   )
 }
 
+function Trading({ api, toast, prompt, user }) {
+  const [tab, setTab] = useState('stock')
+  const subTabs = [['stock', '📈 股票'], ['futures', '⏳ 期貨'], ['etf', '📦 ETF']]
+  return (
+    <>
+      <div style={{display:'flex', gap:6, marginBottom:12}}>
+        {subTabs.map(([k, v]) => (
+          <button key={k} className={`btn btn-sm ${tab === k ? 'btn-primary' : ''}`} onClick={() => setTab(k)}>{v}</button>
+        ))}
+      </div>
+      {tab === 'stock' && <Stock api={api} toast={toast} prompt={prompt} user={user} />}
+      {tab === 'futures' && <Futures api={api} toast={toast} />}
+      {tab === 'etf' && <ETF api={api} toast={toast} />}
+    </>
+  )
+}
+
 function Stock({ api, toast, prompt, user }) {
   const [q, setQ] = useState(null); const [h, setH] = useState([]); const [t, setT] = useState([]); const [myTrades, setMyTrades] = useState([]); const [ipo, setIpo] = useState(null)
   const [pnlData, setPnlData] = useState({ stocks: [], totalPnl: 0 })
@@ -837,8 +992,6 @@ function Stock({ api, toast, prompt, user }) {
   const [selectedStock, setSelectedStock] = useState(1)
   const [stockList, setStockList] = useState([])
   const [indexData, setIndexData] = useState(null)
-  const [etfs, setEtfs] = useState([])
-  const [etfQty, setEtfQty] = useState('')
 
   const stockNames = { 1: '地球互動科技 001', 10: '深海科技 002', 12: '銀河金融 003', 13: '星雲生技 004', 14: '黑洞能源 005', 15: '元界科技 006' }
 
@@ -857,48 +1010,43 @@ function Stock({ api, toast, prompt, user }) {
   }, [limitInfo])
   const markLimit = (r, side) => { if (r?.limitHit) setLimitInfo({ side, at: Date.now() }) }
 
-  const etfBuy = async (e) => {
-    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
-    const r = await api('/api/etf/buy', { etfId: e.id, quantity: qty })
-    if (r.success) { toast(`買入 ${e.name} ${qty} 單位 @ $${r.fillPrice}`, 'success'); setEtfQty(''); refreshStock() } else toast(r.error, 'error')
-  }
-  const etfSell = async (e) => {
-    const qty = parseInt(etfQty); if (!qty || qty <= 0) return toast('請輸入數量', 'error')
-    const r = await api('/api/etf/sell', { etfId: e.id, quantity: qty })
-    if (r.success) { toast(`賣出 ${e.name} ${qty} 單位 @ $${r.fillPrice}（實收 $${r.netRevenue.toLocaleString()}）`, 'success'); setEtfQty(''); refreshStock() } else toast(r.error, 'error')
-  }
-
   useEffect(() => {
     api('/api/company/ipo/list').then(d => {
       if (!Array.isArray(d)) return
       const list = d.filter(c => c.phase && c.phase !== 'null').map(c => ({
         id: c.id,
+        code: c.code,
         name: (stockNames[c.id] || c.name),
         phase: c.phase
       }))
-      if (list.length === 0) list.push({ id: 1, name: '地球互動科技 001', phase: 'trading' })
+      if (list.length === 0) list.push({ id: 1, code: '001', name: '地球互動科技', phase: 'trading' })
       setStockList(list)
       if (!list.find(s => s.id === selectedStock) && list.length > 0) setSelectedStock(list[0].id)
     }).catch(() => {})
   }, [])
 
   const refreshStock = () => {
-    api('/api/stock/quote?companyId=' + selectedStock).then(setQ);
-    api('/api/stock/report?companyId=' + selectedStock).then(d => { if (d && !d.error) setReport(d) }).catch(() => {});
-    api('/api/stock/index').then(d => { if (d) setIndexData(d) }).catch(()=>{});
-    api('/api/etf/list').then(d => setEtfs(Array.isArray(d) ? d : []));
-    api('/api/stock/holdings').then(d => setH(Array.isArray(d)?d:[]));
-    api('/api/stock/trades?companyId=' + selectedStock).then(d => setT(Array.isArray(d)?d:[]));
-    api('/api/stock/trades?companyId=' + selectedStock + '&mine=1').then(d => setMyTrades(Array.isArray(d)?d:[]));
-    api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[]));
-    api('/api/stock/ipo/info?companyId=' + selectedStock).then(setIpo);
-    api('/api/stock/order/list').then(d => setOrders(Array.isArray(d) ? d : []));
-    api('/api/stock/pnl').then(d => setPnlData(d || { stocks: [], totalPnl: 0 })).catch(()=>{});
+    api('/api/stock/dashboard?companyId=' + selectedStock).then(d => {
+      if (!d || d.error) return
+      setQ(d.quote)
+      setH(Array.isArray(d.holdings) ? d.holdings : [])
+      setT(Array.isArray(d.trades) ? d.trades : [])
+      setMyTrades(Array.isArray(d.myTrades) ? d.myTrades : [])
+      setPositions(Array.isArray(d.marginPositions) ? d.marginPositions : [])
+      setIpo(d.ipo)
+      setOrders(Array.isArray(d.orders) ? d.orders : [])
+    }).catch(() => {})
   }
-  useEffect(() => { refreshStock() }, [selectedStock])
+  const refreshHeavy = () => {
+    api('/api/stock/report?companyId=' + selectedStock).then(d => { if (d && !d.error) setReport(d) }).catch(() => {})
+    api('/api/stock/index').then(d => { if (d) setIndexData(d) }).catch(() => {})
+    api('/api/stock/pnl').then(d => setPnlData(d || { stocks: [], totalPnl: 0 })).catch(() => {})
+  }
+  useEffect(() => { refreshStock(); refreshHeavy() }, [selectedStock])
   useEffect(() => {
-    const id = setInterval(refreshStock, 5000)
-    return () => clearInterval(id)
+    const fast = setInterval(refreshStock, 5000)
+    const slow = setInterval(refreshHeavy, 30000)
+    return () => { clearInterval(fast); clearInterval(slow) }
   }, [selectedStock])
   const buy = async () => {
     const fresh = await api('/api/stock/quote?companyId=' + selectedStock)
@@ -937,15 +1085,13 @@ function Stock({ api, toast, prompt, user }) {
     })
   }
   const maxBuy = async () => {
-    // 全部買入 = 買到單筆上限 (受現金/庫存/單筆上限三者限制)
     const price = q?.price || 0
     if (price <= 0) return
     const maxByCash = Math.floor((user?.cash || 0) / (price * 1.005))
-    const maxByInv = Math.max(0, (q?.systemInventory || 0) - (q?.minInventory || 0))
-    const cap = q?.maxTrade || 0
-    const n = Math.max(0, Math.min(maxByCash, maxByInv, cap))
+    const maxByInv = q?.systemInventory || 0
+    const n = Math.max(0, Math.min(maxByCash, maxByInv))
     if (n <= 0) return toast('現金或庫存不足', 'error')
-    toast(`買入 ${n.toLocaleString()} 股（單筆上限 ${cap.toLocaleString()} 股）`, 'info')
+    toast(`買入 ${n.toLocaleString()} 股`, 'info')
     const r = await api('/api/stock/buy', { companyId: selectedStock, quantity: n, force: true })
     if (r.success) { refreshStock(); markLimit(r, 'up'); toast(`買入 ${n} 股 @ $${r.fillPrice}${r.afterPrice && r.afterPrice !== r.fillPrice ? `（成交後市價 $${r.afterPrice}）` : ''} (含手續費 $${(r.totalCost - (r.fillPrice * n)).toLocaleString()})`, r.limitHit ? 'info' : 'success') } else toast(r.error, 'error')
   }
@@ -990,257 +1136,219 @@ function Stock({ api, toast, prompt, user }) {
 
   return (
     <>
-      {indexData && <div className="card mb-12">
-        <div className="flex justify-between items-center">
-          <div className="card-title" style={{margin:0}}>📊 大盤指數（{indexData.stocks} 檔上市）</div>
-          <div style={{fontSize:20, fontWeight:700}} className={indexData.change >= 0 ? 'text-danger' : 'text-accent'}>
-            {indexData.value.toLocaleString()} <span style={{fontSize:13}}>{indexData.change >= 0 ? '▲' : '▼'} {Math.abs(indexData.change)}（{(indexData.value > 0 ? (indexData.change / (indexData.value - indexData.change) * 100) : 0).toFixed(2)}%）</span>
-          </div>
+      {/* 頂部: 大盤指數 + 股票選擇 */}
+      {indexData && <div className="card mb-12" style={{padding:'10px 14px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <span className="text-dim text-sm">📊 大盤 {indexData.stocks} 檔</span>
+          <span style={{fontSize:18, fontWeight:700}} className={indexData.change >= 0 ? 'text-danger' : 'text-accent'}>
+            {indexData.value.toLocaleString()}
+            <span style={{fontSize:12, marginLeft:6}}>{indexData.change >= 0 ? '▲' : '▼'} {Math.abs(indexData.change)}（{(indexData.value > 0 ? (indexData.change / (indexData.value - indexData.change) * 100) : 0).toFixed(2)}%）</span>
+          </span>
         </div>
-        {indexData.timeline?.length > 1 && <IndexSparkline data={indexData.timeline} />}
       </div>}
-      <div className="card mb-12">
-        <div className="card-title">📦 ETF（封閉式 · 追蹤大盤指數）</div>
-        <div className="text-dim text-sm mb-12">單位價 = 指數 × $0.01（指數 1000 → $10）· 手續費 0.5% · 與系統交易</div>
-        {etfs.length === 0 && <div className="text-dim text-sm">載入中...</div>}
-        {etfs.map(e => (
-          <div className="stat" key={e.id}>
-            <span>
-              <span className="text-accent" style={{fontWeight:600}}>{e.name}（{e.symbol}）</span> · 單位價 <strong>${e.price}</strong>（指數 {e.index.toLocaleString()}）
-              <div className="text-dim text-sm">庫存 {e.inventory.toLocaleString()} · 流通 {e.circulating.toLocaleString()} · 單筆上限 {e.maxTrade.toLocaleString()} · 你持有 <span className="text-accent">{e.myHolding.toLocaleString()}</span> 單位</div>
-            </span>
-            <span style={{display:'flex', gap:6, alignItems:'center'}}>
-              <input type="number" placeholder="數量" value={etfQty} onChange={ev => setEtfQty(ev.target.value)} style={{width:90}} />
-              <button className="btn btn-primary btn-sm" onClick={() => etfBuy(e)}>買入</button>
-              <button className="btn btn-sm" onClick={() => etfSell(e)}>賣出</button>
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-8 mb-12">
+      <div style={{display:'flex', gap:6, marginBottom:12, overflowX:'auto', paddingBottom:4}}>
         {stockList.map(s => (
-          <button key={s.id} className={`btn ${selectedStock === s.id ? 'btn-primary' : ''}`} onClick={() => setSelectedStock(s.id)}>{s.name}</button>
+          <button key={s.id} className={`btn btn-sm ${selectedStock === s.id ? 'btn-primary' : ''}`} onClick={() => setSelectedStock(s.id)} style={{whiteSpace:'nowrap', fontSize:11}}>
+            {s.code ? `${s.code} ` : ''}{s.name.split(' ')[0]}{s.phase === 'ipo' ? ' 🚀' : s.phase === 'queued' ? ' 📋' : ''}
+          </button>
         ))}
       </div>
-      {ipo?.phase === 'ipo' && <div className="card mb-12" style={{borderColor:'var(--warn)'}}>
-        <div className="card-title" style={{color:'var(--warn)'}}>🚀 IPO 認購中 — {stockNames[selectedStock] || '股票'}</div>
-        <div className="text-dim mb-12">價格 ${ipo.price || 100}/股</div>
-        <div style={{background:'var(--bg2)', borderRadius:6, height:8, marginBottom:8, overflow:'hidden'}}>
-          <div style={{background:'var(--warn)', height:'100%', borderRadius:6, width:`${Math.min(100, ((ipo.subscribed||0)/(ipo.maxSubscribed||1))*100)}%`, transition:'width 0.3s'}} />
+
+      {/* 財報 (置頂) */}
+      {ipo?.phase !== 'ipo' && report && <div className="card mb-12">
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+          <span style={{fontWeight:600, fontSize:13}}>📋 {report.code ? `${report.code} ` : ''}{report.name}</span>
+          {report.rating && <span style={{padding:'2px 8px', borderRadius:99, fontSize:11, fontWeight:700, color:'#fff', background: report.rating === 'S' ? '#dc2626' : report.rating === 'A' ? '#ea580c' : report.rating === 'B' ? '#ca8a04' : '#64748b'}}>{report.rating}</span>}
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-accent">{(ipo.subscribed||0).toLocaleString()} / {(ipo.maxSubscribed||0).toLocaleString()} 股已認購</span>
-          <span className="text-dim">{(((ipo.subscribed||0)/(ipo.maxSubscribed||1))*100).toFixed(1)}%</span>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8, marginBottom:8}}>
+          <div style={{textAlign:'center'}}><div className="text-dim" style={{fontSize:10}}>收入/分</div><div style={{fontWeight:600, fontSize:13}}>${(report.incomeRate || 0).toLocaleString()}</div></div>
+          <div style={{textAlign:'center'}}><div className="text-dim" style={{fontSize:10}}>淨利潤/分</div><div style={{fontWeight:600, fontSize:13, color: report.profitRate >= 0 ? 'var(--accent)' : 'var(--danger)'}}>${(report.profitRate || 0).toLocaleString()}</div></div>
+          <div style={{textAlign:'center'}}><div className="text-dim" style={{fontSize:10}}>本益比</div><div style={{fontWeight:600, fontSize:13}}>{report.pe !== null && report.pe !== undefined ? report.pe.toFixed(1) : '—'}</div></div>
+          <div style={{textAlign:'center'}}><div className="text-dim" style={{fontSize:10}}>殖利率</div><div style={{fontWeight:600, fontSize:13, color: report.yieldPctDaily > 0.002 ? 'var(--accent)' : 'inherit'}}>{(report.yieldPctDaily * 100).toFixed(2)}%</div></div>
         </div>
-        {ipo.isFull
-          ? <div className="text-sm mt-12" style={{color:'var(--accent)', fontWeight:600}}>✅ 認購已滿，即將上市</div>
-          : <div className="text-sm mt-12" style={{color:'var(--warn)'}}>剩餘時間：<span style={{fontWeight:600}}>{fmtRemain(ipo.remainMs)}</span>（滿了立即上市，未滿等期限）</div>}
-        <div className="text-sm mt-12" style={{color:'var(--warn)'}}>你已認購 <span style={{fontWeight:600}}>{(ipo.myShares||0).toLocaleString()} 股</span>（花費 ${((ipo.myShares||0) * (ipo.price||100)).toLocaleString()}）</div>
-        <button className="btn btn-sm mt-12" onClick={subIpo} disabled={ipo.isFull} style={ipo.isFull ? {opacity:0.5, cursor:'not-allowed'} : {}}>{ipo.isFull ? '已滿' : '認購'}</button>
+        <div style={{display:'flex', gap:12, flexWrap:'wrap', fontSize:11}}>
+          <span className="text-dim">市值 ${report.marketCap ? report.marketCap.toLocaleString() : 0}</span>
+          <span className="text-dim">24h <span style={{color: report.growthPct >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{report.growthPct !== null ? (report.growthPct >= 0 ? '+' : '') + (report.growthPct * 100).toFixed(1) + '%' : '—'}</span></span>
+          <span className="text-dim">趨勢 <span style={{color: report.trend === 'up' ? 'var(--danger)' : report.trend === 'down' ? 'var(--accent)' : 'var(--text-secondary)'}}>{report.trend === 'up' ? '▲強' : report.trend === 'down' ? '▼弱' : '—持平'}</span></span>
+          <span className="text-dim">24h量 {(report.volume24h || 0).toLocaleString()}</span>
+        </div>
+        {report.analysis && <div className="text-dim" style={{marginTop:8, fontSize:12, lineHeight:1.6, background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:6}}>🔍 {report.analysis}</div>}
       </div>}
-        {ipo?.phase !== 'ipo' && q && <><div className="grid-2 mt-12">
-          <div><div className="stat"><span className="stat-label">價格</span><span className="stat-value" style={{fontSize:20}}>${q.price}
-            {q.limit === 'up' && <span style={{fontSize:11, marginLeft:8, color:'#ef4444', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.5)', padding:'2px 8px', borderRadius:99, fontWeight:700}}>⚠️ 漲停</span>}
-            {q.limit === 'down' && <span style={{fontSize:11, marginLeft:8, color:'#00ff41', background:'rgba(0,255,65,0.12)', border:'1px solid rgba(0,255,65,0.5)', padding:'2px 8px', borderRadius:99, fontWeight:700}}>⚠️ 跌停</span>}
-          </span></div>
-            <div className="stat"><span className="stat-label">手續費</span><span className="stat-value">0.5%</span></div>
-            <div className="stat"><span className="stat-label">流通</span><span className="stat-value">{(q.circulating||0).toLocaleString()}</span></div></div>
-          <div><div className="stat"><span className="stat-label">庫存</span><span className="stat-value">{(q.systemInventory||0).toLocaleString()}</span></div>
-            <div className="stat"><span className="stat-label">可買量</span><span className="stat-value">{(Math.max(0,(q.systemInventory||0)-(q.minInventory||0))).toLocaleString()}</span></div>
-            <div className="stat"><span className="stat-label">單筆上限</span><span className="stat-value">{(q.maxTrade||0).toLocaleString()} 股</span></div></div>
+
+      {/* IPO 認購 */}
+      {ipo?.phase === 'ipo' && <div className="card mb-12" style={{borderColor:'var(--warn)'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <div>
+            <span style={{fontWeight:700, color:'var(--warn)'}}>🚀 IPO 認購中</span>
+            <span className="text-dim text-sm" style={{marginLeft:8}}>${ipo.price || 100}/股</span>
+          </div>
+          <span className="text-dim text-sm">{fmtRemain(ipo.remainMs)}</span>
         </div>
-        {q.limit && <div className="text-sm mt-12" style={{fontWeight:600, color: q.limit === 'up' ? '#ef4444' : '#00ff41'}}>⚠️ 已達{q.limit === 'up' ? '漲停板' : '跌停板'}，交易暫停，1分鐘後恢復</div>}
-        <div className="flex gap-8 mt-12">
-          <button className="btn btn-primary btn-sm" onClick={buy} disabled={q.limit === 'up'} style={q.limit === 'up' ? {opacity:0.5, cursor:'not-allowed'} : {}}>買入</button>
-          <button className="btn btn-primary btn-sm" onClick={maxBuy} disabled={q.limit === 'up'} style={q.limit === 'up' ? {opacity:0.5, cursor:'not-allowed'} : {}}>全部買入</button>
-          <button className="btn btn-sm" onClick={sell} disabled={q.limit === 'down'} style={q.limit === 'down' ? {opacity:0.5, cursor:'not-allowed'} : {}}>賣出</button>
-          <button className="btn btn-sm" onClick={maxSell} disabled={q.limit === 'down'} style={q.limit === 'down' ? {opacity:0.5, cursor:'not-allowed'} : {}}>全部賣出</button>
+        <div style={{background:'var(--bg2)', borderRadius:4, height:6, marginTop:8, overflow:'hidden'}}>
+          <div style={{background:'var(--warn)', height:'100%', borderRadius:4, width:`${Math.min(100, ((ipo.subscribed||0)/(ipo.maxSubscribed||1))*100)}%`, transition:'width 0.3s'}} />
         </div>
-        </>}
-      {ipo?.phase !== 'ipo' && <div className="card mb-12">
-        <div className="flex justify-between items-center mb-12">
-          <div className="card-title" style={{margin:0}}>📈 走勢圖</div>
-          <div className="flex gap-8">
-            {[['realtime', '即時'], ['5m', '5分'], ['1h', '1時']].map(([k, v]) => (
-              <button key={k} className={`btn btn-sm ${chartTimeframe === k ? 'btn-primary' : ''}`} onClick={() => setChartTimeframe(k)}>{v}</button>
+        <div style={{display:'flex', justifyContent:'space-between', marginTop:4}}>
+          <span className="text-dim text-sm">{(ipo.subscribed||0).toLocaleString()} / {(ipo.maxSubscribed||0).toLocaleString()}</span>
+          <span className="text-dim text-sm">你 {(ipo.myShares||0).toLocaleString()} 股</span>
+        </div>
+        <button className="btn btn-sm mt-12" onClick={subIpo} disabled={ipo.isFull} style={{width:'100%', ...(ipo.isFull ? {opacity:0.5} : {})}}>{ipo.isFull ? '已滿' : '認購'}</button>
+      </div>}
+
+      {/* 主要交易區 */}
+      {ipo?.phase !== 'ipo' && q && <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12}}>
+        {/* 左側: 價格 + 走勢圖 */}
+        <div>
+          <div className="card" style={{marginBottom:0}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+              <div>
+                <div style={{fontSize:28, fontWeight:700}}>${q.price}</div>
+                {q.limit && <span style={{fontSize:11, color: q.limit === 'up' ? '#ef4444' : '#00ff41', fontWeight:600}}>⚠️ {q.limit === 'up' ? '漲停' : '跌停'}</span>}
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div className="text-dim text-sm">流通 {(q.circulating||0).toLocaleString()}</div>
+                <div className="text-dim text-sm">上限 {(q.maxTrade||0).toLocaleString()} 股</div>
+              </div>
+            </div>
+            <div style={{display:'flex', gap:6, marginTop:10}}>
+              <button className="btn btn-primary btn-sm" onClick={buy} disabled={q.limit === 'up'} style={{flex:1, ...(q.limit === 'up' ? {opacity:0.5} : {})}}>買入</button>
+              <button className="btn btn-sm" onClick={sell} disabled={q.limit === 'down'} style={{flex:1, ...(q.limit === 'down' ? {opacity:0.5} : {})}}>賣出</button>
+              <button className="btn btn-sm" onClick={maxBuy} disabled={q.limit === 'up'} style={{fontSize:10, ...(q.limit === 'up' ? {opacity:0.5} : {})}}>全買</button>
+              <button className="btn btn-sm" onClick={maxSell} disabled={q.limit === 'down'} style={{fontSize:10, ...(q.limit === 'down' ? {opacity:0.5} : {})}}>全賣</button>
+            </div>
+          </div>
+          <div className="card" style={{marginTop:12}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+              <span style={{fontWeight:600, fontSize:13}}>📈 走勢圖</span>
+              <div style={{display:'flex', gap:4}}>
+                {[['realtime', '即時'], ['5m', '5分'], ['1h', '1時']].map(([k, v]) => (
+                  <button key={k} className={`btn btn-sm ${chartTimeframe === k ? 'btn-primary' : ''}`} onClick={() => setChartTimeframe(k)} style={{fontSize:10, padding:'2px 8px'}}>{v}</button>
+                ))}
+              </div>
+            </div>
+            {limitInfo && <div style={{padding:'8px 10px', borderRadius:6, marginBottom:8, fontWeight:600, fontSize:12, background: limitInfo.side === 'up' ? 'rgba(239,68,68,0.12)' : 'rgba(0,255,65,0.12)', border:`1px solid ${limitInfo.side === 'up' ? 'rgba(239,68,68,0.3)' : 'rgba(0,255,65,0.3)'}`, color: limitInfo.side === 'up' ? '#ef4444' : '#00ff41', display:'flex', justifyContent:'space-between'}}>
+              <span>⚠️ {limitInfo.side === 'up' ? '漲停' : '跌停'}</span>
+              <span>{Math.max(0, Math.ceil(60 - (Date.now() - limitInfo.at) / 1000))}s</span>
+            </div>}
+            <KLineChart api={api} timeframe={chartTimeframe} companyId={selectedStock} />
+          </div>
+        </div>
+
+        {/* 右側: 持倉 + 損益 + 交易 */}
+        <div>
+          {/* 持倉損益 */}
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{fontWeight:600, fontSize:13, marginBottom:8}}>💼 持倉</div>
+            {(pnlData?.stocks || []).filter(x => x.companyId === selectedStock).length === 0 && <div className="text-dim text-sm">無持股</div>}
+            {(pnlData?.stocks || []).filter(x => x.companyId === selectedStock).map(x => (
+              <div key={x.companyId} style={{padding:'8px 0', borderTop:'1px solid var(--border)'}}>
+                <div style={{display:'flex', justifyContent:'space-between'}}>
+                  <span style={{fontWeight:600}}>{x.holdings} 股</span>
+                  <span style={{fontWeight:700, color: x.totalPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{x.totalPnl >= 0 ? '+' : ''}{x.totalPnl.toLocaleString()}</span>
+                </div>
+                <div style={{display:'flex', gap:12, marginTop:4}}>
+                  <span className="text-dim text-sm">均價 ${(x.avgCost || 0).toLocaleString()}</span>
+                  <span className="text-dim text-sm">現價 ${x.currentPrice || '?'}</span>
+                </div>
+                <div style={{display:'flex', gap:12, marginTop:2}}>
+                  <span className="text-dim text-sm">已實現 <span style={{color: x.realizedPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{x.realizedPnl >= 0 ? '+' : ''}{x.realizedPnl.toLocaleString()}</span></span>
+                  <span className="text-dim text-sm">浮動 <span style={{color: x.unrealizedPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{x.unrealizedPnl >= 0 ? '+' : ''}{x.unrealizedPnl.toLocaleString()}</span></span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 掛單 */}
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+              <span style={{fontWeight:600, fontSize:13}}>📋 掛單</span>
+              <span className="text-dim text-sm">{orders.filter(o => o.status === 'open').length}/20</span>
+            </div>
+            <div style={{display:'flex', gap:6, marginBottom:8, alignItems:'center'}}>
+              <select value={ordType} onChange={e => setOrdType(e.target.value)} className="select-sm" style={{width:65}}>
+                <option value="buy">買入</option>
+                <option value="sell">賣出</option>
+              </select>
+              <input type="number" placeholder="價格 $" value={ordPrice} onChange={e => setOrdPrice(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
+              <input type="number" placeholder="數量 股" value={ordQty} onChange={e => setOrdQty(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
+              <button className="btn btn-primary btn-sm" onClick={placeOrder} style={{padding:'5px 12px', fontWeight:600}}>掛</button>
+            </div>
+            {orders.filter(o => o.company_id === selectedStock).slice(0, 5).map(o => (
+              <div key={o.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderTop:'1px solid var(--border)', fontSize:12}}>
+                <span>
+                  <span style={{color: o.type === 'buy' ? 'var(--accent)' : 'var(--danger)', fontWeight:600}}>{o.type === 'buy' ? '買' : '賣'}</span>
+                  {' '}${o.price} × {o.quantity}
+                  <span className="text-dim" style={{marginLeft:4}}>{o.status === 'open' ? '⏳' : o.status === 'filled' ? '✅' : '❌'}</span>
+                </span>
+                {o.status === 'open' && <button className="btn btn-sm" onClick={() => cancelOrder(o.id)} style={{fontSize:9, padding:'1px 6px'}}>取消</button>}
+              </div>
+            ))}
+          </div>
+
+          {/* 槓桿 */}
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{fontWeight:600, fontSize:13, marginBottom:8}}>⚡ 槓桿</div>
+            <div style={{display:'flex', gap:6, marginBottom:6, alignItems:'center'}}>
+              <select value={marginType} onChange={e => setMarginType(e.target.value)} className="select-sm" style={{width:65}}>
+                <option value="long">做多</option>
+                <option value="short">做空</option>
+              </select>
+              <input type="number" placeholder="數量 股" value={marginQty} onChange={e => setMarginQty(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
+              <select value={marginLev} onChange={e => setMarginLev(e.target.value)} className="select-sm" style={{width:55}}>
+                <option value="2">2x</option><option value="3">3x</option><option value="5">5x</option>
+              </select>
+              <button className="btn btn-primary btn-sm" onClick={openMargin} style={{padding:'5px 12px', fontWeight:600}}>開</button>
+            </div>
+            {positions.filter(p => p.company_id === selectedStock).map(p => {
+              const cur = q?.price || 0;
+              const pnl = p.type === 'long' ? (cur - p.entry_price) * p.quantity - p.dividend_debt : (p.entry_price - cur) * p.quantity - p.dividend_debt;
+              const mRate = p.type === 'long' ? (p.loan_amount > 0 ? (cur * p.quantity + (p.extra_margin||0)) / p.loan_amount * 100 : 0) : (cur * p.quantity > 0 ? (p.loan_amount + p.margin_amount + (p.extra_margin||0) - p.dividend_debt) / (cur * p.quantity) * 100 : 0);
+              const mc = mRate < 115
+              return (
+                <div key={p.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderTop:'1px solid var(--border)', borderLeft:`3px solid ${p.type === 'long' ? 'var(--accent)' : 'var(--danger)'}`, paddingLeft:8}}>
+                  <div>
+                    <span style={{color: p.type === 'long' ? 'var(--accent)' : 'var(--danger)', fontWeight:600, fontSize:12}}>{p.type === 'long' ? '多' : '空'} {p.quantity}股 ×{p.leverage}</span>
+                    <div style={{fontSize:11, color: pnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{pnl >= 0 ? '+' : ''}{pnl.toLocaleString()} · {mRate.toFixed(0)}%{mc ? ' ⚠️' : ''}</div>
+                  </div>
+                  <div style={{display:'flex', gap:4}}>
+                    {mc && <button className="btn btn-sm" onClick={() => addMargin(p)} style={{fontSize:9, padding:'1px 6px', borderColor:'var(--danger)', color:'var(--danger)'}}>補</button>}
+                    <button className="btn btn-sm" onClick={() => closePos(p.id)} style={{fontSize:9, padding:'1px 6px'}}>平</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 最近成交 */}
+          <div className="card">
+            <div style={{fontWeight:600, fontSize:13, marginBottom:8}}>📊 最近成交</div>
+            {(t || []).slice(0,8).map(x => (
+              <div key={x.id} style={{display:'flex', justifyContent:'space-between', padding:'3px 0', borderTop:'1px solid var(--border)', fontSize:12}}>
+                <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲' : '▼'}</span> ${x.price}</span>
+                <span>{x.quantity} 股</span>
+              </div>
             ))}
           </div>
         </div>
-        {limitInfo && (
-          <div style={{
-            padding: '10px 14px', borderRadius: 8, marginBottom: 12, fontWeight: 700, fontSize: 13,
-            background: limitInfo.side === 'up' ? 'rgba(239,68,68,0.12)' : 'rgba(0,255,65,0.12)',
-            border: `1px solid ${limitInfo.side === 'up' ? 'rgba(239,68,68,0.5)' : 'rgba(0,255,65,0.5)'}`,
-            color: limitInfo.side === 'up' ? '#ef4444' : '#00ff41',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span>⚠️ 已達{limitInfo.side === 'up' ? '漲停板' : '跌停板'}，1分鐘後恢復</span>
-            <span style={{fontWeight: 600, opacity: 0.8}}>{Math.max(0, Math.ceil(60 - (Date.now() - limitInfo.at) / 1000))}s</span>
-          </div>
-        )}
-        <KLineChart api={api} timeframe={chartTimeframe} companyId={selectedStock} />
       </div>}
-      {report && <div className="card mb-12">
-        <div className="card-title">📋 財報與基本面分析 — {report.name}</div>
-        {report.rating && <span style={{display:'inline-block', marginLeft:8, padding:'2px 10px', borderRadius:99, fontSize:12, fontWeight:700, color:'#fff', background: report.rating === 'S' ? '#dc2626' : report.rating === 'A' ? '#ea580c' : report.rating === 'B' ? '#ca8a04' : report.rating === 'C' ? '#64748b' : '#1d4ed8'}}>{report.rating} · {report.ratingLabel}</span>}
-        <div className="grid-2 mt-12">
-          <div><div className="stat"><span className="stat-label">收入</span><span className="stat-value">${(report.incomeRate || 0).toLocaleString()}/分</span></div>
-            <div className="stat"><span className="stat-label">成本</span><span className="stat-value">${(report.costRate || 0).toLocaleString()}/分</span></div>
-            <div className="stat"><span className="stat-label">淨利潤</span><span className="stat-value" style={{color: report.profitRate >= 0 ? 'var(--accent)' : 'var(--danger)'}}>${(report.profitRate || 0).toLocaleString()}/分</span></div></div>
-          <div><div className="stat"><span className="stat-label">本益比(日)</span><span className="stat-value">{report.pe !== null && report.pe !== undefined ? report.pe.toFixed(1) : '虧損'}</span></div>
-            <div className="stat"><span className="stat-label">每股日盈餘</span><span className="stat-value">${report.epsDay ? report.epsDay.toFixed(2) : '0.00'}</span></div>
-            <div className="stat"><span className="stat-label">獲利率</span><span className="stat-value">{report.margin === -1 ? '虧損' : (report.margin * 100).toFixed(1) + '%'}</span></div></div>
-        </div>
-        <div className="flex gap-8 flex-wrap mt-12">
-          <span className="text-dim text-sm">市值 <strong style={{color:'var(--text2)'}}>${report.marketCap ? report.marketCap.toLocaleString() : 0}</strong></span>
-          <span className="text-dim text-sm">流通市值 <strong style={{color:'var(--text2)'}}>${report.floatCap ? report.floatCap.toLocaleString() : 0}</strong></span>
-          <span className="text-dim text-sm">庫存市值 <strong style={{color:'var(--text2)'}}>${report.inventoryValue ? report.inventoryValue.toLocaleString() : 0}</strong></span>
-          <span className="text-dim text-sm">日殖利率 <strong style={{color: report.yieldPctDaily > 0.002 ? 'var(--accent)' : 'var(--text2)'}}>{(report.yieldPctDaily * 100).toFixed(2)}%</strong></span>
-          <span className="text-dim text-sm">24h獲利成長 <strong style={{color: report.growthPct >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{report.growthPct !== null && report.growthPct !== undefined ? (report.growthPct >= 0 ? '+' : '') + (report.growthPct * 100).toFixed(1) + '%' : '—'}</strong></span>
-          <span className="text-dim text-sm">現價 vs 60分均線 <strong style={{color: report.trend === 'up' ? 'var(--danger)' : 'var(--accent)'}}>{report.trend === 'up' ? '▲強勢' : '▼弱勢'}</strong>（${report.ma60 ? Math.round(report.ma60) : '—'}）</span>
-          <span className="text-dim text-sm">24h成交量 <strong style={{color:'var(--text2)'}}>{(report.volume24h || 0).toLocaleString()}</strong></span>
-        </div>
-        {report.analysis && <div className="text-sm mt-12" style={{color:'var(--text2)', lineHeight:1.8, background:'rgba(255,255,255,0.03)', padding:'10px 14px', borderRadius:8}}>🔍 {report.analysis}</div>}
-        {report.history?.length > 1 && <>
-          <div className="divider" />
-          <div className="text-sm text-accent" style={{fontWeight:600, marginBottom:6}}>歷史財報（每小時）</div>
-          {report.history.slice(0, 8).map((h, i) => (
-            <div className="stat" key={i}>
-              <span className="text-dim text-sm">{(h.periodStart ? new Date(h.periodStart).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—')}</span>
-              <span className="text-dim text-sm">收入 ${h.incomeRate.toLocaleString()}/分</span>
-              <span className="text-dim text-sm">淨利潤 <span style={{color: h.profitRate >= 0 ? 'var(--accent)' : 'var(--danger)'}}>${h.profitRate.toLocaleString()}</span></span>
-              <span className="text-dim text-sm">收盤 $${h.price}</span>
-            </div>
-          ))}
-        </>}
-      </div>}
-      {ipo?.phase !== 'ipo' && <div className="card mb-12">
-        <div className="card-title">📋 掛單交易（自動條件交易）</div>
-        <div className="text-dim text-sm mb-12">買單：市價跌到掛單價以下自動買入；賣單：市價漲到掛單價以上自動賣出（每分鐘撮合，成交自動通知）</div>
-        <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}} className="mt-12 mb-12">
-          <select value={ordType} onChange={e => setOrdType(e.target.value)} className="select-sm">
-            <option value="buy">🟢 條件買入</option>
-            <option value="sell">🔴 條件賣出</option>
-          </select>
-          <input type="number" placeholder="掛單價 $" value={ordPrice} onChange={e => setOrdPrice(e.target.value)} style={{width:110}} />
-          <input type="number" placeholder={`股數 (≤${(q?.maxTrade || 0).toLocaleString()})`} value={ordQty} onChange={e => setOrdQty(e.target.value)} style={{width:130}} />
-          <button className="btn btn-primary btn-sm" onClick={placeOrder}>掛單</button>
-        </div>
-        {orders.filter(o => o.company_id === selectedStock).length === 0 && <div className="text-dim text-sm">尚無掛單</div>}
-        {orders.filter(o => o.company_id === selectedStock).map(o => (
-          <div className="stat" key={o.id}>
-            <span><span className={o.type === 'buy' ? 'text-danger' : 'text-accent'} style={{fontWeight:600}}>{o.type === 'buy' ? '買' : '賣'}</span> @ ${o.price} × {o.quantity.toLocaleString()} 股
-              <div className="text-dim text-sm">市價 ${o.current_price} · {o.status === 'open' ? '⏳ 等待成交' : o.status === 'filled' ? '✅ 已成交' : '❌ 已取消'}</div>
-            </span>
-            {o.status === 'open' && <button className="btn btn-sm" onClick={() => cancelOrder(o.id)}>取消</button>}
-          </div>
-        ))}
-        <div className="divider" />
-        <div className="text-dim text-sm">全部掛單：{orders.filter(o => o.status === 'open').length} 筆等待中（上限 20 筆）</div>
-      </div>}
-      {ipo?.phase !== 'ipo' && <div className="card mb-12">
-        <div className="card-title">⚡ 槓桿交易</div>
-        <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}} className="mt-12 mb-12">
-          <select value={marginType} onChange={e => setMarginType(e.target.value)} className="select-sm">
-            <option value="long">🟢 做多</option>
-            <option value="short">🔴 做空</option>
-          </select>
-          <input type="number" placeholder="股數" value={marginQty} onChange={e => setMarginQty(e.target.value)} style={{width:100}} />
-          <select value={marginLev} onChange={e => setMarginLev(e.target.value)} className="select-sm">
-            <option value="2">2x</option>
-            <option value="3">3x</option>
-            <option value="5">5x</option>
-          </select>
-          <button className="btn btn-primary btn-sm" onClick={openMargin}>開倉</button>
-        </div>
-        <div className="text-dim text-sm">維持率 115% 追繳 · 100% 強制平倉</div>
-        {positions.filter(p => p.company_id === selectedStock).length > 0 && <>
-          <div className="divider" />
-          <div className="card-title">槓桿持倉</div>
-          {positions.filter(p => p.company_id === selectedStock).map(p => {
-            const cur = q?.price || 0;
-            const pnl = p.type === 'long'
-              ? (cur - p.entry_price) * p.quantity - p.dividend_debt
-              : (p.entry_price - cur) * p.quantity - p.dividend_debt;
-            const pnlPct = p.margin_amount > 0 ? (pnl / p.margin_amount) * 100 : 0;
-            const mRate = p.type === 'long'
-              ? (p.loan_amount > 0 ? (cur * p.quantity + (p.extra_margin||0)) / p.loan_amount * 100 : 0)
-              : (cur * p.quantity > 0 ? (p.loan_amount + p.margin_amount + (p.extra_margin||0) - p.dividend_debt) / (cur * p.quantity) * 100 : 0);
-            const marginCall = mRate < 115
-            return (
-              <div className="stat" key={p.id} style={{borderLeft: `3px solid ${p.type === 'long' ? 'var(--accent)' : 'var(--danger)'}`, paddingLeft:8}}>
-                <div>
-                  <span style={{color: p.type === 'long' ? 'var(--accent)' : 'var(--danger)', fontWeight:600}}>{p.type === 'long' ? '做多' : '做空'}</span>
-                  <span className="text-dim text-sm"> {p.quantity}股 ×{p.leverage} · 入場${p.entry_price}</span>
-                  <div className="text-sm" style={{color: pnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>
-                    {pnl >= 0 ? '+' : ''}{pnl.toLocaleString()} ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%)
-                    {p.dividend_debt > 0 && <span className="text-dim"> (股利欠${p.dividend_debt.toLocaleString()})</span>}
-                  </div>
-                  <div className="text-sm" style={{color: marginCall ? 'var(--danger)' : 'var(--text-dim)'}}>
-                    維持率 {mRate.toFixed(0)}%{marginCall ? <span style={{fontWeight:700}}> ⚠️追繳中！</span> : ''}
-                    {p.extra_margin > 0 && <span className="text-dim"> · 已補繳 ${p.extra_margin.toLocaleString()}</span>}
-                  </div>
-                  {marginCall && <button className="btn btn-sm" style={{marginTop:6, borderColor:'var(--danger)', color:'var(--danger)'}} onClick={() => addMargin(p)}>💸 自動補繳</button>}
-                </div>
-                <button className="btn btn-sm" onClick={() => closePos(p.id)}>平倉</button>
-              </div>
-            )
-          })}
-        </>}
-      </div>}
-      {ipo?.phase !== 'ipo' && <div className="grid-2">
-        <div className="card"><div className="card-title">持倉損益</div>
-          {(pnlData?.stocks || []).filter(x => x.companyId === selectedStock).map(x => (
-            <div key={x.companyId}>
-              <div className="stat">
-                <span className="stat-label">{x.companyName}</span>
-                <span className="stat-value">{x.holdings} 股</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">均價</span>
-                <span className="stat-value">${(x.avgCost || 0).toLocaleString()}</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">現價</span>
-                <span className="stat-value">${x.currentPrice || '?'}</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">已實現損益</span>
-                <span className="stat-value" style={{color: x.realizedPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{x.realizedPnl >= 0 ? '+' : ''}{x.realizedPnl.toLocaleString()}</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">浮動損益</span>
-                <span className="stat-value" style={{color: x.unrealizedPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{x.unrealizedPnl >= 0 ? '+' : ''}{x.unrealizedPnl.toLocaleString()}</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label" style={{fontWeight:700}}>總損益</span>
-                <span className="stat-value" style={{fontWeight:700, color: x.totalPnl >= 0 ? 'var(--accent)' : 'var(--danger)'}}>{x.totalPnl >= 0 ? '+' : ''}{x.totalPnl.toLocaleString()}</span>
-              </div>
-            </div>
-          ))}
-          {(!pnlData?.stocks || pnlData.stocks.filter(x => x.companyId === selectedStock).length === 0) && <div className="text-dim">無持股</div>}</div>
-        <div className="card"><div className="card-title">全部成交紀錄</div>
-          {(t || []).slice(0,10).map(x => <div className="stat" key={x.id}>
-            <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲' : '▼'}</span> ${x.price}</span>
-            <span className="stat-value">{x.quantity} 股</span></div>
-          )}</div>
-      </div>}
-      {ipo?.phase !== 'ipo' && <div className="card mt-12"><div className="card-title">我的成交紀錄</div>
-        {(myTrades || []).length === 0 && <div className="text-dim">暫無交易</div>}
-        {(myTrades || []).slice(0,20).map(x => {
+
+      {/* 我的成交紀錄 */}
+      {ipo?.phase !== 'ipo' && myTrades?.length > 0 && <div className="card">
+        <div style={{fontWeight:600, fontSize:13, marginBottom:8}}>🕐 我的紀錄</div>
+        {myTrades.slice(0,10).map(x => {
           const gross = x.price * x.quantity
           const fee = Math.floor(gross * 0.005)
-          const amount = x.type === 'buy' ? -(gross + fee) : (gross - fee)
           return (
-            <div className="stat" key={x.id}>
-              <div>
-                <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲買入' : '▼賣出'}</span> ${x.price} × {x.quantity}股</span>
-                <div className="text-dim text-sm">{x.type === 'buy' ? `花費 $${(gross + fee).toLocaleString()}（含手續費 $${fee.toLocaleString()}）` : `實收 $${(gross - fee).toLocaleString()}（扣手續費 $${fee.toLocaleString()}）`}</div>
-              </div>
-              <span className="text-dim text-sm">{new Date(x.traded_at).toLocaleTimeString('zh-TW')}</span>
+            <div key={x.id} style={{display:'flex', justifyContent:'space-between', padding:'4px 0', borderTop:'1px solid var(--border)', fontSize:12}}>
+              <span>
+                <span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)', fontWeight:600}}>{x.type === 'buy' ? '▲' : '▼'}</span>
+                {' '}${x.price} × {x.quantity}
+                <span className="text-dim" style={{marginLeft:4}}>{x.type === 'buy' ? `-($${(gross+fee).toLocaleString()})` : `+$${(gross-fee).toLocaleString()}`}</span>
+              </span>
+              <span className="text-dim">{new Date(x.traded_at).toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'})}</span>
             </div>
           )
-        })}</div>}
+        })}
+      </div>}
     </>
   )
 }
@@ -1325,6 +1433,8 @@ function AdminPanel({ api }) {
   const [marginData, setMarginData] = useState({ positions: [], byUser: [], byCompany: [] })
   const [announcements, setAnnouncements] = useState([])
   const [exclude, setExclude] = useState(() => localStorage.getItem('eo_admin_exclude') || '')
+  const [resetReq, setResetReq] = useState(null)
+  const [ipoSchedule, setIpoSchedule] = useState([])
   const loadAll = (ex) => {
     const q = ex ? '?exclude=' + encodeURIComponent(ex) : ''
     api('/api/admin/users' + q).then(d => setUsers(Array.isArray(d) ? d : []));
@@ -1334,6 +1444,8 @@ function AdminPanel({ api }) {
     api('/api/admin/trades' + q).then(d => setTradeData(d || { trades: [], stats: [] }));
     api('/api/admin/margin' + q).then(d => setMarginData(d || { positions: [], byUser: [], byCompany: [] }));
     api('/api/admin/announcements').then(d => setAnnouncements(Array.isArray(d) ? d : []));
+    api('/api/admin/reset/status').then(d => setResetReq(d?.request || null));
+    api('/api/admin/ipo/schedule').then(d => setIpoSchedule(Array.isArray(d) ? d : []));
   }
   useEffect(() => { loadAll(exclude) }, [])
   useEffect(() => {
@@ -1427,6 +1539,45 @@ function AdminPanel({ api }) {
             <span>{a.message}</span>
           </div>
         ))}
+      </div>}
+
+      {/* IPO 排程管理 */}
+      {ipoSchedule.length > 0 && <div className="card mb-12">
+        <div className="card-title">📋 IPO 排程管理</div>
+        <div className="text-dim text-sm mb-12">管理系統公司上市時程 · 點「開始」設定 IPO 時間</div>
+        <div style={{display:'grid', gap:8}}>
+          {ipoSchedule.map(c => {
+            const phaseLabel = c.phase === 'ipo' ? '🚀 IPO中' : c.phase === 'trading' ? '✅ 交易中' : c.phase === 'queued' ? '⏳ 排隊中' : '⏸️ 待設定';
+            const phaseColor = c.phase === 'ipo' ? 'var(--accent)' : c.phase === 'trading' ? '#10b981' : c.phase === 'queued' ? 'var(--warn)' : 'var(--text-secondary)';
+            return (
+              <div key={c.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:'var(--bg2)', borderRadius:8, borderLeft:`3px solid ${phaseColor}`}}>
+                <div>
+                  <span style={{fontWeight:600, fontSize:13}}>{c.code} {c.name}</span>
+                  <span className="text-dim text-sm" style={{marginLeft:8}}>{c.industry}</span>
+                  <span style={{marginLeft:8, fontSize:11, color:phaseColor, fontWeight:600}}>{phaseLabel}</span>
+                  {c.phase === 'ipo' && c.started_at > 0 && <span className="text-dim text-sm" style={{marginLeft:8}}>
+                    剩 {Math.max(0, Math.ceil(((c.duration_minutes || 4320) * 60000 - (Date.now() - c.started_at)) / 3600000))}h
+                  </span>}
+                </div>
+                <div style={{display:'flex', gap:6, alignItems:'center'}}>
+                  <span className="text-dim text-sm">庫存 {(c.inventory || 0).toLocaleString()}</span>
+                  {(c.phase === 'pending' || c.phase === 'queued') && <button className="btn btn-primary btn-sm" style={{fontSize:11}} onClick={async () => {
+                    promptMulti('設定 IPO（預設3天）', [
+                      { label: 'IPO時長(分鐘)', placeholder: '4320 = 3天', default: '4320' },
+                    ], async ([mins]) => {
+                      const r = await api('/api/admin/ipo/start', { companyId: c.id, durationMinutes: parseInt(mins) || 4320 })
+                      if (r.success) { toast(r.message, 'success'); loadAll(exclude) } else toast(r.error, 'error')
+                    })
+                  }}>開始</button>}
+                  {c.phase === 'queued' && <button className="btn btn-sm" style={{fontSize:11}} onClick={async () => {
+                    const r = await api('/api/admin/ipo/cancel', { companyId: c.id })
+                    if (r.success) { toast('已取消', 'success'); loadAll(exclude) } else toast(r.error, 'error')
+                  }}>取消</button>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>}
 
       <div className="grid-3 mb-12">
@@ -1553,6 +1704,45 @@ function AdminPanel({ api }) {
             </div>}
           </div>}
         </div>)}
+      </div>
+
+      {/* 危險區域 */}
+      <div className="card" style={{borderColor:'var(--danger)', marginTop:12}}>
+        <div style={{fontWeight:600, fontSize:13, color:'var(--danger)', marginBottom:8}}>⚠️ 危險區域</div>
+
+        {resetReq && !resetReq.executed && <div style={{background:'rgba(239,68,68,0.1)', border:'1px solid var(--danger)', borderRadius:8, padding:12, marginBottom:12}}>
+          <div style={{fontWeight:600, fontSize:13, marginBottom:6}}>📋 重置請求進行中</div>
+          <div className="text-dim text-sm" style={{marginBottom:8}}>發起者: {resetReq.initiatorName} · 簽署: {resetReq.signatures.length}/{resetReq.required}</div>
+          <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:8}}>
+            {resetReq.signatures.map((s, i) => <span key={i} className="btn btn-sm" style={{fontSize:10, opacity:0.7}}>✅ #{s}</span>)}
+          </div>
+          {!resetReq.signatures.includes(window.__userId) && <button className="btn btn-danger btn-sm" onClick={async () => {
+            const r = await api('/api/admin/reset/sign', {})
+            if (r.success) { toast(r.message, 'success'); loadAll(exclude) } else toast(r.error, 'error')
+          }}>✍️ 簽署重置</button>}
+        </div>}
+
+        {!resetReq?.executed && <div style={{display:'flex', gap:8}}>
+          <button className="btn btn-danger btn-sm" onClick={async () => {
+            prompt('⚠️ 全服重置：所有玩家數據將歸零，無法復原！輸入「重置」確認', async (v) => {
+              if (v !== '重置') return toast('已取消', 'info')
+              toast('正在重置...', 'info')
+              const r = await api('/api/admin/reset?force=1')
+              if (r.success) { toast('✅ 全服重置完成！', 'success'); loadAll(exclude) }
+              else if (r.needSignatures) {
+                // 需要多管理員簽署
+                const req = await api('/api/admin/reset/request', {})
+                if (req.success) { toast(req.message, 'success'); loadAll(exclude) } else toast(req.error, 'error')
+              }
+              else toast(r.error || '重置失敗', 'error')
+            })
+          }}>🗑️ 全服重置</button>
+          {resetReq && !resetReq.executed && <button className="btn btn-sm" onClick={async () => {
+            const r = await api('/api/admin/reset/request', {})
+            if (r.success) { toast(r.message, 'success'); loadAll(exclude) } else toast(r.error, 'error')
+          }}>📋 發起重置請求</button>}
+        </div>}
+        {resetReq?.executed && <div className="text-dim text-sm">✅ 上次重置: {new Date(resetReq.executedAt).toLocaleString('zh-TW')}</div>}
       </div>
     </>
   )

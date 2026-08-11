@@ -1,9 +1,10 @@
 // 央行利率機制 (仿聯準會): 依市場熱度升/降息
 // 熱度 = 近30分鐘成交量 vs 前5.5小時平均; 熱 → 升息 (吸金降溫), 冷 → 降息 (刺激投資)
-const BASE_SAVINGS = 0.0005;   // 0.05%/分 基準
-const MIN_SAVINGS = 0.0001;    // 0.01%/分 地板
-const MAX_SAVINGS = 0.003;     // 0.3%/分 天花板
-const STEP = 0.00005;          // 每次 ±0.005%/分
+// 基準 0.00001/分 = 1.44%/天 (活存低於定存 7天 0.00009/分)
+const BASE_SAVINGS = 0.00001;   // 1.44%/天 基準
+const MIN_SAVINGS = 0.000005;   // 0.72%/天 地板
+const MAX_SAVINGS = 0.00003;    // 4.32%/天 天花板
+const STEP = 0.000005;          // 每次 ±0.0005%/分
 const ADJUST_MINUTES = 30;     // 每 30 分鐘決策一次
 
 export async function getRates(db) {

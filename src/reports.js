@@ -81,7 +81,7 @@ export async function getCompanyReport(db, companyId) {
   const klines = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(companyId).all();
   const closes = klines.results.map(k => k.close);
   const ma60 = closes.length > 0 ? closes.reduce((s, v) => s + v, 0) / closes.length : price;
-  const trend = price > ma60 ? 'up' : 'down';
+  const trend = price > ma60 + 0.5 ? 'up' : price < ma60 - 0.5 ? 'down' : 'flat';
 
   // 近24h成交量
   const vol24 = await db.prepare('SELECT COALESCE(SUM(quantity), 0) as v FROM stock_trades WHERE company_id = ? AND traded_at >= ?').bind(companyId, now - 24 * 3600000).first();
@@ -100,7 +100,7 @@ export async function getCompanyReport(db, companyId) {
   if (profitRate > 0) score += 2; else score -= 2;
   if (growthPct !== null) { if (growthPct > 0.1) score += 2; else if (growthPct < -0.1) score -= 2; }
   if (yieldDaily > 0.002) score += 1;
-  if (trend === 'up') score += 1; else score -= 1;
+  if (trend === 'up') score += 1; else if (trend === 'down') score -= 1;
   score = Math.max(-10, Math.min(10, score));
 
   let rating, ratingLabel;
@@ -118,11 +118,12 @@ export async function getCompanyReport(db, companyId) {
   lines.push(`本益比（日）${pe !== null ? pe.toFixed(1) : '無（虧損）'}，評價${peTag}。`);
   if (growthPct !== null) lines.push(profitRate > 0 && past?.profit_rate <= 0 ? '' : `近 24 小時淨利潤${growthPct >= 0 ? '成長' : '下滑'} ${Math.abs(growthPct * 100).toFixed(1)}%。`);
   if (yieldDaily > 0) lines.push(`每股日股利 $${(divRate * 1440).toFixed(2)}，殖利率 ${(yieldDaily * 100).toFixed(2)}%。`);
-  lines.push(`現價 $${price} ${trend === 'up' ? '高於' : '低於'} 60 分鐘均價 $${Math.round(ma60)}，${trend === 'up' ? '短線偏多' : '短線偏空'}。`);
+  lines.push(`現價 $${price} ${trend === 'up' ? '高於' : trend === 'down' ? '低於' : '持平'} 60 分鐘均價 $${Math.round(ma60)}，${trend === 'up' ? '短線偏多' : trend === 'down' ? '短線偏空' : '短線盤整'}。`);
   const text = lines.filter(Boolean).join(' ');
 
   return {
     companyId,
+    code: company.code,
     name: company.name,
     price,
     incomeRate,

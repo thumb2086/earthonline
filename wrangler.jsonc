@@ -1,5 +1,6 @@
 {
   "name": "earthonline",
+  "account_id": "2513d9129183c9319ad07b504251a69b",
   "compatibility_date": "2026-07-29",
   "main": "src/index.js",
   "assets": {
@@ -32,7 +33,6 @@
     "crons": ["*/1 * * * *"]
   },
   "vars": {
-    "JWT_SECRET": "eo_secret_change_in_prod",
     "DISCORD_CLIENT_ID": "1513563333985304596",
     "FRONTEND_URL": "https://twonline.dpdns.org",
     "DISCORD_GUILD_ID": "1512345209005015101"

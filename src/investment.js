@@ -1,20 +1,20 @@
-import { logTransaction, logHourly, notify } from './utils.js';
-import { getUserSubscriptions } from './subscription.js';
+import { logTransaction, logHourly } from './utils.js';
 import { getRates } from './rates.js';
 
+// 利率基準: 每天 0.3%~3% 規模 (0.00001/分 ≈ 1.44%/天), 讓升級/股票操作更有意義
 const INVEST_TYPES = {
-  bond: { label: '債券', rateMin: 0.0001, rateMax: 0.0001, unlockEarned: 1000, maxPerUser: 10000000, risk: 0 },
-  index_fund: { label: '指數基金', rateMin: 0.0001, rateMax: 0.00025, unlockEarned: 5000, maxPerUser: 20000000, risk: 0 },
-  real_estate: { label: '房地產', rateMin: 0.0004, rateMax: 0.0004, unlockEarned: 50000, maxPerUser: 50000000, risk: 0 },
-  startup: { label: '新創投資', rateMin: 0.0008, rateMax: 0.0015, unlockEarned: 200000, maxPerUser: 100000000, risk: 0.0005 },
+  bond: { label: '債券', rateMin: 0.00001, rateMax: 0.00001, unlockEarned: 1000, maxPerUser: 10000000, risk: 0 },
+  index_fund: { label: '指數基金', rateMin: 0.00002, rateMax: 0.00004, unlockEarned: 5000, maxPerUser: 20000000, risk: 0 },
+  real_estate: { label: '房地產', rateMin: 0.00008, rateMax: 0.00008, unlockEarned: 50000, maxPerUser: 50000000, risk: 0 },
+  startup: { label: '新創投資', rateMin: 0.00012, rateMax: 0.0002, unlockEarned: 200000, maxPerUser: 100000000, risk: 0.003 },
 };
 
-// 定存期限 (分鐘): 利率/分
+// 定存期限 (分鐘): 利率/分 (7天 13%/天 最高, 低風險基準)
 const DEPOSIT_TERMS = [
-  { minutes: 60, rate: 0.0012, label: '1小時' },
-  { minutes: 360, rate: 0.0018, label: '6小時' },
-  { minutes: 1440, rate: 0.003, label: '24小時' },
-  { minutes: 10080, rate: 0.0045, label: '7天' },
+  { minutes: 60, rate: 0.00002, label: '1小時' },
+  { minutes: 360, rate: 0.00004, label: '6小時' },
+  { minutes: 1440, rate: 0.00006, label: '24小時' },
+  { minutes: 10080, rate: 0.00009, label: '7天' },
 ];
 
 function getDiminishingRate(baseRate, totalInvested, maxPerUser) {
@@ -65,6 +65,7 @@ export async function handleInvestment(env, request, path, user) {
 
   if (path === '/api/investment/invest') {
     const { type, amount, termMinutes } = await request.json();
+    if (!Number.isInteger(amount) || amount <= 0) return { error: '金額必須大於 0' };
     if (type === 'deposit') {
       const term = DEPOSIT_TERMS.find(t => t.minutes === termMinutes) || DEPOSIT_TERMS[0];
       const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
@@ -94,11 +95,14 @@ export async function handleInvestment(env, request, path, user) {
     const { investmentId } = await request.json();
     const inv = await db.prepare('SELECT id, type, amount FROM investments WHERE id = ? AND user_id = ?').bind(investmentId, user.id).first();
     if (!inv) return { error: '投資不存在' };
+    if (inv.type === 'startup') return { error: '新創投資屬高風險長期投資，不可提前贖回' };
     const info = INVEST_TYPES[inv.type];
     const fee = inv.type === 'deposit' ? 0 : Math.floor(inv.amount * 0.01);
     const refund = inv.amount - fee;
+    // 先條件刪除再退款: 防止雙花 (兩個併發 withdraw 都讀到同筆)
+    const delRes = await db.prepare('DELETE FROM investments WHERE id = ? AND user_id = ?').bind(inv.id, user.id).run();
+    if (delRes.meta.changes === 0) return { error: '投資不存在' };
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(refund, user.id).run();
-    await db.prepare('DELETE FROM investments WHERE id = ?').bind(inv.id).run();
     await logTransaction(db, user.id, 'investment', refund, `贖回${info?.label || inv.type} $${refund.toLocaleString()}`);
     return { success: true, refund };
   }
@@ -111,17 +115,21 @@ export async function handleInvestment(env, request, path, user) {
   return null;
 }
 
-export async function processInvestmentTick(db) {
+export async function processInvestmentTick(db, logger) {
   const investments = await db.prepare('SELECT id, user_id, type, amount, COALESCE(pending_interest, 0) as pending_interest, term_minutes, mature_at FROM investments').all();
   const rates = await getRates(db);
+  const stmts = [];
+  const logs = [];
+  const txLogs = [];
   const subCache = {};
+
   for (const inv of investments.results) {
     // 定存: 到期自動贖回
     if (inv.type === 'deposit') {
       if (inv.mature_at && Date.now() >= inv.mature_at) {
-        await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(inv.amount, inv.user_id).run();
-        await db.prepare('DELETE FROM investments WHERE id = ?').bind(inv.id).run();
-        await logTransaction(db, inv.user_id, 'investment', inv.amount, `定存到期自動贖回 $${inv.amount.toLocaleString()}`);
+        stmts.push(db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(inv.amount, inv.user_id));
+        stmts.push(db.prepare('DELETE FROM investments WHERE id = ?').bind(inv.id));
+        txLogs.push(db.prepare('INSERT INTO transaction_history (user_id, type, amount, description, created_at) VALUES (?, ?, ?, ?, ?)').bind(inv.user_id, 'investment', inv.amount, `定存到期自動贖回 $${inv.amount.toLocaleString()}`, Date.now()));
         continue;
       }
       const term = DEPOSIT_TERMS.find(t => t.minutes === inv.term_minutes) || DEPOSIT_TERMS[0];
@@ -129,18 +137,23 @@ export async function processInvestmentTick(db) {
       const totalPending = (inv.pending_interest || 0) + earned;
       const payout = Math.floor(totalPending);
       if (payout > 0) {
-        await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, inv.user_id).run();
-        await db.prepare('UPDATE investments SET pending_interest = ?, total_paid = COALESCE(total_paid, 0) + ? WHERE id = ?').bind(totalPending - payout, payout, inv.id).run();
-        await logHourly(db, inv.user_id, 'investment_interest', payout, '定存利息');
+        stmts.push(db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, inv.user_id));
+        stmts.push(db.prepare('UPDATE investments SET pending_interest = ?, total_paid = COALESCE(total_paid, 0) + ? WHERE id = ?').bind(totalPending - payout, payout, inv.id));
+        logs.push([inv.user_id, 'investment_interest', payout, '定存利息']);
       } else {
-        await db.prepare('UPDATE investments SET pending_interest = ? WHERE id = ?').bind(totalPending, inv.id).run();
+        stmts.push(db.prepare('UPDATE investments SET pending_interest = ? WHERE id = ?').bind(totalPending, inv.id));
       }
       continue;
     }
 
     const info = INVEST_TYPES[inv.type];
     if (!info) continue;
-    if (!subCache[inv.user_id]) subCache[inv.user_id] = await getUserSubscriptions(db, inv.user_id);
+    if (!subCache[inv.user_id]) {
+      const subRows = await db.prepare('SELECT key, enabled FROM subscriptions WHERE user_id = ?').bind(inv.user_id).all();
+      const m = {};
+      for (const r of subRows.results) m[r.key] = !!r.enabled;
+      subCache[inv.user_id] = m;
+    }
     const financeBonus = subCache[inv.user_id]?.finance ? 1.15 : 1;
     const totalInvested = inv.amount + (inv.pending_interest || 0);
     const baseRate = info.rateMin + Math.random() * (info.rateMax - info.rateMin);
@@ -149,24 +162,28 @@ export async function processInvestmentTick(db) {
     const totalPending = (inv.pending_interest || 0) + earned;
     const payout = Math.floor(totalPending);
     if (payout > 0) {
-      await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, inv.user_id).run();
-      await db.prepare('UPDATE investments SET pending_interest = ?, total_paid = COALESCE(total_paid, 0) + ? WHERE id = ?').bind(totalPending - payout, payout, inv.id).run();
-      await logHourly(db, inv.user_id, 'investment_interest', payout, `${info.label}利息`);
+      stmts.push(db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, inv.user_id));
+      stmts.push(db.prepare('UPDATE investments SET pending_interest = ?, total_paid = COALESCE(total_paid, 0) + ? WHERE id = ?').bind(totalPending - payout, payout, inv.id));
+      logs.push([inv.user_id, 'investment_interest', payout, `${info.label}利息`]);
     } else {
-      await db.prepare('UPDATE investments SET pending_interest = ? WHERE id = ?').bind(totalPending, inv.id).run();
+      stmts.push(db.prepare('UPDATE investments SET pending_interest = ? WHERE id = ?').bind(totalPending, inv.id));
     }
-    await applyStartupRisk(db, inv);
+    // 新創虧損: 小機率損失 5~20% 本金
+    if (info?.risk && Math.random() < info.risk) {
+      const lossPct = 0.05 + Math.random() * 0.15;
+      const loss = Math.max(1, Math.floor(inv.amount * lossPct));
+      stmts.push(db.prepare('UPDATE wallets SET cash = MAX(cash - ?, 0) WHERE user_id = ?').bind(loss, inv.user_id));
+      stmts.push(db.prepare('UPDATE investments SET amount = amount - ? WHERE id = ?').bind(loss, inv.id));
+      logs.push([inv.user_id, 'investment_loss', -loss, `${info.label}虧損`]);
+      stmts.push(db.prepare('INSERT INTO notifications (user_id, type, message, created_at) VALUES (?, ?, ?, ?)').bind(inv.user_id, 'investment_loss', `📉 你的${info.label}虧損 $${loss.toLocaleString()}（-${(lossPct * 100).toFixed(1)}%）`, Date.now()));
+    }
   }
-}
 
-// 每分鐘小機率新創虧損 (risk 機率, 損失 5~20% 本金)
-async function applyStartupRisk(db, inv) {
-  const info = INVEST_TYPES[inv.type];
-  if (!info?.risk || Math.random() >= info.risk) return;
-  const lossPct = 0.05 + Math.random() * 0.15;
-  const loss = Math.max(1, Math.floor(inv.amount * lossPct));
-  await db.prepare('UPDATE wallets SET cash = MAX(cash - ?, 0) WHERE user_id = ?').bind(loss, inv.user_id).run();
-  await db.prepare('UPDATE investments SET amount = amount - ? WHERE id = ?').bind(loss, inv.id).run();
-  await logHourly(db, inv.user_id, 'investment_loss', -loss, `${info.label}虧損`);
-  await notify(db, inv.user_id, 'investment_loss', `📉 你的${info.label}虧損 $${loss.toLocaleString()}（-${(lossPct * 100).toFixed(1)}%）`);
+  const allStmts = [...stmts, ...txLogs];
+  if (allStmts.length > 0) await db.batch(allStmts);
+  if (logger) {
+    for (const [u, t, a, d] of logs) logger.log(u, t, a, d);
+  } else {
+    for (const [u, t, a, d] of logs) await logHourly(db, u, t, a, d);
+  }
 }

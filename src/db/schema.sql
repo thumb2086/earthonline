@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS investments (
 
 CREATE TABLE IF NOT EXISTS companies (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  code            TEXT,
   owner_id        INTEGER NOT NULL,
   name            TEXT NOT NULL,
   industry        TEXT NOT NULL,
@@ -65,7 +66,8 @@ CREATE TABLE IF NOT EXISTS companies (
   equipment_level INTEGER DEFAULT 1,
   brand_level     INTEGER DEFAULT 1,
   base_income     INTEGER DEFAULT 0,
-  created_at      INTEGER NOT NULL
+  created_at      INTEGER NOT NULL,
+  last_delisted_at INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS ipo_subscriptions (
@@ -147,5 +149,12 @@ CREATE TABLE IF NOT EXISTS system_reserve (
 CREATE TABLE IF NOT EXISTS ipo_state (
   company_id    INTEGER PRIMARY KEY REFERENCES companies(id),
   phase         TEXT NOT NULL DEFAULT 'ipo',
-  started_at    INTEGER NOT NULL
+  started_at    INTEGER NOT NULL,
+  duration_minutes INTEGER DEFAULT 60
+);
+
+CREATE TABLE IF NOT EXISTS oauth_states (
+  state      TEXT PRIMARY KEY,
+  provider   TEXT NOT NULL,
+  created_at INTEGER NOT NULL
 );

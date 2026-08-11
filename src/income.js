@@ -1,5 +1,4 @@
 import { logHourly } from './utils.js';
-import { getUserSubscriptions } from './subscription.js';
 
 const BASE_INCOME = 20;
 
@@ -75,33 +74,66 @@ export async function handleIncome(env, request, path, user) {
   return null;
 }
 
-export async function processIncomeTick(db) {
-  // 語音掛機加成 (全服 1.2x)
-  const boostRow = await db.prepare("SELECT value FROM community_state WHERE key = 'voice_boost'").first();
-  const boost = boostRow?.value === '1' ? 1.2 : 1;
+export async function processIncomeTick(db, logger) {
+  let boost = 1;
+  try {
+    const boostRow = await db.prepare("SELECT value FROM community_state WHERE key = 'voice_boost'").first();
+    if (boostRow?.value === '1') boost = 1.2;
+  } catch (e) {}
   const users = await db.prepare('SELECT id FROM users').all();
-  for (const user of users.results) {
-    const subs = await getUserSubscriptions(db, user.id);
-    const income = Math.floor(await getIncomePerMin(db, user.id, subs) * boost);
-    const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
-    if (!wallet) continue;
-    if (income > 0) {
-      await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(income, income, user.id).run();
-      await logHourly(db, user.id, 'income', income, '基礎收入');
-    }
+  if (users.results.length === 0) return;
 
-    // 生活費階梯（保險：現金最低保留 $200）
-    const rate = getLivingCostRate(income);
-    const livingCost = Math.floor(income * rate);
-    if (livingCost > 0 && wallet.cash > 0) {
-      let cash = wallet.cash;
-      const protectFloor = subs.insurance ? 200 : 0;
-      const deductable = Math.max(0, cash - protectFloor);
-      const actual = Math.min(livingCost, deductable);
-      if (actual > 0) {
-        await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(actual, user.id).run();
-        await logHourly(db, user.id, 'living_cost', -actual, '生活費');
+  // 1 次 batch 預載全部玩家資料, 迴圈內零查詢
+  const [levelsRes, subsRes, walletsRes] = await db.batch([
+    db.prepare('SELECT user_id, computer, server, ai_assistant FROM income_levels'),
+    db.prepare('SELECT user_id, key, enabled FROM subscriptions'),
+    db.prepare('SELECT user_id, cash FROM wallets'),
+  ]);
+  const levels = {};
+  for (const r of levelsRes.results) levels[r.user_id] = r;
+  const subsMap = {};
+  for (const r of subsRes.results) { (subsMap[r.user_id] ||= {})[r.key] = !!r.enabled; }
+  const walletCash = {};
+  for (const r of walletsRes.results) walletCash[r.user_id] = r.cash;
+
+  const stmts = [];
+  const logs = [];
+  for (const user of users.results) {
+    try {
+      const sub = subsMap[user.id] || {};
+      const lv = levels[user.id];
+      let income = BASE_INCOME;
+      if (lv) {
+        income += (UPGRADE_INCOME.computer[lv.computer] || 0) + (UPGRADE_INCOME.server[lv.server] || 0) + (UPGRADE_INCOME.ai_assistant[lv.ai_assistant] || 0);
+        if (sub.home) income = Math.floor(income * 1.1);
       }
-    }
+      income = Math.floor(income * boost);
+      let cash = walletCash[user.id];
+      if (cash === undefined) continue;
+      if (income > 0) {
+        stmts.push(db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(income, income, user.id));
+        logs.push([user.id, 'income', income, '基礎收入']);
+        cash += income;
+      }
+
+      // 生活費階梯（保險：現金最低保留 $200）— 用加完收入後的現金計算
+      const rate = getLivingCostRate(income);
+      const livingCost = Math.floor(income * rate);
+      if (livingCost > 0 && cash > 0) {
+        const protectFloor = sub.insurance ? 200 : 0;
+        const deductable = Math.max(0, cash - protectFloor);
+        const actual = Math.min(livingCost, deductable);
+        if (actual > 0) {
+          stmts.push(db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(actual, user.id));
+          logs.push([user.id, 'living_cost', -actual, '生活費']);
+        }
+      }
+    } catch (e) {}
+  }
+  if (stmts.length > 0) await db.batch(stmts);
+  if (logger) {
+    for (const [u, t, a, d] of logs) logger.log(u, t, a, d);
+  } else {
+    for (const [u, t, a, d] of logs) await logHourly(db, u, t, a, d);
   }
 }

@@ -1,6 +1,7 @@
 import { getUserSubscriptions } from './subscription.js';
 import { getIncomePerMin, getLivingCostRate } from './income.js';
 import { getCompanyProfit } from './company.js';
+import { forceResetGame } from './reset.js';
 
 const UPGRADE_INCOME = {
   computer: [0, 5, 12, 30, 75, 180, 450, 1200],
@@ -38,7 +39,10 @@ function inClause(ids, prefix) {
 }
 
 export async function handleAdmin(env, request, path, user) {
-  if (user.role !== 'admin') return { error: '管理員專用' };
+  // 每請求從 DB 重新驗證角色 (防 token 內 stale admin role 持續 30 天)
+  const dbRole = await env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(user.id).first();
+  if (!dbRole || dbRole.role !== 'admin') return { error: '管理員專用' };
+  user.role = 'admin';
 
   const db = env.DB;
 
@@ -208,6 +212,62 @@ export async function handleAdmin(env, request, path, user) {
     return { success: true };
   }
 
+  // IPO 排程管理: 列出所有公司狀態
+  if (path === '/api/admin/ipo/schedule') {
+    const companies = await db.prepare(`
+      SELECT c.id, c.code, c.name, c.industry, c.total_shares, c.share_price,
+             i.phase, i.started_at, i.duration_minutes,
+             COALESCE(inv.stock_quantity, 0) as inventory,
+             (SELECT COALESCE(SUM(shares),0) FROM ipo_subscriptions WHERE company_id=c.id) as subscribed
+      FROM companies c
+      LEFT JOIN ipo_state i ON c.id = i.company_id
+      LEFT JOIN stock_inventory inv ON c.id = inv.company_id
+      ORDER BY c.code
+    `).all();
+    return companies.results;
+  }
+
+  // 設定 IPO 時間並開始
+  if (path === '/api/admin/ipo/start' && request.method === 'POST') {
+    const { companyId, durationMinutes, startTime } = await request.json();
+    if (!companyId) return { error: '請選擇公司' };
+    const company = await db.prepare('SELECT id, code, name FROM companies WHERE id = ?').bind(companyId).first();
+    if (!company) return { error: '公司不存在' };
+    const ipo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
+    if (!ipo) return { error: '公司無 IPO 狀態' };
+    if (ipo.phase === 'ipo') return { error: '已在 IPO 中' };
+    if (ipo.phase === 'trading') return { error: '已上市交易中' };
+    if (ipo.phase === 'queued') return { error: '已在排隊中，等自動開始' };
+
+    const duration = Math.max(60, Math.min(4320, parseInt(durationMinutes) || 4320)); // 1hr ~ 3days
+    const startAt = startTime ? new Date(startTime).getTime() : Date.now();
+    if (isNaN(startAt) || startAt < Date.now() - 60000) return { error: '開始時間無效' };
+
+    // 檢查是否已有正在進行的 IPO
+    const currentIpo = await db.prepare("SELECT company_id FROM ipo_state WHERE phase = 'ipo'").first();
+    if (currentIpo && startAt <= Date.now()) {
+      // 立即開始且已有 IPO 進行中: 排隊
+      await db.prepare("UPDATE ipo_state SET phase = 'queued', started_at = ?, duration_minutes = ? WHERE company_id = ?").bind(startAt, duration, companyId).run();
+    } else {
+      // 設定時間或立即開始(無其他IPO): 直接開始
+      await db.prepare("UPDATE ipo_state SET phase = 'ipo', started_at = ?, duration_minutes = ? WHERE company_id = ?").bind(startAt, duration, companyId).run();
+    }
+
+    await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`📢 「${company.code} ${company.name}」IPO 已排程，認購期 ${duration} 分鐘`, Date.now()).run();
+    return { success: true, message: `「${company.code} ${company.name}」IPO 已排程` };
+  }
+
+  // 取消 IPO 排程
+  if (path === '/api/admin/ipo/cancel' && request.method === 'POST') {
+    const { companyId } = await request.json();
+    if (!companyId) return { error: '請選擇公司' };
+    const ipo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
+    if (!ipo) return { error: '公司無 IPO 狀態' };
+    if (ipo.phase === 'trading') return { error: '已上市交易中，無法取消' };
+    await db.prepare("UPDATE ipo_state SET phase = 'pending', started_at = 0 WHERE company_id = ?").bind(companyId).run();
+    return { success: true, message: '已取消 IPO 排程' };
+  }
+
   if (path === '/api/admin/margin') {
     const excludeIds = await resolveExclude(db, request);
     const excl = excludeIds.length > 0 ? ` AND mp.user_id NOT IN (${excludeIds.join(',')})` : '';
@@ -322,6 +382,87 @@ export async function handleAdmin(env, request, path, user) {
     const incomeLevels = await db.prepare('SELECT * FROM income_levels WHERE user_id = ?').bind(targetId).first();
 
     return { ...target, holdings: holdings.results, loans: loans.results, investments: investments.results, employees: employees.results, marginPositions: positions.results, companies: companies.results, departments: depts.results, subscriptions: subs, incomeLevels };
+  }
+
+  // 重置系統: 正式版前單人可重置, 正式版後需3位管理員簽署
+  if (path === '/api/admin/reset') {
+    const url = new URL(request.url);
+    const force = url.searchParams.get('force') === '1';
+    const done = await db.prepare("SELECT value FROM game_meta WHERE key = 'v2_reset_done'").first();
+
+    if (!done || force) {
+      // 正式版前 或 強制: 單人可重置
+      if (force) await db.prepare("DELETE FROM game_meta WHERE key = 'v2_reset_done'").run();
+      const result = await forceResetGame(db);
+      if (result) return { success: true, message: '全服重置完成' };
+      return { error: '重置失敗' };
+    }
+
+    // 正式版後: 需要多管理員簽署
+    return { error: '正式版已上線，需3位管理員簽署才能重置。請用 /api/admin/reset/request 發起請求', needSignatures: true };
+  }
+
+  // 發起重置請求
+  if (path === '/api/admin/reset/request') {
+    const existing = await db.prepare("SELECT * FROM game_meta WHERE key = 'reset_request'").first();
+    if (existing) {
+      const req = JSON.parse(existing.value || '{}');
+      if (req.executed) return { error: '重置已執行過了' };
+      return { error: '已有重置請求進行中', request: req };
+    }
+    const admins = await db.prepare("SELECT id, username FROM users WHERE role = 'admin'").all();
+    if (admins.results.length < 3) return { error: `需要至少3位管理員，目前只有${admins.results.length}位` };
+    const request = {
+      initiator: user.id,
+      initiatorName: user.username,
+      signatures: [user.id],
+      required: 3,
+      createdAt: Date.now(),
+      executed: false,
+    };
+    await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('reset_request', ?)").bind(JSON.stringify(request)).run();
+    // 通知其他管理員
+    for (const admin of admins.results) {
+      if (admin.id !== user.id) {
+        await notify(db, admin.id, 'reset_request', `⚠️ ${user.username} 發起了全服重置請求，需要你的簽署。前往管理面板確認。`);
+      }
+    }
+    return { success: true, message: `重置請求已發起（${request.signatures.length}/${request.required}）`, request };
+  }
+
+  // 簽署重置請求
+  if (path === '/api/admin/reset/sign') {
+    const existing = await db.prepare("SELECT value FROM game_meta WHERE key = 'reset_request'").first();
+    if (!existing) return { error: '沒有進行中的重置請求' };
+    const req = JSON.parse(existing.value || '{}');
+    if (req.executed) return { error: '重置已執行過了' };
+    if (req.signatures.includes(user.id)) return { error: '你已經簽署過了' };
+    req.signatures.push(user.id);
+    await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('reset_request', ?)").bind(JSON.stringify(req)).run();
+
+    if (req.signatures.length >= req.required) {
+      // 足夠簽署: 執行重置
+      await db.prepare("DELETE FROM game_meta WHERE key = 'v2_reset_done'").run();
+      const result = await forceResetGame(db);
+      req.executed = true;
+      req.executedAt = Date.now();
+      await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('reset_request', ?)").bind(JSON.stringify(req)).run();
+      // 通知全體
+      const admins = await db.prepare("SELECT id FROM users WHERE role = 'admin'").all();
+      for (const admin of admins.results) {
+        await notify(db, admin.id, 'reset_executed', `✅ 全服重置已由 ${req.signatures.length} 位管理員簽署並執行！`);
+      }
+      return { success: true, message: '全服重置完成！' };
+    }
+
+    return { success: true, message: `簽署成功（${req.signatures.length}/${req.required}）`, request: req };
+  }
+
+  // 查詢重置請求狀態
+  if (path === '/api/admin/reset/status') {
+    const existing = await db.prepare("SELECT value FROM game_meta WHERE key = 'reset_request'").first();
+    if (!existing) return { request: null };
+    return { request: JSON.parse(existing.value || '{}') };
   }
 
   return null;

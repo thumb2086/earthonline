@@ -58,6 +58,12 @@ export async function handleStock(env, request, path, user) {
   const db = env.DB;
   const method = request.method;
 
+  if (path === '/api/stock/dashboard') {
+    const reqUrl = new URL(request.url);
+    const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
+    return await handleStockDashboard(db, user, companyId);
+  }
+
   if (path === '/api/stock/quote') {    const reqUrl = new URL(request.url);
     const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
     const price = await getCurrentPrice(db, companyId);
@@ -79,7 +85,6 @@ export async function handleStock(env, request, path, user) {
       buyPrice: Math.round(price),
       sellPrice: Math.round(price),
       spread: 0,
-      systemCash: inv?.cash || 0,
       systemInventory: inv?.stock_quantity || 0,
       circulating,
       maxTrade,
@@ -198,9 +203,10 @@ export async function handleStock(env, request, path, user) {
   if (path === '/api/stock/klines/agg') {
     const reqUrl = new URL(request.url);
     const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
-    const aggMs = parseInt(reqUrl.searchParams.get('interval') || '300000');
-    const limit = parseInt(reqUrl.searchParams.get('limit') || '120');
-    const klines = await db.prepare('SELECT * FROM stock_klines WHERE company_id = ? ORDER BY minute DESC').bind(companyId).all();
+    const aggMs = Math.max(parseInt(reqUrl.searchParams.get('interval') || '300000'), 5000);
+    const limit = Math.min(parseInt(reqUrl.searchParams.get('limit') || '120') || 120, 300);
+    // 只取最近 48 小時的 K 線做聚合 (防全表掃描 DoS)
+    const klines = await db.prepare('SELECT * FROM stock_klines WHERE company_id = ? AND minute >= ? ORDER BY minute DESC').bind(companyId, Date.now() - 48 * 3600000).all();
     const results = [];
     const blocks = {};
     for (const k of klines.results) {
@@ -268,8 +274,14 @@ const price = await getCurrentPrice(db, companyId);
 
     const now = Date.now();
 
-    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost + fee, user.id).run();
-    await db.prepare('UPDATE stock_inventory SET cash = cash + ?, stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(totalCost + fee, quantity, companyId).run();
+    // 條件更新防雙花: 現金/庫存足夠才扣, 不足則拒絕
+    const cashRes = await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ? AND cash >= ?').bind(totalCost + fee, user.id, totalCost + fee).run();
+    if (cashRes.meta.changes === 0) return { error: '餘額不足' };
+    const invRes = await db.prepare('UPDATE stock_inventory SET cash = cash + ?, stock_quantity = stock_quantity - ? WHERE company_id = ? AND stock_quantity >= ?').bind(totalCost + fee, quantity, companyId, quantity).run();
+    if (invRes.meta.changes === 0) {
+      await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(totalCost + fee, user.id).run();
+      return { error: '系統庫存不足' };
+    }
 
     const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).first();
     if (holding) {
@@ -325,16 +337,21 @@ const price = await getCurrentPrice(db, companyId);
     const netRevenue = totalRevenue - fee;
     const now = Date.now();
 
-    // 賣出: 庫存增加但上限 = total_shares (超過部分視為系統銷毀, 維持 庫存+持股 = total 恆等式)
+    // 賣出: 先條件扣持股 (防雙花, 不足則整個交易取消)
+    let deductOk = false;
+    if (holding.quantity === quantity) {
+      const delRes = await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ? AND quantity = ?').bind(user.id, companyId, quantity).run();
+      if (delRes.meta.changes > 0) deductOk = true;
+    } else {
+      const updRes = await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ? AND quantity >= ?').bind(quantity, user.id, companyId, quantity).run();
+      if (updRes.meta.changes > 0) deductOk = true;
+    }
+    if (!deductOk) return { error: '持股不足' };
+
+    // 庫存增加但上限 = total_shares (超過部分視為系統銷毀, 維持 庫存+持股 = total 恆等式)
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(netRevenue, user.id).run();
     await db.prepare('UPDATE stock_inventory SET cash = cash - ? WHERE company_id = ?').bind(totalRevenue, companyId).run();
     await db.prepare('UPDATE stock_inventory SET stock_quantity = MIN(stock_quantity + ?, ?) WHERE company_id = ?').bind(quantity, companyS.total_shares, companyId).run();
-
-    if (holding.quantity === quantity) {
-      await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).run();
-    } else {
-      await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(quantity, user.id, companyId).run();
-    }
 
     await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, companyId).run();
     await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(companyId, user.id, 'sell', newPrice, quantity, now).run();
@@ -447,6 +464,8 @@ const price = await getCurrentPrice(db, companyId);
 
   if (path === '/api/stock/margin/open') {
     const { companyId = 1, quantity, leverage, type } = await request.json();
+    if (!Number.isInteger(quantity) || quantity <= 0) return { error: '股數必須為正整數' };
+    if (!['long', 'short'].includes(type)) return { error: '方向需為 long / short' };
     if (!LEVERAGE_OPTIONS.includes(leverage)) return { error: '無效槓桿' };
 
     const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
@@ -477,16 +496,23 @@ const price = await getCurrentPrice(db, companyId);
       return { error: `單筆交易上限 ${maxTradeM.toLocaleString()} 股` };
     }
 
-    // 依影響後價計算倉位價值與保證金 (先檢查後扣款)
+    // 依影響後價計算倉位價值與保證金 (先檢查庫存再扣款)
     const totalValue = newPrice * quantity;
     const marginAmount = Math.floor(totalValue / leverage);
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet || wallet.cash < marginAmount) return { error: '保證金不足' };
-    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(marginAmount, user.id).run();
 
     if (type === 'long') {
       if (!inv || inv.stock_quantity < quantity) return { error: '系統庫存不足' };
-      await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(quantity, companyId).run();
+    }
+    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(marginAmount, user.id).run();
+
+    if (type === 'long') {
+      const invResM = await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity - ? WHERE company_id = ? AND stock_quantity >= ?').bind(quantity, companyId, quantity).run();
+      if (invResM.meta.changes === 0) {
+        await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(marginAmount, user.id).run();
+        return { error: '系統庫存不足' };
+      }
       const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).first();
       if (holding) {
         await db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(quantity, user.id, companyId).run();
@@ -505,6 +531,9 @@ const price = await getCurrentPrice(db, companyId);
       // Short: check system has enough cash to buy back
       const invShort = await db.prepare('SELECT cash FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
       if (!invShort || invShort.cash < totalValue * 0.1) return { error: '系統資金不足做空' };
+      // 做空總量上限 = 流通量 (防超額空單操控)
+      const openShorts = await db.prepare("SELECT COALESCE(SUM(quantity),0) as q FROM margin_positions WHERE company_id = ? AND type = 'short' AND status != 'closed'").bind(companyId).first();
+      if ((openShorts?.q || 0) >= circulating) return { error: `做空已達上限（總流通 ${circulating.toLocaleString()} 股）` };
       const sellRevenue = totalValue;
       await db.prepare('UPDATE stock_inventory SET cash = cash + ? WHERE company_id = ?').bind(sellRevenue, companyId).run();
       await db.prepare('INSERT INTO margin_positions (user_id, company_id, type, quantity, entry_price, loan_amount, margin_amount, leverage, opened_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(user.id, companyId, 'short', quantity, newPrice, sellRevenue, marginAmount, leverage, now).run();
@@ -541,7 +570,9 @@ const price = await getCurrentPrice(db, companyId);
     const positionId = parseInt(path.split('/').pop());
     const pos = await db.prepare('SELECT * FROM margin_positions WHERE id = ? AND user_id = ?').bind(positionId, user.id).first();
     if (!pos) return { error: '倉位不存在' };
-    return await closePosition(db, pos);
+    const result = await closePosition(db, pos);
+    if (!result) return { error: '倉位已平倉' };
+    return result;
   }
 
   if (path === '/api/stock/margin/positions') {
@@ -553,6 +584,9 @@ const price = await getCurrentPrice(db, companyId);
 }
 
 async function closePosition(db, pos) {
+  // 先原子鎖定: 條件刪除成功才結算 (防併發平倉/清算雙重入帳)
+  const lockRes = await db.prepare('DELETE FROM margin_positions WHERE id = ?').bind(pos.id).run();
+  if (lockRes.meta.changes === 0) return null;
   const currentPrice = await getCurrentPrice(db, pos.company_id);
   const companyData = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(pos.company_id).first();
   const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(pos.company_id).first();
@@ -585,7 +619,6 @@ async function closePosition(db, pos) {
     await db.prepare('UPDATE stock_inventory SET cash = cash - ? WHERE company_id = ?').bind(buyCost, pos.company_id).run();
     await logTransaction(db, pos.user_id, 'margin_close', Math.max(totalReturn, 0), `平倉做空 ${pos.quantity}股 @ $${closePrice}（損益 ${pnl >= 0 ? '+' : ''}${pnl.toLocaleString()}）`);
   }
-  await db.prepare('DELETE FROM margin_positions WHERE id = ?').bind(pos.id).run();
   return { success: true };
 }
 
@@ -634,6 +667,7 @@ export async function processMarginTick(db) {
 }
 
 export async function finalizeIPO(db) {
+  // 1. 完成已到期的 IPO
   const ipos = await db.prepare("SELECT company_id, phase, started_at, duration_minutes FROM ipo_state WHERE phase = 'ipo'").all();
   for (const ipo of ipos.results) {
     const durationMs = (ipo.duration_minutes || 60) * 60000;
@@ -646,6 +680,9 @@ export async function finalizeIPO(db) {
 
     if (!timeUp && !isFull) continue;
 
+    // 冪等: 先標記 trading, 失敗代表已被其他 run 處理過
+    const flipRes = await db.prepare("UPDATE ipo_state SET phase = 'trading' WHERE company_id = ? AND phase = 'ipo'").bind(ipo.company_id).run();
+    if (flipRes.meta.changes === 0) continue;
     const subs = await db.prepare('SELECT user_id, shares FROM ipo_subscriptions WHERE company_id = ?').bind(ipo.company_id).all();
     const companyName = await db.prepare('SELECT name FROM companies WHERE id = ?').bind(ipo.company_id).first();
     for (const sub of subs.results) {
@@ -655,15 +692,25 @@ export async function finalizeIPO(db) {
       } else {
         await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(sub.user_id, ipo.company_id, sub.shares).run();
       }
-      await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(sub.shares, ipo.company_id).run();
+      await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity - ? WHERE company_id = ? AND stock_quantity >= ?').bind(sub.shares, ipo.company_id, sub.shares).run();
       await notify(db, sub.user_id, 'ipo_listed', `🚀 「${companyName?.name || '公司'}」已上市！你認購的 ${sub.shares.toLocaleString()} 股已入帳。`);
     }
-    await db.prepare("UPDATE ipo_state SET phase = 'trading' WHERE company_id = ?").bind(ipo.company_id).run();
     const owner = await db.prepare('SELECT owner_id, share_price FROM companies WHERE id = ?').bind(ipo.company_id).first();
     if (owner && owner.owner_id > 0) {
       await notify(db, owner.owner_id, 'ipo_listed', `🚀 你的公司「${companyName?.name || ''}」已完成 IPO 上市！`);
     }
     await broadcast(db, `🎉 「${companyName?.name || '公司'}」IPO 結束，正式上市！發行價 $${owner?.share_price || 100}，${subTotal?.t || 0 ? `全體認購 ${(subTotal?.t || 0).toLocaleString()} 股` : '認購未滿額'}，開始掛牌交易`);
+  }
+
+  // 2. 啟動排隊中的 IPO: 如果目前沒有 'ipo' 階段的公司, 啟動下一家排隊公司
+  const currentIpo = await db.prepare("SELECT company_id FROM ipo_state WHERE phase = 'ipo'").first();
+  if (!currentIpo) {
+    const nextQueued = await db.prepare("SELECT company_id, duration_minutes FROM ipo_state WHERE phase = 'queued' ORDER BY company_id ASC LIMIT 1").first();
+    if (nextQueued) {
+      await db.prepare("UPDATE ipo_state SET phase = 'ipo', started_at = ? WHERE company_id = ? AND phase = 'queued'").bind(Date.now(), nextQueued.company_id).run();
+      const company = await db.prepare('SELECT name, code FROM companies WHERE id = ?').bind(nextQueued.company_id).first();
+      await broadcast(db, `📢 「${company?.code || ''} ${company?.name || '公司'}」IPO 開始！認購期 ${(nextQueued.duration_minutes || 4320) / 1440} 天`);
+    }
   }
 }
 
@@ -698,7 +745,21 @@ export async function matchLimitOrders(db) {
       const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(o.user_id).first();
       if (!wallet) continue;
       const now = Date.now();
-      const fillPrice = Math.round(price);
+
+      // 掛單成交也承受市場影響 (與市價單一致, 防拆單規避滑點) — 成交價不超過 limit price
+      const impact = getPriceImpact(o.quantity, circulating, comp.total_shares);
+      const rawFill = o.type === 'buy'
+        ? Math.round(price * (1 + impact))
+        : Math.max(1, Math.round(price * (1 - impact)));
+      const fillPrice = o.type === 'buy' ? Math.min(rawFill, o.price) : Math.max(rawFill, o.price);
+      // 漲跌停檢查: 影響後價格仍須在 ±20% 帶內
+      const refTrade2 = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(o.company_id, now - 60000).first();
+      if (refTrade2) {
+        const maxP2 = Math.ceil(refTrade2.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
+        const minP2 = Math.floor(refTrade2.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
+        if (fillPrice > maxP2) continue;
+        if (fillPrice < minP2) continue;
+      }
       let ok = false;
 
       if (o.type === 'buy') {
@@ -738,7 +799,8 @@ export async function matchLimitOrders(db) {
         await notify(db, o.user_id, 'limit_order', `✅ 掛單賣出「${comp.name}」成交 ${o.quantity.toLocaleString()} 股 @ $${fillPrice}（掛單價 $${o.price}）`);
         ok = true;
       }
-      if (ok) {
+if (ok) {
+        await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(fillPrice, o.company_id).run();
         await db.prepare("UPDATE stock_limit_orders SET status = 'filled', filled_quantity = ?, filled_at = ? WHERE id = ?").bind(o.quantity, now, o.id).run();
       }
     } catch (e) {
@@ -780,4 +842,47 @@ export async function computeMarketIndex(db) {
     return { minute: parseInt(ms), value: baseCap > 0 ? Math.round((cap / baseCap) * 1000) : 1000 };
   });
   return { value: indexValue, change: timeline.length > 1 ? (timeline[timeline.length - 1].value - timeline[0].value) : 0, timeline: timeline.slice(-300), stocks: rows.length };
+}
+
+// 合併 endpoint: 一次回傳交易頁面所需的核心資料，減少前端 API 呼叫次數
+export async function handleStockDashboard(db, user, companyId) {
+  const [quoteRes, holdingsRes, tradesRes, myTradesRes, marginRes, ipoRes, ordersRes] = await Promise.all([
+    // quote
+    (async () => {
+      const price = await getCurrentPrice(db, companyId);
+      const inv = await db.prepare('SELECT cash, stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
+      const company = await db.prepare('SELECT total_shares, code, name FROM companies WHERE id = ?').bind(companyId).first();
+      const circulating = (company?.total_shares || 1000000) - (inv?.stock_quantity || 0);
+      const maxTrade = getMaxTrade(circulating, inv?.stock_quantity || 0, Math.floor((company?.total_shares || 0) * 0.03));
+      let limit = null;
+      const refTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, Date.now() - 60000).first();
+      if (refTrade) {
+        if (price >= Math.ceil(refTrade.price * 1.2)) limit = 'up';
+        else if (price <= Math.floor(refTrade.price * 0.8)) limit = 'down';
+      }
+      return { price, code: company?.code, companyName: company?.name, systemInventory: inv?.stock_quantity || 0, circulating, maxTrade, limit, minInventory: Math.floor((company?.total_shares || 0) * 0.03) };
+    })(),
+    // holdings
+    db.prepare('SELECT sh.company_id, sh.quantity, c.name as company_name FROM stock_holdings sh JOIN companies c ON c.id = sh.company_id WHERE user_id = ?').bind(user.id).all(),
+    // trades (recent 10)
+    db.prepare('SELECT * FROM stock_trades WHERE company_id = ? ORDER BY traded_at DESC LIMIT 10').bind(companyId).all(),
+    // my trades (recent 20)
+    db.prepare('SELECT * FROM stock_trades WHERE company_id = ? AND user_id = ? ORDER BY traded_at DESC LIMIT 20').bind(companyId, user.id).all(),
+    // margin positions
+    db.prepare('SELECT * FROM margin_positions WHERE user_id = ?').bind(user.id).all(),
+    // ipo info
+    db.prepare("SELECT ipo.*, c.name as company_name FROM ipo_state ipo JOIN companies c ON c.id = ipo.company_id WHERE ipo.company_id = ?").bind(companyId).first(),
+    // orders
+    db.prepare('SELECT * FROM stock_limit_orders WHERE user_id = ?').bind(user.id).all(),
+  ]);
+
+  return {
+    quote: quoteRes,
+    holdings: holdingsRes.results || [],
+    trades: tradesRes.results || [],
+    myTrades: myTradesRes.results || [],
+    marginPositions: marginRes.results || [],
+    ipo: ipoRes || null,
+    orders: ordersRes.results || [],
+  };
 }

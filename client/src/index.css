@@ -493,7 +493,7 @@ select, .select-sm {
   .stat-value { font-size: 14px; }
 
   .flex.gap-8, .flex.gap-12 { flex-wrap: wrap; gap: 4px; }
-  input[type="number"], input[type="text"] { width: 100% !important; min-width: 0 !important; box-sizing: border-box; }
+  input[type="number"], input[type="text"] { min-width: 0 !important; box-sizing: border-box; }
   .btn { padding: 5px 8px; font-size: 10px; border-radius: 5px; }
   .select-sm { padding: 3px 5px; font-size: 10px; }
 

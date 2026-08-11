@@ -1,4 +1,4 @@
-import { corsHeaders, json, authCheck, createJWT, logTransaction, logHourly, notify } from './utils.js';
+import { corsHeaders, json, authCheck, createJWT, logTransaction, logHourly, notify, createHourlyLogger } from './utils.js';
 import { handleIncome, processIncomeTick, getIncomePerMin } from './income.js';
 import { handleBank, processBankTick } from './bank.js';
 import { handleInvestment, processInvestmentTick } from './investment.js';
@@ -45,10 +45,30 @@ async function isAdmin(discordId, env) {
 const CALLBACK_PATH = '/api/auth/cb';
 const GOOGLE_CALLBACK_PATH = '/api/auth/google/cb';
 
+// OAuth state 驗證: 產生隨機 state 存 DB (10 分鐘有效), callback 時驗證並刪除
+async function createOAuthState(db, provider) {
+  const state = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+  await db.prepare('INSERT INTO oauth_states (state, provider, created_at) VALUES (?, ?, ?)').bind(state, provider, Date.now()).run();
+  return state;
+}
+
+async function consumeOAuthState(db, state, provider) {
+  if (!state) return false;
+  const row = await db.prepare('SELECT created_at FROM oauth_states WHERE state = ? AND provider = ?').bind(state, provider).first();
+  if (!row) return false;
+  if (Date.now() - row.created_at > 10 * 60000) {
+    await db.prepare('DELETE FROM oauth_states WHERE state = ?').bind(state).run();
+    return false;
+  }
+  await db.prepare('DELETE FROM oauth_states WHERE state = ?').bind(state).run();
+  return true;
+}
+
 async function handleGoogleLogin(request, env, headers, url) {
   try {
     const code = url.searchParams.get('code');
     if (!code) return json({ error: 'Missing code' }, headers, 400);
+    if (!(await consumeOAuthState(env.DB, url.searchParams.get('state'), 'google'))) return json({ error: 'OAuth state 驗證失敗' }, headers, 400);
 
     const redirectUri = (env.FRONTEND_URL || `${url.origin}`) + GOOGLE_CALLBACK_PATH;
     const bodyParams = new URLSearchParams();
@@ -91,7 +111,7 @@ async function handleGoogleLogin(request, env, headers, url) {
 
     const token = await createJWT({ id: account.id, username: account.username, role: account.role }, env.JWT_SECRET);
     const frontendUrl = env.FRONTEND_URL || `${url.origin}`;
-    return Response.redirect(`${frontendUrl}/?token=${token}`, 302);
+    return Response.redirect(`${frontendUrl}/login#token=${token}`, 302);
   } catch (err) {
     return json({ error: 'google callback error: ' + err.message }, headers, 500);
   }
@@ -101,6 +121,7 @@ async function handleDiscordLogin(request, env, headers, url) {
   try {
   const code = url.searchParams.get('code');
   if (!code) return json({ error: 'Missing code' }, headers, 400);
+  if (!(await consumeOAuthState(env.DB, url.searchParams.get('state'), 'discord'))) return json({ error: 'OAuth state 驗證失敗' }, headers, 400);
 
   const redirectUri = (env.FRONTEND_URL || `${url.origin}`) + CALLBACK_PATH;
   const bodyParams = new URLSearchParams();
@@ -148,7 +169,7 @@ async function handleDiscordLogin(request, env, headers, url) {
 
   const token = await createJWT({ id: account.id, username: account.username, role: account.role }, env.JWT_SECRET);
   const frontendUrl = env.FRONTEND_URL || `${url.origin}`;
-  return Response.redirect(`${frontendUrl}/?token=${token}`, 302);
+  return Response.redirect(`${frontendUrl}/login#token=${token}`, 302);
   } catch (err) {
     return json({ error: 'callback error: ' + err.message }, headers, 500);
   }
@@ -166,7 +187,7 @@ export default {
       if (path === '/api/health') return json({ status: 'ok', timestamp: Date.now() }, headers);
 
       if (path === '/api/auth/discord' && request.method === 'GET') {
-        const state = url.searchParams.get('state') || 'discord_login';
+        const state = await createOAuthState(env.DB, 'discord');
         const redirectUri = (env.FRONTEND_URL || `${url.origin}`) + CALLBACK_PATH;
         const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${env.DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify&state=${state}`;
         return Response.redirect(discordAuthUrl, 302);
@@ -177,8 +198,9 @@ export default {
       }
 
       if (path === '/api/auth/google' && request.method === 'GET') {
+        const state = await createOAuthState(env.DB, 'google');
         const redirectUri = (env.FRONTEND_URL || `${url.origin}`) + GOOGLE_CALLBACK_PATH;
-        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account`;
+        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account&state=${state}`;
         return Response.redirect(googleAuthUrl, 302);
       }
 
@@ -223,18 +245,24 @@ export default {
         return json(result, headers, result.error ? 400 : 200);
       }
 
-      // 診斷 Ed25519 支援
+      // 診斷 Ed25519 支援 — 需登入
       if (path === '/api/bot/crypto' && request.method === 'GET') {
+        const au = await authCheck(request, env);
+        if (!au) return json({ error: 'Unauthorized' }, headers, 401);
         return json(await checkCryptoSupport(env), headers);
       }
 
-      // 診斷 body 讀取
+      // 診斷 body 讀取 — 需 admin (回顯請求頭含 IP)
       if (path === '/api/bot/echo' && request.method === 'POST') {
+        const au = await authCheck(request, env);
+        if (!au || au.role !== 'admin') return json({ error: '管理員專用' }, headers, 401);
         return json(await checkBodyEcho(request), headers);
       }
 
-      // Gateway 狀態
+      // Gateway 狀態 — 需登入
       if (path === '/api/bot/gateway' && request.method === 'GET') {
+        const au = await authCheck(request, env);
+        if (!au) return json({ error: 'Unauthorized' }, headers, 401);
         if (!env.GATEWAY) return json({ status: 'no_gateway_binding' }, headers);
         const id = env.GATEWAY.idFromName('main');
         const stub = env.GATEWAY.get(id);
@@ -242,7 +270,7 @@ export default {
         return new Response(resp.body, { headers: { 'content-type': 'application/json' } });
       }
 
-      // Public leaderboard
+      // Public leaderboard — 只暴露排名所需 (不洩漏個人錢包細節)
       if (path === '/api/leaderboard') {
         const users = await env.DB.prepare(`
           SELECT u.id, u.username, u.last_active, w.total_earned, w.cash, w.savings, w.bank,
@@ -254,9 +282,10 @@ export default {
         `).all();
         const now = Date.now();
         const rows = users.results.map(u => ({
-          ...u,
-          stock_value: u.stock_value || 0,
+          id: u.id,
+          username: u.username,
           worth: (u.cash || 0) + (u.savings || 0) + (u.bank || 0) + (u.stock_value || 0) + (u.investments || 0) - (u.debt || 0),
+          stocks: u.stocks || 0,
           online: u.last_active && now - u.last_active < 300000,
         }));
         rows.sort((a, b) => b.worth - a.worth);
@@ -307,14 +336,14 @@ export default {
 
       if (path === '/api/transactions') {
         const url = new URL(request.url);
-        const limit = parseInt(url.searchParams.get('limit') || '50');
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '50') || 50, 200);
         const txs = await env.DB.prepare('SELECT * FROM transaction_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').bind(user.id, limit).all();
         return json(txs.results, headers);
       }
 
       if (path === '/api/notifications') {
         const url = new URL(request.url);
-        const limit = parseInt(url.searchParams.get('limit') || '30');
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '30') || 30, 200);
         const rows = await env.DB.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').bind(user.id, limit).all();
         const unread = await env.DB.prepare('SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND read = 0').bind(user.id).first();
         return json({ items: rows.results, unread: unread?.c || 0 }, headers);
@@ -338,16 +367,33 @@ export default {
         ['/api/admin', handleAdmin],
       ];
 
+      // 公開資料邊緣快取 (秒): 只快取「全用戶相同」的資料, 提高 Cache hit rate
+      const PUBLIC_CACHE_TTL = {
+        '/api/stock/index': 3,
+        '/api/stock/quote': 3,
+        '/api/leaderboard': 15,
+        '/api/investment/terms': 60,
+        '/api/stock/report': 30,
+      };
+
       for (const [prefix, handler] of routes) {
         if (path.startsWith(prefix)) {
           const result = await handler(env, request, path, user);
-          if (result !== null) return json(result, headers, result.error ? 400 : 200);
+          if (result !== null) {
+            // 公開 GET 且無錯誤 → 加 Cache-Control 進邊緣快取
+            const ttl = request.method === 'GET' && !result.error ? PUBLIC_CACHE_TTL[path] : undefined;
+            if (ttl) {
+              return json(result, { ...headers, 'Cache-Control': `public, max-age=${ttl}` }, 200);
+            }
+            return json(result, headers, result.error ? 400 : 200);
+          }
         }
       }
 
       return json({ error: 'Not found' }, headers, 404);
     } catch (err) {
-      return json({ error: err.message, stack: err.stack }, headers, 500);
+      console.error('Request error:', err.message);
+      return json({ error: '伺服器錯誤' }, headers, 500);
     }
   },
 
@@ -355,15 +401,13 @@ export default {
     const db = env.DB;
     const minute = Math.floor(Date.now() / 60000);
 
-    // 核心 tick: 每分鐘必跑 (income/扣費/投資利息)
-    try {
-      await processIncomeTick(db);
-      await processBankTick(db);
-      await processSubscriptionTick(db);
-      await processInvestmentTick(db);
-    } catch (err) {
-      console.error('Scheduled core tick error:', err.message);
-    }
+    // 核心 tick: 每分鐘必跑 (income/扣費/投資利息) — 各自獨立容錯
+    // 共用批次 logger: 1次預載 + 記憶體累加 + 最後1次 batch 寫入 (取代逐用戶 logHourly)
+    const hourlyLogger = await createHourlyLogger(db);
+    try { await processIncomeTick(db, hourlyLogger); } catch (err) { console.error('Scheduled income error:', err.message); }
+    try { await processBankTick(db, hourlyLogger); } catch (err) { console.error('Scheduled bank error:', err.message); }
+    try { await processSubscriptionTick(db, hourlyLogger); } catch (err) { console.error('Scheduled subscription error:', err.message); }
+    try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
 
     // 輕量波動: 每分鐘, 只更新價格 (1查詢/公司)
     try {
@@ -417,8 +461,8 @@ export default {
     if (minute % 2 === 0) {
       try {
         await processEmployeeTick(db);
-        await processCompanyTick(db);
-        await processStockTick(db, minute % 10 === 0); // K線+股利每10分鐘
+        await processCompanyTick(db, hourlyLogger);
+        await processStockTick(db, minute % 10 === 0, hourlyLogger); // K線+股利每10分鐘
       } catch (err) {
         console.error('Scheduled rotate tick error:', err.message);
       }
@@ -429,6 +473,10 @@ export default {
       try {
         await finalizeIPO(db);
         await processMarginTick(db);
+        // K 線留存: 保留最近 48 小時 (半小時清理一次, 防表無限膨脹)
+        if (minute % 60 === 30) {
+          await db.prepare('DELETE FROM stock_klines WHERE minute < ?').bind(Date.now() - 48 * 3600000).run();
+        }
       } catch (err) {
         console.error('Scheduled stock tick error:', err.message);
       }
@@ -453,6 +501,8 @@ export default {
     if (now.getDay() === 0 && now.getHours() === 0 && now.getMinutes() < 5) {
       try { await weeklySettlement(db, env); } catch (e) {}
     }
+    // 最後才 flush 小時彙總 log (收集所有 tick 後一次 batch 寫入)
+    try { await hourlyLogger.flush(); } catch (err) { console.error('Scheduled hourly log flush error:', err.message); }
   },
 };
 
@@ -461,20 +511,30 @@ export { DiscordGateway };
 // 輕量價格波動: 每分鐘 ±0.5% + 回歸力(基準=近60分鐘移動平均, 純波動被抑制但買賣趨勢不被拉回)
 async function processPriceWave(db) {
   const companies = await db.prepare('SELECT id, share_price, total_shares, issue_cap FROM companies').all();
+  if (companies.results.length === 0) return;
   const now = Date.now();
   const interval = 5000;
-  const block = Math.floor(now / interval) * interval;
+
+  // 1 次預載所有公司的 IPO 狀態與庫存, 迴圈內零查詢
+  const [ipoRes, invRes] = await db.batch([
+    db.prepare("SELECT company_id, phase FROM ipo_state"),
+    db.prepare('SELECT company_id, stock_quantity FROM stock_inventory'),
+  ]);
+  const ipoPhase = {};
+  for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
+  const invQty = {};
+  for (const r of invRes.results) invQty[r.company_id] = r.stock_quantity;
+
   for (const c of companies.results) {
-    const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(c.id).first();
-    if (!ipo || ipo.phase !== 'trading') continue;
+    if (ipoPhase[c.id] !== 'trading') continue;
 
     // 有上限溫和回補: 庫存 < 10% → 補到 20%, 總股本不得超過 issue_cap (稀釋有硬頂)
-    const invRow = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(c.id).first();
+    const stockQty = invQty[c.id];
     const issueCap = c.issue_cap || (c.total_shares * 2);
-    if (invRow) {
+    if (stockQty !== undefined) {
       const floor = Math.floor(c.total_shares * 0.1);
-      if (invRow.stock_quantity < floor && c.total_shares < issueCap) {
-        const topUp = Math.min(Math.floor(c.total_shares * 0.2) - invRow.stock_quantity, issueCap - c.total_shares);
+      if (stockQty < floor && c.total_shares < issueCap) {
+        const topUp = Math.min(Math.floor(c.total_shares * 0.2) - stockQty, issueCap - c.total_shares);
         if (topUp > 0) {
           await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, c.id).run();
           await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, c.id).run();
@@ -484,63 +544,93 @@ async function processPriceWave(db) {
     }
 
     // 基準 = 近60分鐘均價 (最後120根5秒K線)
-    const klines = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(c.id).all();
+    const klines = await db.prepare('SELECT close, minute FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(c.id).all();
     const closes = klines.results.map(k => k.close);
     const basePrice = closes.length > 0 ? closes.reduce((s, v) => s + v, 0) / closes.length : (c.share_price || 100);
     let price = c.share_price || basePrice;
-    // 回歸: 偏離移動平均越多拉回越多 (0.3% 回歸率, 允許買賣推升的價格維持)
-    const deviation = basePrice > 0 ? (price - basePrice) / basePrice : 0;
-    const drift = (Math.random() * 2 - 1) * 0.005;
-    const revert = -deviation * 0.003;
-    const newPrice = Math.max(1, Math.round(price * (1 + drift + revert)));
-    // 無條件同步 share_price, 確保報價與 K 線一致
-    if (newPrice !== price) {
-      await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, c.id).run();
-    } else {
-      await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(price, c.id).run();
+
+    // 找出最後一根 K 線的時間，補齊中間遺漏的 K 線 (無 K 線時從現在往前補, 避免 1970 時間戳)
+    const lastKlineTime = klines.results.length > 0 ? klines.results[0].minute : (Math.floor(now / interval) * interval - interval);
+    const stepsNeeded = Math.min(Math.floor((now - lastKlineTime) / interval), 12); // 最多補 12 根 (60 秒)
+
+    // 全部 K 線 + 價格更新一次 batch (INSERT OR REPLACE 靠 UNIQUE(company_id, minute))
+    const stmts = [];
+    for (let step = 0; step <= stepsNeeded; step++) {
+      const blockTime = step < stepsNeeded ? (lastKlineTime + (step + 1) * interval) : (Math.floor(now / interval) * interval);
+      if (blockTime > now) break;
+
+      // 回歸: 偏離移動平均越多拉回越多
+      const deviation = basePrice > 0 ? (price - basePrice) / basePrice : 0;
+      const drift = (Math.random() * 2 - 1) * 0.005;
+      const revert = -deviation * 0.003;
+      const newPrice = Math.max(1, Math.round(price * (1 + drift + revert)));
+
+      stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, Math.max(price, newPrice), Math.min(price, newPrice), newPrice, blockTime));
+      price = newPrice;
     }
-    // 寫入即時K線 (與交易 updateKline 相同語義: 保留 volume/買賣量, close=最新市價)
-    try {
-      const existing = await db.prepare('SELECT id FROM stock_klines WHERE company_id = ? AND minute = ?').bind(c.id, block).first();
-      if (existing) {
-        await db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ? WHERE id = ?').bind(Math.max(price, newPrice), Math.min(price, newPrice), newPrice, existing.id).run();
-      } else {
-        await db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, Math.max(price, newPrice), Math.min(price, newPrice), newPrice, block).run();
-      }
-    } catch (e) {}
+    stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(price, c.id));
+    try { await db.batch(stmts); } catch (e) {}
   }
 }
 
-async function processStockTick(db, doDividend = true) {
+async function processStockTick(db, doDividend = true, logger) {
   const companies = await db.prepare('SELECT * FROM companies').all();
+  if (companies.results.length === 0) return;
+
+  const now = Date.now();
+  const interval = 5000;
+  const block = Math.floor(now / interval) * interval;
+
+  // 預載: 所有 IPO 狀態 + 全部持股 (奪權/股利用)
+  const [ipoRes, holdingsRes] = await db.batch([
+    db.prepare("SELECT company_id, phase FROM ipo_state"),
+    db.prepare('SELECT user_id, company_id, quantity FROM stock_holdings WHERE quantity > 0'),
+  ]);
+  const ipoPhase = {};
+  for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
+  const holdingsByCompany = {};
+  for (const r of holdingsRes.results) (holdingsByCompany[r.company_id] ||= []).push(r);
+
+  // 近10分鐘有買入的 (company,user) 集合 — 股利防套利
+  const recentBuySet = new Set();
+  if (doDividend) {
+    const buys = await db.prepare("SELECT DISTINCT company_id, user_id FROM stock_trades WHERE type = 'buy' AND traded_at >= ?").bind(now - 600000).all();
+    for (const b of buys.results) recentBuySet.add(`${b.company_id}|${b.user_id}`);
+  }
+  // 全部空單 (股利債務)
+  const shortsRes = await db.prepare("SELECT id, user_id, company_id, quantity FROM margin_positions WHERE type = 'short'").all();
+  const shortsByCompany = {};
+  for (const s of shortsRes.results) (shortsByCompany[s.company_id] ||= []).push(s);
+
+  const stmts = [];
+  const logs = [];
+  const notifs = [];
+
   for (const company of companies.results) {
-    const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(company.id).first();
-    if (!ipo || ipo.phase !== 'trading') continue;
+    if (ipoPhase[company.id] !== 'trading') continue;
 
     // 自動奪權: 任何玩家持股超過 50% 總股數 → 自動成為 owner (現實控股邏輯, 適用所有公司)
-    const topHolder = await db.prepare('SELECT user_id, SUM(quantity) as total FROM stock_holdings WHERE company_id = ? GROUP BY user_id ORDER BY total DESC LIMIT 1').bind(company.id).first();
-    if (topHolder && topHolder.total > company.total_shares * 0.5 && topHolder.user_id !== company.owner_id) {
+    const top = (holdingsByCompany[company.id] || []).sort((a, b) => b.quantity - a.quantity)[0];
+    if ((company.owner_id || 0) !== 0 && top && top.quantity > company.total_shares * 0.5 && top.user_id !== company.owner_id) {
       const oldOwner = company.owner_id;
-      await db.prepare('UPDATE companies SET owner_id = ?, sell_price = 0 WHERE id = ?').bind(topHolder.user_id, company.id).run();
-      const holderName = await db.prepare('SELECT username FROM users WHERE id = ?').bind(topHolder.user_id).first();
+      stmts.push(db.prepare('UPDATE companies SET owner_id = ?, sell_price = 0 WHERE id = ?').bind(top.user_id, company.id));
+      const holderName = await db.prepare('SELECT username FROM users WHERE id = ?').bind(top.user_id).first();
       const oldOwnerName = oldOwner > 0 ? await db.prepare('SELECT username FROM users WHERE id = ?').bind(oldOwner).first() : null;
-      await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${holderName?.username || '玩家'} 持股超過 50%，奪得 ${company.name} 控制權！`, Date.now()).run();
+      stmts.push(db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${holderName?.username || '玩家'} 持股超過 50%，奪得 ${company.name} 控制權！`, now));
       if (oldOwner > 0) {
-        await logTransaction(db, oldOwner, 'takeover', 0, `${holderName?.username || '玩家'} 持股過半，奪取 ${company.name} 控制權`);
-        await notify(db, oldOwner, 'takeover', `⚠️ ${holderName?.username || '玩家'} 持股超過 50%，奪取了你的公司「${company.name}」控制權！`);
+        notifs.push(db.prepare('INSERT INTO notifications (user_id, type, message, created_at) VALUES (?, ?, ?, ?)').bind(oldOwner, 'takeover', `⚠️ ${holderName?.username || '玩家'} 持股超過 50%，奪取了你的公司「${company.name}」控制權！`, now));
+        stmts.push(db.prepare('INSERT INTO transaction_history (user_id, type, amount, description, created_at) VALUES (?, ?, ?, ?, ?)').bind(oldOwner, 'takeover', 0, `${holderName?.username || '玩家'} 持股過半，奪取 ${company.name} 控制權`, now));
       }
-      await notify(db, topHolder.user_id, 'takeover', `🎉 你持股超過 50%，奪得「${company.name}」控制權，成為新 owner！`);
+      notifs.push(db.prepare('INSERT INTO notifications (user_id, type, message, created_at) VALUES (?, ?, ?, ?)').bind(top.user_id, 'takeover', `🎉 你持股超過 50%，奪得「${company.name}」控制權，成為新 owner！`, now));
     }
 
     // 自動增資已移除: 系統庫存有限, 不再發新股稀釋現有股東 (庫存買完即停止賣出)
 
-    const interval = 5000;
-    const block = Math.floor(Date.now() / interval) * interval;
+    // 有交易才寫K線 (無交易的波動由 processPriceWave 每分鐘處理)
     const trades = await db.prepare('SELECT price, quantity, type FROM stock_trades WHERE company_id = ? AND traded_at >= ?').bind(company.id, block).all();
     const companyData = await db.prepare('SELECT share_price FROM companies WHERE id = ?').bind(company.id).first();
     const close = companyData?.share_price || 100;
 
-    // 有交易才寫K線 (無交易的波動由 processPriceWave 每分鐘處理)
     if (trades.results.length > 0) {
       const open = trades.results[0].price;
       const high = Math.max(...trades.results.map(t => t.price));
@@ -548,30 +638,39 @@ async function processStockTick(db, doDividend = true) {
       const volume = trades.results.reduce((s, t) => s + t.quantity, 0);
       const buyVol = trades.results.filter(t => t.type === 'buy').reduce((s, t) => s + t.quantity, 0);
       const sellVol = trades.results.filter(t => t.type === 'sell').reduce((s, t) => s + t.quantity, 0);
-      try { await db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, buyVol, sellVol, block).run(); } catch (e) {}
+      stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, buyVol, sellVol, block));
     }
 
     if (!doDividend) continue;
 
     const baseIncome = company.base_income || 100;
-    const growthRate = 0.0005;
-    const elapsed = (Date.now() - company.created_at) / 60000;
-    const currentIncome = Math.floor(baseIncome * Math.pow(1 + growthRate, Math.max(elapsed, 0)));
+    // 成長率 0.000005/分 ≈ 0.72%/天 (原 0.0005 = ×2/天 是財務爆炸的根源)
+    const growthRate = 0.000005;
+    const elapsed = (now - company.created_at) / 60000;
+    const currentIncome = Math.min(Math.floor(baseIncome * Math.pow(1 + growthRate, Math.max(elapsed, 0))), baseIncome * 3);
     const dividendPerShare = currentIncome / company.total_shares;
 
-    const holdings = await db.prepare('SELECT user_id, quantity FROM stock_holdings WHERE company_id = ?').bind(company.id).all();
-    for (const h of holdings.results) {
+    for (const h of holdingsByCompany[company.id] || []) {
+      // 最低持有 10 分鐘才可領股利 (防 買→領→賣 無風險套利)
+      if (recentBuySet.has(`${company.id}|${h.user_id}`)) continue;
       const payout = Math.floor(dividendPerShare * h.quantity);
       if (payout > 0) {
-        await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, h.user_id).run();
-        await logHourly(db, h.user_id, 'dividend', payout, `${company.name}股利`);
+        stmts.push(db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, h.user_id));
+        logs.push([h.user_id, 'dividend', payout, `${company.name}股利`]);
       }
     }
 
-    const shortPositions = await db.prepare("SELECT id, user_id, quantity FROM margin_positions WHERE company_id = ? AND type = 'short'").bind(company.id).all();
-    for (const pos of shortPositions.results) {
+    for (const pos of shortsByCompany[company.id] || []) {
       const debt = Math.floor(dividendPerShare * pos.quantity);
-      await db.prepare('UPDATE margin_positions SET dividend_debt = dividend_debt + ? WHERE id = ?').bind(debt, pos.id).run();
+      stmts.push(db.prepare('UPDATE margin_positions SET dividend_debt = dividend_debt + ? WHERE id = ?').bind(debt, pos.id));
     }
+  }
+
+  const allStmts = [...stmts, ...notifs];
+  if (allStmts.length > 0) await db.batch(allStmts);
+  if (logger) {
+    for (const [u, t, a, d] of logs) logger.log(u, t, a, d);
+  } else {
+    for (const [u, t, a, d] of logs) await logHourly(db, u, t, a, d);
   }
 }

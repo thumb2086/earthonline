@@ -11,6 +11,7 @@ export function corsHeaders(request) {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Expose-Headers': 'X-Token-Refresh',
     'Access-Control-Allow-Credentials': 'true',
   };
 }
@@ -48,6 +49,18 @@ export async function createJWT(payload, secret) {
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(header + '.' + body));
   const sigB64 = b64urlFromBytes(new Uint8Array(sig));
   return header + '.' + body + '.' + sigB64;
+}
+
+export async function maybeRefreshJWT(token, secret) {
+  try {
+    const payload = await verifyJWT(token, secret);
+    if (!payload) return null;
+    const remaining = payload.exp - Date.now() / 1000;
+    if (remaining < 7 * 86400) {
+      return await createJWT({ id: payload.id, username: payload.username, role: payload.role }, secret);
+    }
+    return null;
+  } catch { return null; }
 }
 
 export async function verifyJWT(token, secret) {
@@ -108,6 +121,45 @@ export async function logHourly(db, userId, type, amount, description) {
 // 通知信箱
 export async function notify(db, userId, type, message) {
   await db.prepare('INSERT INTO notifications (user_id, type, message, created_at) VALUES (?, ?, ?, ?)').bind(userId, type, message || '', Date.now()).run();
+}
+
+// 批次化小時彙總 logger: 1次預載當小時既有列 → 記憶體累加 → 1次 batch 寫入
+// 取代 tick 內逐用戶的 logHourly (每次 SELECT+UPDATE/INSERT = 2 查詢)
+export async function createHourlyLogger(db) {
+  const hourStart = Math.floor(Date.now() / 3600000) * 3600000;
+  let map = null;
+  const pending = {}; // key -> 累加金額
+  const keyOf = (userId, type, description) => `${userId}|${type}|${description || ''}`;
+  return {
+    async load() {
+      if (map) return;
+      map = {};
+      const rows = await db.prepare('SELECT id, user_id, type, description FROM transaction_history WHERE created_at >= ?').bind(hourStart).all();
+      for (const r of rows.results) map[keyOf(r.user_id, r.type, r.description)] = r.id;
+    },
+    log(userId, type, amount, description) {
+      const key = keyOf(userId, type, description);
+      pending[key] = (pending[key] || 0) + amount;
+    },
+    async flush() {
+      const keys = Object.keys(pending);
+      if (keys.length === 0) return;
+      if (!map) await this.load();
+      const stmts = [];
+      for (const key of keys) {
+        const amount = pending[key];
+        const id = map[key];
+        if (id) {
+          stmts.push(db.prepare('UPDATE transaction_history SET amount = amount + ? WHERE id = ?').bind(amount, id));
+        } else {
+          const [userId, type, ...descParts] = key.split('|');
+          stmts.push(db.prepare('INSERT INTO transaction_history (user_id, type, amount, description, created_at) VALUES (?, ?, ?, ?, ?)').bind(parseInt(userId), type, amount, descParts.join('|'), Date.now()));
+        }
+      }
+      if (stmts.length > 0) await db.batch(stmts);
+      for (const k of Object.keys(pending)) delete pending[k];
+    },
+  };
 }
 
 // 全體廣播: 系統公告 + 每位玩家通知

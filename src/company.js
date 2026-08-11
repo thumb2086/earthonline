@@ -121,27 +121,33 @@ export async function handleCompany(env, request, path, user) {
   if (path === '/api/company/dilute') {
     const { companyId, shares, price } = await request.json();
     if (!companyId || !shares || shares <= 0) return { error: '參數無效' };
+    const qty = parseInt(shares);
+    if (!Number.isInteger(qty) || qty <= 0) return { error: '股數無效' };
     const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
     if (!company) return { error: '公司不存在或非owner' };
+    // 僅上市交易中可增資 (防 創建→dilute→IPO 循環印鈔)
+    const ipoD = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(companyId).first();
+    if (!ipoD || ipoD.phase !== 'trading') return { error: '僅上市交易中可增資' };
     const marketPrice = company.share_price || 10;
     const maxShares = Math.max(1, Math.floor(company.total_shares * 0.05));
-    if (shares > maxShares) return { error: `單次增資上限 ${maxShares.toLocaleString()} 股（總股本 5%）` };
-    // 發行上限: 總股本不得超過 issue_cap (回補與增資共用額度)
+    if (qty > maxShares) return { error: `單次增資上限 ${maxShares.toLocaleString()} 股（總股本 5%）` };
+    // 發行上限: 總股本不得超過 issue_cap (回補與增資共用額度) — 條件更新防併發突破
     const cap = company.issue_cap || (company.total_shares * 2);
-    if (company.total_shares + shares > cap) return { error: `已達發行上限 ${cap.toLocaleString()} 股，無法再增資` };
+    if (company.total_shares + qty > cap) return { error: `已達發行上限 ${cap.toLocaleString()} 股，無法再增資` };
     const pricePerShare = Math.max(1, Math.min(parseInt(price) || marketPrice, marketPrice));
-    const revenue = shares * pricePerShare;
+    const revenue = qty * pricePerShare;
     // 新股進入庫存 (系統持有, 玩家可買)
-    await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(shares, companyId).run();
+    const upRes = await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ? AND total_shares + ? <= issue_cap').bind(qty, companyId, qty).run();
+    if (upRes.meta.changes === 0) return { error: '已達發行上限，無法再增資' };
     const inv = await db.prepare('SELECT id FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
     if (inv) {
-      await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ?, cash = cash - ? WHERE company_id = ?').bind(shares, revenue, companyId).run();
+      await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ?, cash = cash - ? WHERE company_id = ?').bind(qty, revenue, companyId).run();
     } else {
-      await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, ?, ?)').bind(companyId, -revenue, shares).run();
+      await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, ?, ?)').bind(companyId, -revenue, qty).run();
     }
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(revenue, user.id).run();
-    await logTransaction(db, user.id, 'ipo_revenue', revenue, `增資 ${shares} 股 @ $${pricePerShare}`);
-    return { success: true, shares, revenue, pricePerShare };
+    await logTransaction(db, user.id, 'ipo_revenue', revenue, `增資 ${qty} 股 @ $${pricePerShare}`);
+    return { success: true, shares: qty, revenue, pricePerShare };
   }
 
   if (path === '/api/company/ipo/start') {
@@ -151,15 +157,39 @@ export async function handleCompany(env, request, path, user) {
     if (!company) return { error: '公司不存在或非owner' };
     const existingIpo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
     if (existingIpo && existingIpo.phase !== null) return { error: '已有IPO記錄' };
-    if (!ipoPrice || ipoPrice < 10) return { error: 'IPO價格至少$10' };
+    // 下市冷卻: 下市後 24h 內不可重新 IPO (防 IPO→下市→IPO 循環印鈔)
+    if (company.last_delisted_at && Date.now() - company.last_delisted_at < 24 * 3600000) {
+      return { error: `下市後需等待 24 小時才可重新上市` };
+    }
+    const price = parseInt(ipoPrice);
+    if (!Number.isInteger(price) || price < 10 || price > 1000) return { error: 'IPO價格需 $10~$1,000' };
     if (!totalShares || totalShares < 100 || totalShares > 100000) return { error: '發行股數需 100~100,000' };
     const minutes = Math.max(5, Math.min(1440, parseInt(ipoMinutes) || 60));
     // 創辦人保留比例 (IPO發行比例 = 1 - founderRatio)
     const founderKeep = Math.min(Math.max(parseFloat(founderRatio) || 0.6, 0), 0.9);
 
-    await db.prepare('UPDATE companies SET total_shares = ?, share_price = ?, issue_cap = ? WHERE id = ?').bind(totalShares, ipoPrice, totalShares * 2, companyId).run();
+    // 自動分配公司編號 (找最大現有編號 +1)
+    if (!company.code) {
+      const maxCode = await db.prepare("SELECT code FROM companies WHERE code IS NOT NULL ORDER BY CAST(code AS INTEGER) DESC LIMIT 1").first();
+      const nextNum = maxCode ? (parseInt(maxCode.code) || 0) + 1 : 1;
+      const newCode = String(nextNum).padStart(3, '0');
+      await db.prepare('UPDATE companies SET code = ? WHERE id = ?').bind(newCode, companyId).run();
+      company.code = newCode;
+    }
+
+    await db.prepare('UPDATE companies SET total_shares = ?, share_price = ?, issue_cap = ? WHERE id = ?').bind(totalShares, price, totalShares * 2, companyId).run();
     const ipoShares = Math.floor(totalShares * (1 - founderKeep));
-    await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'ipo', Date.now(), minutes).run();
+
+    // 檢查是否有正在進行的 IPO
+    const currentIpo = await db.prepare("SELECT company_id FROM ipo_state WHERE phase = 'ipo'").first();
+    if (currentIpo) {
+      // 有進行中: 排隊等候
+      await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'queued', Date.now(), minutes).run();
+    } else {
+      // 無進行中: 立即開始 IPO
+      await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'ipo', Date.now(), minutes).run();
+    }
+
     await db.prepare('INSERT INTO stock_inventory (company_id, cash, stock_quantity) VALUES (?, 0, ?)').bind(companyId, ipoShares).run();
     // 創辦人持有剩餘股份
     const founderShares = totalShares - ipoShares;
@@ -170,8 +200,14 @@ export async function handleCompany(env, request, path, user) {
       await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(company.owner_id, companyId, founderShares).run();
     }
     await logTransaction(db, company.owner_id, 'ipo_revenue', 0, `創辦人持有 ${founderShares.toLocaleString()} 股 (IPO發行 ${ipoShares.toLocaleString()} 股)`);
-    await broadcast(db, `🚀 ${company.name} 啟動 IPO！發行價 $${ipoPrice} · 對外發行 ${ipoShares.toLocaleString()} 股 · 認購期 ${minutes} 分鐘（滿額立即上市）`);
-    return { success: true, message: `IPO已啟動，${minutes}分鐘後自動上市（創辦人保留 ${(founderKeep*100).toFixed(0)}%）` };
+    const isQueued = !!currentIpo;
+    if (isQueued) {
+      await broadcast(db, `📋 「${company.code} ${company.name}」加入 IPO 排隊！發行價 $${price} · 等候上市中`);
+      return { success: true, message: `已加入排隊（創辦人保留 ${(founderKeep*100).toFixed(0)}%），等候上市中` };
+    } else {
+      await broadcast(db, `🚀 「${company.code} ${company.name}」啟動 IPO！發行價 $${price} · 對外發行 ${ipoShares.toLocaleString()} 股 · 認購期 ${minutes} 分鐘（滿額立即上市）`);
+      return { success: true, message: `IPO已啟動，${minutes}分鐘後自動上市（創辦人保留 ${(founderKeep*100).toFixed(0)}%）` };
+    }
   }
 
   if (path === '/api/company/ipo/list') {
@@ -256,8 +292,9 @@ export async function handleCompany(env, request, path, user) {
       await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(payout, payout, user.id).run();
       await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).run();
     }
-    // 下市: 移除上市狀態, 公司本身保留
+    // 下市: 移除上市狀態, 公司本身保留; 記錄下市時間 (24h 冷卻防循環 IPO 印鈔)
     await db.prepare('DELETE FROM ipo_state WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('UPDATE companies SET last_delisted_at = ? WHERE id = ?').bind(Date.now(), companyId).run();
     await logTransaction(db, user.id, 'company_delist', payout, `「${company.name}」下市${payout > 0 ? `，持股兌現 $${payout.toLocaleString()}` : ''}${boughtBack > 0 ? `，強制收購 ${boughtBack.toLocaleString()} 股` : ''}`);
     return { success: true, payout, boughtBack };
   }
@@ -397,23 +434,33 @@ export async function getCompanyProfit(db, company, subs) {
   return { ...company, income, costs, profit: income - costs, managerCount, expertCount };
 }
 
-export async function processCompanyTick(db) {
+export async function processCompanyTick(db, logger) {
   const companies = await db.prepare('SELECT * FROM companies').all();
+  const stmts = [];
+  const logs = [];
   for (const c of companies.results) {
-    // 自有公司驗傷: 上市中且玩家持股歸零 → 移交系統管理
-    await maybeSystemTakeover(db, c.id);
-    const subs = await getUserSubscriptions(db, c.owner_id);
-    const data = await getCompanyProfit(db, c, subs);
-    const profit = data.profit;
-    if (profit > 0) {
-      await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(profit, profit, c.owner_id).run();
-      await logHourly(db, c.owner_id, 'company_profit', profit, `公司利潤 ${c.name}`);
-    } else {
-      const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(c.owner_id).first();
-      if (wallet && wallet.cash > 0) {
-        await db.prepare('UPDATE wallets SET cash = MAX(cash + ?, 0) WHERE user_id = ?').bind(profit, c.owner_id).run();
-        await logHourly(db, c.owner_id, 'company_loss', profit, `公司虧損 ${c.name}`);
+    try {
+      // 自有公司驗傷: 上市中且玩家持股歸零 → 移交系統管理
+      await maybeSystemTakeover(db, c.id);
+      const subs = await getUserSubscriptions(db, c.owner_id);
+      const data = await getCompanyProfit(db, c, subs);
+      const profit = data.profit;
+      if (profit > 0) {
+        stmts.push(db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(profit, profit, c.owner_id));
+        logs.push([c.owner_id, 'company_profit', profit, `公司利潤 ${c.name}`]);
+      } else {
+        const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(c.owner_id).first();
+        if (wallet && wallet.cash > 0) {
+          stmts.push(db.prepare('UPDATE wallets SET cash = MAX(cash + ?, 0) WHERE user_id = ?').bind(profit, c.owner_id));
+          logs.push([c.owner_id, 'company_loss', profit, `公司虧損 ${c.name}`]);
+        }
       }
-    }
+    } catch (e) {}
+  }
+  if (stmts.length > 0) await db.batch(stmts);
+  if (logger) {
+    for (const [u, t, a, d] of logs) logger.log(u, t, a, d);
+  } else {
+    for (const [u, t, a, d] of logs) await logHourly(db, u, t, a, d);
   }
 }
