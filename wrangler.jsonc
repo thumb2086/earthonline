@@ -5,7 +5,14 @@
   "main": "src/index.js",
   "assets": {
     "directory": "client/dist",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "routing": {
+      "headers": {
+        "/*": {
+          "Content-Security-Policy": "default-src 'self'; script-src 'self' https://pagead2.googlesyndication.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://discord.com https://www.googleapis.com https://static.cloudflareinsights.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep1.adtrafficquality.google; frame-src https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com; frame-ancestors 'none'"
+        }
+      }
+    }
   },
   "routes": [
     {
