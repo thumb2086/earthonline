@@ -870,8 +870,17 @@ export async function handleStockDashboard(db, user, companyId) {
     db.prepare('SELECT * FROM stock_trades WHERE company_id = ? AND user_id = ? ORDER BY traded_at DESC LIMIT 20').bind(companyId, user.id).all(),
     // margin positions
     db.prepare('SELECT * FROM margin_positions WHERE user_id = ?').bind(user.id).all(),
-    // ipo info
-    db.prepare("SELECT ipo.*, c.name as company_name FROM ipo_state ipo JOIN companies c ON c.id = ipo.company_id WHERE ipo.company_id = ?").bind(companyId).first(),
+    // ipo info (enriched: 認購進度/剩餘時間, 與 /api/stock/ipo/info 同欄位)
+    (async () => {
+      const ipoRow = await db.prepare("SELECT ipo.*, c.name as company_name, c.share_price FROM ipo_state ipo JOIN companies c ON c.id = ipo.company_id WHERE ipo.company_id = ?").bind(companyId).first();
+      if (!ipoRow) return null;
+      const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
+      const subs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = ?').bind(companyId).first();
+      const mySubs = await db.prepare('SELECT COALESCE(SUM(shares), 0) as total FROM ipo_subscriptions WHERE company_id = ? AND user_id = ?').bind(companyId, user.id).first();
+      const maxSub = inv?.stock_quantity || 0;
+      const remainMs = ipoRow.started_at ? Math.max(0, ((ipoRow.duration_minutes || 60) * 60000) - (Date.now() - ipoRow.started_at)) : 0;
+      return { ...ipoRow, subscribed: subs?.total || 0, maxSubscribed: maxSub, price: ipoRow.share_price || 100, myShares: mySubs?.total || 0, remainMs, isFull: (subs?.total || 0) >= maxSub };
+    })(),
     // orders
     db.prepare('SELECT * FROM stock_limit_orders WHERE user_id = ?').bind(user.id).all(),
   ]);
