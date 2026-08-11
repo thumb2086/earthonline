@@ -10,6 +10,14 @@ export const RANK_ROLE_NAMES = [
   '戶頭剩三位數的月光族',   // 🥉 平民 (墊底)
 ];
 const RANK_ROLES = ['DISCORD_ROLE_RANK1', 'DISCORD_ROLE_RANK2', 'DISCORD_ROLE_RANK3', 'DISCORD_ROLE_RANK4', 'DISCORD_ROLE_RANK5'];
+// 兜底: 名稱比對若仍失敗, 直接用除錯端點取得的真實角色 ID (2026-08-11)
+const RANK_ROLE_ID_FALLBACK = [
+  '1512350832874750051', // 現充（有現實生活的人） pos 11
+  '1512350598350246039', // 已實現財務自由的人 pos 8
+  '1512350521929760908', // 24小時在線 the 無業遊民 pos 9
+  '1512350680822841404', // 勉強夠付房租的平民 pos 7
+  '1512350758320865320', // 戶頭剩三位數的月光族 pos 6
+];
 export const RANK_LABELS = ['👑 傳奇', '💎 菁英', '🥇 高級', '🥈 中級', '🥉 平民'];
 
 export function normRoleName(name) {
@@ -32,13 +40,14 @@ export async function resolveRankRoleIds(env) {
   const overrides = RANK_ROLES.map(k => env[k]).filter(Boolean);
   if (overrides.length === RANK_ROLES.length) return overrides;
 
-  const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
+const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
     headers: { Authorization: `Bot ${token}` },
   });
   if (!res.ok) return null;
   const roles = await res.json();
   const byName = new Map(roles.map(r => [normRoleName(r.name), r.id]));
-  return RANK_ROLE_NAMES.map(n => byName.get(normRoleName(n)) || null);
+  // 逐個比對名稱, 失敗的用兜底 ID 補上 (不再整個失敗)
+  return RANK_ROLE_NAMES.map((n, i) => byName.get(normRoleName(n)) || RANK_ROLE_ID_FALLBACK[i] || null);
 }
 
 // 依排名百分位 (0.0~1.0, 越小越前面) 取得階級索引 — 與排行榜顯示共用同一套標準
