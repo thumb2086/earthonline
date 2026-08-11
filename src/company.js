@@ -171,7 +171,7 @@ export async function handleCompany(env, request, path, user) {
     // 自動分配公司編號 (找最大現有編號 +1)
     if (!company.code) {
       const maxCode = await db.prepare("SELECT code FROM companies WHERE code IS NOT NULL ORDER BY CAST(code AS INTEGER) DESC LIMIT 1").first();
-      const nextNum = maxCode ? (parseInt(maxCode.code) || 0) + 1 : 1;
+      const nextNum = maxCode ? Math.max(101, (parseInt(maxCode.code) || 0) + 1) : 101;
       const newCode = String(nextNum).padStart(3, '0');
       await db.prepare('UPDATE companies SET code = ? WHERE id = ?').bind(newCode, companyId).run();
       company.code = newCode;

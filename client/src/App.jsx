@@ -1013,7 +1013,7 @@ function Stock({ api, toast, prompt, user }) {
   useEffect(() => {
     api('/api/company/ipo/list').then(d => {
       if (!Array.isArray(d)) return
-      const list = d.filter(c => c.phase && c.phase !== 'null').map(c => ({
+      const list = d.filter(c => ['trading', 'ipo'].includes(c.phase)).map(c => ({
         id: c.id,
         code: c.code,
         name: (stockNames[c.id] || c.name),
