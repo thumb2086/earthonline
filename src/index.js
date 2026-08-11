@@ -20,6 +20,9 @@ import { DiscordGateway } from './gateway.js';
 const ADMIN_GUILD_ID = '1512345209005015101';
 const ADMIN_ROLE_NAME = '地球管理團隊';
 
+// 與 client/index.html 的 meta CSP 一致; 這裡用 header 傳送才能支援 frame-ancestors
+const CSP_HEADER = "default-src 'self'; script-src 'self' https://pagead2.googlesyndication.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://discord.com https://www.googleapis.com https://static.cloudflareinsights.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep1.adtrafficquality.google; frame-src https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com; frame-ancestors 'none'";
+
 async function isAdmin(discordId, env) {
   if (!env.DISCORD_BOT_TOKEN) return false;
   try {
@@ -303,11 +306,17 @@ export default {
 
       // Static assets — no auth required
       if (!path.startsWith('/api/')) {
-        const res = await env.ASSETS.fetch(request);
+        let res = await env.ASSETS.fetch(request);
         if (res.status === 404 && path !== '/') {
-          return env.ASSETS.fetch(new URL('/index.html', url.origin));
+          res = await env.ASSETS.fetch(new URL('/index.html', url.origin));
         }
-        return res;
+        const withCsp = new Response(res.body, res);
+        withCsp.headers.set('Content-Security-Policy', CSP_HEADER);
+        // HTML 不進邊緣快取 (private), 確保 worker 的 CSP header 每次都送達; js/css 不在此列
+        if ((res.headers.get('content-type') || '').includes('text/html')) {
+          withCsp.headers.set('Cache-Control', 'private, max-age=0, must-revalidate');
+        }
+        return withCsp;
       }
 
       const user = await authCheck(request, env);
