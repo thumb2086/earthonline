@@ -1,4 +1,4 @@
-import { corsHeaders, json, authCheck, createJWT, logTransaction, logHourly, notify, createHourlyLogger } from './utils.js';
+import { corsHeaders, json, authCheck, createJWT, logTransaction, logHourly, notify, createHourlyLogger, validateUsername } from './utils.js';
 import { handleIncome, processIncomeTick, getIncomePerMin } from './income.js';
 import { handleBank, processBankTick } from './bank.js';
 import { handleInvestment, processInvestmentTick } from './investment.js';
@@ -14,7 +14,7 @@ import { handleDailyTasks, updateDailyTaskProgress } from './daily_tasks.js';
 import { handleSubscription, processSubscriptionTick, getUserSubscriptions } from './subscription.js';
 import { handleAdmin } from './admin.js';
 import { handleInteractions, setupDiscordBot, listGuildBots, kickGuildBot, checkCryptoSupport, checkBodyEcho, listAppCommands, clearGuildCommands } from './discord_bot.js';
-import { checkVoiceBoost, weeklySettlement } from './community.js';
+import { checkVoiceBoost, weeklySettlement, rankIdxFromPct, RANK_LABELS } from './community.js';
 import { DiscordGateway } from './gateway.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
@@ -99,7 +99,7 @@ async function handleGoogleLogin(request, env, headers, url) {
       if (!baseName) baseName = 'google_user';
       let finalName = baseName;
       let counter = 1;
-      while (await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(finalName).first()) {
+      while (validateUsername(finalName) || await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(finalName).first()) {
         finalName = `${baseName}_${counter++}`;
       }
       const info = await env.DB.prepare('INSERT INTO users (username, password_hash, role, google_id, google_username, google_avatar, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(finalName, '', 'user', gUser.id, gUser.name || gUser.email, gUser.picture || '', Date.now()).run();
@@ -154,7 +154,7 @@ async function handleDiscordLogin(request, env, headers, url) {
     let baseName = (discordUser.global_name || discordUser.username).replace(/\s+/g, '_');
     let finalName = baseName;
     let counter = 1;
-    while (await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(finalName).first()) {
+    while (validateUsername(finalName) || await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(finalName).first()) {
       finalName = `${baseName}_${counter++}`;
     }
     const info = await env.DB.prepare('INSERT INTO users (username, password_hash, role, discord_id, discord_username, discord_avatar, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(finalName, '', role, discordUser.id, discordUser.global_name || discordUser.username, '', Date.now()).run();
@@ -281,13 +281,22 @@ export default {
           FROM users u JOIN wallets w ON w.user_id = u.id
         `).all();
         const now = Date.now();
-        const rows = users.results.map(u => ({
-          id: u.id,
-          username: u.username,
-          worth: (u.cash || 0) + (u.savings || 0) + (u.bank || 0) + (u.stock_value || 0) + (u.investments || 0) - (u.debt || 0),
-          stocks: u.stocks || 0,
-          online: u.last_active && now - u.last_active < 300000,
-        }));
+        const total = users.results.length || 1;
+        // 依累計賺取排名 (與每週身分組清算同標準), 換算身分標籤
+        const earnedOrder = [...users.results].sort((a, b) => (b.total_earned || 0) - (a.total_earned || 0));
+        const earnedIdx = new Map(earnedOrder.map((u, i) => [u.id, i]));
+        const rows = users.results.map(u => {
+          const i = earnedIdx.get(u.id) ?? 0;
+          const pct = (i + 1) / total;
+          return {
+            id: u.id,
+            username: u.username,
+            rank: RANK_LABELS[rankIdxFromPct(pct)],
+            worth: (u.cash || 0) + (u.savings || 0) + (u.bank || 0) + (u.stock_value || 0) + (u.investments || 0) - (u.debt || 0),
+            stocks: u.stocks || 0,
+            online: u.last_active && now - u.last_active < 300000,
+          };
+        });
         rows.sort((a, b) => b.worth - a.worth);
         return json(rows.slice(0, 50), headers);
       }
@@ -332,6 +341,17 @@ export default {
         await env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(now, user.id).run();
 
         return json({ id: user.id, username: user.username, role: dbUser?.role || 'user', discord: dbUser?.discord_username, ...wallet, levels: levels || {}, pendingInterest: investPending?.p || 0, offlineEarnings }, headers);
+      }
+
+      if (path === '/api/auth/rename' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const name = String(body.username || '').trim();
+        const err = validateUsername(name);
+        if (err) return json({ error: err }, headers, 400);
+        const dup = await env.DB.prepare('SELECT id FROM users WHERE username = ? AND id != ?').bind(name, user.id).first();
+        if (dup) return json({ error: '此名稱已被使用' }, headers, 400);
+        await env.DB.prepare('UPDATE users SET username = ? WHERE id = ?').bind(name, user.id).run();
+        return json({ success: true, username: name }, headers);
       }
 
       if (path === '/api/transactions') {

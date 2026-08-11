@@ -1,9 +1,46 @@
 // 社群維運系統: 每週階級清算 + 語音掛機加成
 // 需求 env: DISCORD_GUILD_ID, DISCORD_BOT_TOKEN, DISCORD_VOICE_CHANNEL_ID (可選)
-// 身分組配置: DISCORD_ROLE_RANK1..5 (選填, 依排名分配)
+// 身分組配置: 預設依名稱查找公會內建身分組; 也可用 DISCORD_ROLE_RANK1..5 env 指定 ID 覆寫
 
+export const RANK_ROLE_NAMES = [
+  '現充(有現實生活的人)',   // 👑 傳奇 (前10%)
+  '已實現財務自由的人',     // 💎 菁英 (10~30%)
+  '24小時在線the 無業遊民', // 🥇 高級 (30~60%)
+  '勉強夠付房租的平民',     // 🥈 中級 (60~85%)
+  '戶頭剩三位數的月光族',   // 🥉 平民 (墊底)
+];
 const RANK_ROLES = ['DISCORD_ROLE_RANK1', 'DISCORD_ROLE_RANK2', 'DISCORD_ROLE_RANK3', 'DISCORD_ROLE_RANK4', 'DISCORD_ROLE_RANK5'];
-const RANK_LABELS = ['👑 傳奇', '💎 菁英', '🥇 高級', '🥈 中級', '🥉 平民'];
+export const RANK_LABELS = ['👑 傳奇', '💎 菁英', '🥇 高級', '🥈 中級', '🥉 平民'];
+
+function normRoleName(name) {
+  return String(name || '').replace(/[【】\s]/g, '').toLowerCase();
+}
+
+// 依名稱解析身分組 ID (優先 env 覆寫, 否則查公會內同名身分組)
+async function resolveRankRoleIds(env) {
+  const guildId = env.DISCORD_GUILD_ID;
+  const token = env.DISCORD_BOT_TOKEN;
+  if (!guildId || !token) return null;
+  const overrides = RANK_ROLES.map(k => env[k]).filter(Boolean);
+  if (overrides.length === RANK_ROLES.length) return overrides;
+
+  const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
+    headers: { Authorization: `Bot ${token}` },
+  });
+  if (!res.ok) return null;
+  const roles = await res.json();
+  const byName = new Map(roles.map(r => [normRoleName(r.name), r.id]));
+  return RANK_ROLE_NAMES.map(n => (overrides.length ? null : byName.get(normRoleName(n)) || null));
+}
+
+// 依排名百分位 (0.0~1.0, 越小越前面) 取得階級索引 — 與排行榜顯示共用同一套標準
+export function rankIdxFromPct(pct) {
+  if (pct <= 0.1) return 0;
+  if (pct <= 0.3) return 1;
+  if (pct <= 0.6) return 2;
+  if (pct <= 0.85) return 3;
+  return 4;
+}
 
 export async function getBoostMultiplier(db) {
   const row = await db.prepare("SELECT value FROM community_state WHERE key = 'voice_boost'").first();
@@ -63,8 +100,8 @@ export async function weeklySettlement(db, env) {
   const token = env.DISCORD_BOT_TOKEN;
   if (!guildId || !token) return;
 
-  const roleIds = RANK_ROLES.map(k => env[k]).filter(Boolean);
-  if (roleIds.length === 0) return;
+  const roleIds = await resolveRankRoleIds(env);
+  if (!roleIds || roleIds.every(r => !r)) return;
 
   try {
     const users = await db.prepare(`
@@ -74,18 +111,23 @@ export async function weeklySettlement(db, env) {
       ORDER BY w.total_earned DESC
     `).all();
 
-    const total = users.results.length;
+    const total = users.results.length || 1;
     let log = [];
     for (let i = 0; i < users.results.length; i++) {
       const u = users.results[i];
       const pct = (i + 1) / total;
-      let rankIdx = 4;
-      if (pct <= 0.1) rankIdx = 0;
-      else if (pct <= 0.3) rankIdx = 1;
-      else if (pct <= 0.6) rankIdx = 2;
-      else if (pct <= 0.85) rankIdx = 3;
+      const rankIdx = rankIdxFromPct(pct);
       const roleId = roleIds[rankIdx];
       if (!roleId) continue;
+
+      // 先移除舊的階級身分組, 再套用新階級 (避免降階後還掛著舊身份)
+      for (const oldId of roleIds) {
+        if (!oldId || oldId === roleId) continue;
+        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${u.discord_id}/roles/${oldId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bot ${token}` },
+        }).catch(() => {});
+      }
 
       const setRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${u.discord_id}/roles/${roleId}`, {
         method: 'PUT',

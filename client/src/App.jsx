@@ -63,6 +63,13 @@ export default function App() {
 
   const handleLogin = (t) => { localStorage.setItem('eo_token', t); setToken(t) }
   const logout = () => { localStorage.removeItem('eo_token'); setToken(null); setUser(null) }
+  const renameUser = async () => {
+    const name = (prompt(`輸入新名稱（與 admin 等系統名稱相衝突的不可使用，最多 20 字）：`, user?.username) || '').trim()
+    if (!name || name === user?.username) return
+    const r = await api('/api/auth/rename', { username: name })
+    if (r.error) { alert(r.error); return }
+    setUser(u => ({ ...u, username: r.username }))
+  }
 
   if (!token) return <><LoginGateway onLogin={handleLogin} /><Watermark /></>
 
@@ -114,6 +121,7 @@ export default function App() {
             )}
           </div>
           <span className="text-dim" style={{fontWeight:500}}>{user?.username ?? '載入中...'}{user?.role === 'admin' ? ' ⭐' : ''}</span>
+          <button className="btn btn-sm" onClick={renameUser} title="改名">✏️</button>
           <button className="btn btn-sm btn-danger" onClick={logout}>登出</button>
         </div>
       </div>

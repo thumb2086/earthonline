@@ -16,6 +16,18 @@ export function corsHeaders(request) {
   };
 }
 
+// 保留名稱: 系統/官方/管理相關不可被玩家使用 (含前綴, 擋 admin、admin123 這類)
+export const RESERVED_NAMES = ['admin', 'administrator', 'mod', 'system', 'sys', 'root', 'bot', 'discord', 'google', 'server', '官方', '管理員', '系統', '地球', 'earth'];
+
+export function validateUsername(name) {
+  const n = String(name || '').trim();
+  if (!n) return '名稱不能為空';
+  if (n.length > 20) return '名稱最多 20 個字元';
+  const low = n.toLowerCase();
+  if (RESERVED_NAMES.some(r => low === r || low.startsWith(r))) return '此名稱為系統保留，不可使用';
+  return null;
+}
+
 export function json(data, headers = {}, status = 200) {
   return new Response(JSON.stringify(data), {
     status,

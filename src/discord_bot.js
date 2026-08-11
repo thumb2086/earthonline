@@ -1,6 +1,8 @@
 // Discord Bot: slash commands via interactions webhook
 // 指令: /ipo /price /leaderboard /profile /server /me /help
 
+import { rankIdxFromPct, RANK_LABELS } from './community.js';
+
 function textResponse(text, buttons = null) {
   const data = { content: text };
   if (buttons && buttons.length > 0) {
@@ -102,6 +104,7 @@ async function ipoContent(db) {
 
 // 生成 /leaderboard 內容
 async function leaderboardContent(db) {
+  const total = (await db.prepare('SELECT COUNT(*) as c FROM users').first())?.c || 1;
   const rows = await db.prepare(`
     SELECT u.username, w.total_earned, w.cash,
       (SELECT COALESCE(SUM(quantity),0) FROM stock_holdings WHERE user_id = u.id) as stocks
@@ -111,7 +114,8 @@ async function leaderboardContent(db) {
   if (rows.results.length === 0) return '📊 尚無資料';
   let out = '🏆 **全球掛機排行榜 TOP 10**\n';
   rows.results.forEach((r, i) => {
-    out += `**#${i + 1}** ${r.username}\n` +
+    const pct = (i + 1) / total;
+    out += `**#${i + 1}** ${RANK_LABELS[rankIdxFromPct(pct)]} ${r.username}\n` +
       `　📈 累計 $${(r.total_earned || 0).toLocaleString()} · 💰 $${(r.cash || 0).toLocaleString()} · 📊 ${(r.stocks || 0).toLocaleString()}股\n`;
   });
   return out;
