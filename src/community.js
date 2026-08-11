@@ -23,7 +23,7 @@ async function recordSettlement(db, summary) {
 }
 
 // 依名稱解析身分組 ID (優先 env 覆寫, 否則查公會內同名身分組)
-async function resolveRankRoleIds(env) {
+export async function resolveRankRoleIds(env) {
   const guildId = env.DISCORD_GUILD_ID;
   const token = env.DISCORD_BOT_TOKEN;
   if (!guildId || !token) return null;
