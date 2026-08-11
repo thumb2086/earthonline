@@ -13,7 +13,9 @@ const RANK_ROLES = ['DISCORD_ROLE_RANK1', 'DISCORD_ROLE_RANK2', 'DISCORD_ROLE_RA
 export const RANK_LABELS = ['👑 傳奇', '💎 菁英', '🥇 高級', '🥈 中級', '🥉 平民'];
 
 export function normRoleName(name) {
-  return String(name || '').replace(/[【】()（）\[\]{}、\s]/g, '').toLowerCase();
+  return String(name || '')
+    .replace(/[【】()（）\[\]{}、]|[\s\u200B\u200C\u200D\u2060\uFEFF\u00A0\u00AD]/g, '')
+    .toLowerCase();
 }
 
 async function recordSettlement(db, summary) {
@@ -107,7 +109,12 @@ export async function weeklySettlement(db, env) {
   if (!guildId || !token) return;
 
   const roleIds = await resolveRankRoleIds(env);
-  if (!roleIds || roleIds.every(r => !r)) return;
+  if (!roleIds || roleIds.every(r => !r)) {
+    const reason = !roleIds ? '缺少 DISCORD_GUILD_ID/DISCORD_BOT_TOKEN 或公會查詢失敗' : `身分組名稱全部比對失敗: 期望 ${JSON.stringify(RANK_ROLE_NAMES)} → 得到 ${JSON.stringify(roleIds)}`;
+    const info = { time: Date.now(), applied: 0, errors: [reason] };
+    await recordSettlement(db, info).catch(() => {});
+    return info;
+  }
 
   try {
     const users = await db.prepare(`
