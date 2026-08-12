@@ -3,22 +3,15 @@
 // 身分組配置: 預設依名稱查找公會內建身分組; 也可用 DISCORD_ROLE_RANK1..5 env 指定 ID 覆寫
 
 export const RANK_ROLE_NAMES = [
-  '現充(有現實生活的人)',   // 👑 傳奇 (前10%)
-  '已實現財務自由的人',     // 💎 菁英 (10~30%)
-  '24小時在線the 無業遊民', // 🥇 高級 (30~60%)
-  '勉強夠付房租的平民',     // 🥈 中級 (60~85%)
-  '戶頭剩三位數的月光族',   // 🥉 平民 (墊底)
+  '現充（有現實生活的人）',   // 第一階 (前10%)
+  '已實現財務自由的人',       // 第二階 (10~30%)
+  '24小時在線 the 無業遊民',  // 第三階 (30~60%)
+  '勉強夠付房租的平民',       // 第四階 (60~85%)
+  '戶頭剩三位數的月光族',     // 墊底
 ];
 const RANK_ROLES = ['DISCORD_ROLE_RANK1', 'DISCORD_ROLE_RANK2', 'DISCORD_ROLE_RANK3', 'DISCORD_ROLE_RANK4', 'DISCORD_ROLE_RANK5'];
-// 兜底: 名稱比對若仍失敗, 直接用除錯端點取得的真實角色 ID (2026-08-11)
-const RANK_ROLE_ID_FALLBACK = [
-  '1512350832874750051', // 現充（有現實生活的人） pos 11
-  '1512350598350246039', // 已實現財務自由的人 pos 8
-  '1512350521929760908', // 24小時在線 the 無業遊民 pos 9
-  '1512350680822841404', // 勉強夠付房租的平民 pos 7
-  '1512350758320865320', // 戶頭剩三位數的月光族 pos 6
-];
-export const RANK_LABELS = ['👑 傳奇', '💎 菁英', '🥇 高級', '🥈 中級', '🥉 平民'];
+// 排行榜顯示名稱 = 與 Discord 身分組名稱一致
+export const RANK_LABELS = ['現充（有現實生活的人）', '已實現財務自由的人', '24小時在線 the 無業遊民', '勉強夠付房租的平民', '戶頭剩三位數的月光族'];
 
 export function normRoleName(name) {
   return String(name || '')
@@ -49,6 +42,15 @@ const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/roles`, {
   // 逐個比對名稱, 失敗的用兜底 ID 補上 (不再整個失敗)
   return RANK_ROLE_NAMES.map((n, i) => byName.get(normRoleName(n)) || RANK_ROLE_ID_FALLBACK[i] || null);
 }
+
+// 兜底: 名稱比對若仍失敗, 直接用除錯端點取得的真實角色 ID (2026-08-11)
+const RANK_ROLE_ID_FALLBACK = [
+  '1512350832874750051', // 現充（有現實生活的人） pos 11
+  '1512350598350246039', // 已實現財務自由的人 pos 8
+  '1512350521929760908', // 24小時在線 the 無業遊民 pos 9
+  '1512350680822841404', // 勉強夠付房租的平民 pos 7
+  '1512350758320865320', // 戶頭剩三位數的月光族 pos 6
+];
 
 // 依排名百分位 (0.0~1.0, 越小越前面) 取得階級索引 — 與排行榜顯示共用同一套標準
 export function rankIdxFromPct(pct) {
