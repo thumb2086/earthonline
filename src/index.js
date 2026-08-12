@@ -276,7 +276,7 @@ export default {
       // Public leaderboard — 只暴露排名所需 (不洩漏個人錢包細節)
       if (path === '/api/leaderboard') {
         const users = await env.DB.prepare(`
-          SELECT u.id, u.username, u.last_active, w.total_earned, w.cash, w.savings, w.bank,
+          SELECT u.id, u.username, u.last_active, u.discord_id IS NOT NULL AS has_dc, w.total_earned, w.cash, w.savings, w.bank,
             (SELECT COALESCE(SUM(h.quantity * c.share_price), 0) FROM stock_holdings h JOIN companies c ON c.id = h.company_id WHERE h.user_id = u.id) as stock_value,
             (SELECT COALESCE(SUM(quantity), 0) FROM stock_holdings WHERE user_id = u.id) as stocks,
             (SELECT COALESCE(SUM(remaining), 0) FROM loans WHERE user_id = u.id AND status = 'active') as debt,
@@ -284,17 +284,18 @@ export default {
           FROM users u JOIN wallets w ON w.user_id = u.id
         `).all();
         const now = Date.now();
-        const total = users.results.length || 1;
-        // 依累計賺取排名 (與每週身分組清算同標準), 換算身分標籤
-        const earnedOrder = [...users.results].sort((a, b) => (b.total_earned || 0) - (a.total_earned || 0));
+        // 身份計算基數 = 有綁 Discord 的玩家, 與每週身分組清算完全一致 (分母相同 → 標籤=實際身分組)
+        const dcUsers = users.results.filter(u => u.has_dc);
+        const total = dcUsers.length || 1;
+        const earnedOrder = [...dcUsers].sort((a, b) => (b.total_earned || 0) - (a.total_earned || 0));
         const earnedIdx = new Map(earnedOrder.map((u, i) => [u.id, i]));
         const rows = users.results.map(u => {
-          const i = earnedIdx.get(u.id) ?? 0;
-          const pct = (i + 1) / total;
+          const i = earnedIdx.get(u.id);
+          const rank = i === undefined ? null : RANK_LABELS[rankIdxFromPct((i + 1) / total)];
           return {
             id: u.id,
             username: u.username,
-            rank: RANK_LABELS[rankIdxFromPct(pct)],
+            rank,
             worth: (u.cash || 0) + (u.savings || 0) + (u.bank || 0) + (u.stock_value || 0) + (u.investments || 0) - (u.debt || 0),
             stocks: u.stocks || 0,
             online: u.last_active && now - u.last_active < 300000,
