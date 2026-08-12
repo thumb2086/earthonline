@@ -126,12 +126,41 @@ export async function weeklySettlement(db, env) {
   }
 
   try {
+    // 減少請求次數: 先抓全部公會成員(含現有角色), 只對實際掛著的舊身份做 DELETE
+    const membersRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members?limit=1000`, {
+      headers: { Authorization: `Bot ${token}` },
+    });
+    const memberRoles = new Map();
+    if (membersRes.ok) {
+      const members = await membersRes.json();
+      for (const m of members) memberRoles.set(m.user?.id, m.roles || []);
+    }
+
     const users = await db.prepare(`
-      SELECT u.id, u.discord_id, w.total_earned FROM users u
+      SELECT u.id, u.username, u.discord_id, w.total_earned FROM users u
       JOIN wallets w ON w.user_id = u.id
       WHERE u.discord_id IS NOT NULL
       ORDER BY w.total_earned DESC
     `).all();
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    // Discord 限流: 每 5 秒最多約 5 次角色變更, 429 時依 Retry-After 退避重試
+    const changeRole = async (method, discordId, roleId) => {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${discordId}/roles/${roleId}`, {
+          method,
+          headers: { Authorization: `Bot ${token}` },
+        });
+        if (res.ok) return res;
+        if (res.status === 429) {
+          const retry = Math.max(parseInt(res.headers.get('Retry-After') || '1') || 1, 1);
+          await sleep(retry * 1000 + 100);
+          continue;
+        }
+        return res;
+      }
+      return null;
+    };
 
     const total = users.results.length || 1;
     let log = [];
@@ -142,22 +171,24 @@ export async function weeklySettlement(db, env) {
       const rankIdx = rankIdxFromPct(pct);
       const roleId = roleIds[rankIdx];
       if (!roleId) continue;
+      const have = memberRoles.get(u.discord_id) || [];
 
-      // 先移除舊的階級身分組, 再套用新階級 (避免降階後還掛著舊身份)
+      // 只移除實際掛著的舊階級身分組, 再套用新階級
       for (const oldId of roleIds) {
-        if (!oldId || oldId === roleId) continue;
-        await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${u.discord_id}/roles/${oldId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bot ${token}` },
-        }).catch(() => {});
+        if (!oldId || oldId === roleId || !have.includes(oldId)) continue;
+        const delRes = await changeRole('DELETE', u.discord_id, oldId);
+        await sleep(150);
+        if (delRes && !delRes.ok) errors.push(`${u.username} 移除舊身份失敗 HTTP ${delRes.status}`);
       }
 
-      const setRes = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${u.discord_id}/roles/${roleId}`, {
-        method: 'PUT',
-        headers: { Authorization: `Bot ${token}` },
-      });
-      if (setRes.ok) log.push(`${u.username} → ${RANK_LABELS[rankIdx]}`);
-      else errors.push(`${u.username} → 失敗 HTTP ${setRes.status}`);
+      if (!have.includes(roleId)) {
+        const setRes = await changeRole('PUT', u.discord_id, roleId);
+        if (setRes && setRes.ok) log.push(`${u.username} → ${RANK_LABELS[rankIdx]}`);
+        else errors.push(`${u.username} → 失敗${setRes ? ` HTTP ${setRes.status}` : ' 重試用盡'}`);
+      } else {
+        log.push(`${u.username} → ${RANK_LABELS[rankIdx]} (已持有)`);
+      }
+      await sleep(150);
     }
     const summary = { time: Date.now(), applied: log.length, log, errors };
     await db.prepare(`INSERT INTO community_state (key, value, updated_at) VALUES ('last_settlement', ?, ?)
