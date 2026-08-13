@@ -113,7 +113,7 @@ export async function checkVoiceBoost(db, env) {
   } catch (e) {}
 }
 
-// 每週日 24:00 社會階級清算: 依累計賺取排名分配身分組
+// 每日 00:00 (UTC) 社會階級清算: 依累計賺取排名分配身分組
 export async function weeklySettlement(db, env) {
   const guildId = env.DISCORD_GUILD_ID;
   const token = env.DISCORD_BOT_TOKEN;

@@ -528,7 +528,8 @@ export default {
       }
     }
     const now = new Date();
-    if (now.getDay() === 0 && now.getHours() === 0 && now.getMinutes() < 5) {
+    // 每日 00:00~00:04 UTC (台灣 08:00) 社會階級清算
+    if (now.getHours() === 0 && now.getMinutes() < 5) {
       try { await weeklySettlement(db, env); } catch (e) {}
     }
     // 最後才 flush 小時彙總 log (收集所有 tick 後一次 batch 寫入)
