@@ -303,8 +303,8 @@ function Bank({ act, api, toast }) {
       </div>
       <div className="grid-2">
         <div className="card card-accent">
-          <div className="card-title">活期存款 {(info?.savingsRate || 0.0005) * 100}%/分 <span className="text-dim text-sm">（央行依市場熱度升降息）</span></div>
-          <div className="text-dim text-sm" style={{marginTop:4}}>利息 <span className="text-accent">${((info?.savings || 0) * (info?.savingsRate || 0.0005)).toFixed(2)}/分</span>（每天約 ${Math.floor((info?.savings || 0) * (info?.savingsRate || 0.0005) * 1440).toLocaleString()}）</div>
+          <div className="card-title">活期存款 {(info?.savingsRate || 0.0005) * 1440 * 100}%/天 <span className="text-dim text-sm">（央行依市場熱度升降息）</span></div>
+          <div className="text-dim text-sm" style={{marginTop:4}}>利息 <span className="text-accent">${Math.floor((info?.savings || 0) * (info?.savingsRate || 0.0005) * 1440).toLocaleString()}/天</span></div>
           <form onSubmit={e => { act(e, '/api/bank/deposit'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
             <input name="amount" type="number" placeholder="存入金額" /><button className="btn btn-primary btn-sm">存入</button></form>
           <form onSubmit={e => { act(e, '/api/bank/withdraw'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
@@ -316,7 +316,7 @@ function Bank({ act, api, toast }) {
           <div className="flex gap-8 flex-wrap mt-12">
             {(terms || []).map(t => (
               <button key={t.minutes} className={`btn btn-sm ${termMinutes === t.minutes ? 'btn-primary' : ''}`} onClick={() => setTermMinutes(t.minutes)}>
-                {t.label} ({(t.rate * 100).toFixed(3)}%/分)
+                {t.label} ({(t.rate * 1440 * 100).toFixed(2)}%/天)
               </button>
             ))}
           </div>
@@ -330,7 +330,7 @@ function Bank({ act, api, toast }) {
               <div>
                 <span style={{fontWeight:600}}>${(d.amount || 0).toLocaleString()}</span>
                 <span className="text-dim text-sm"> · {d.termLabel} · 剩 {fmtRemain(d.matureIn)}</span>
-                <div className="text-dim text-sm">利息 <span className="text-accent">${Math.floor((d.amount || 0) * (d.rate || 0)).toLocaleString()}/分</span> · 已領 ${(d.totalPaid || 0).toLocaleString()}</div>
+                <div className="text-dim text-sm">利息 <span className="text-accent">${Math.floor((d.amount || 0) * (d.rate || 0) * 1440).toLocaleString()}/天</span> · 已領 ${(d.totalPaid || 0).toLocaleString()}</div>
               </div>
               <button className="btn btn-sm" onClick={() => earlyWithdraw(d.id, d.amount)}>提前贖回</button>
             </div>
