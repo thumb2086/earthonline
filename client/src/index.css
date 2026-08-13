@@ -31,6 +31,35 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ─── 淺色主題 (html[data-theme="light"]) ─── */
+[data-theme="light"] {
+  --bg: #f3f6fa;
+  --bg2: #ffffff;
+  --surface: #ffffff;
+  --surface2: #eef2f7;
+  --border: #dfe5ee;
+  --border-bright: #c3ccda;
+  --text: #101828;
+  --text2: #475467;
+  --text3: #98a2b3;
+  --accent: #12a150;
+  --accent2: #0e8a43;
+  --accent-dim: rgba(18,161,80,0.12);
+  --accent-glow: 0 0 20px rgba(18,161,80,0.12);
+  --danger: #d92d20;
+  --danger-dim: rgba(217,45,32,0.10);
+  --warn: #b54708;
+  --warn-dim: rgba(181,71,8,0.10);
+  --shadow: 0 1px 3px rgba(16,24,40,0.06);
+  --shadow-lg: 0 8px 32px rgba(16,24,40,0.10);
+}
+[data-theme="light"] .topbar {
+  background: linear-gradient(180deg, var(--bg2) 0%, #ffffff 100%);
+}
+[data-theme="light"] .logo { text-shadow: 0 0 20px rgba(18,161,80,0.2); }
+[data-theme="light"] .card:hover { box-shadow: 0 4px 20px rgba(16,24,40,0.06); }
+[data-theme="light"] ::selection { background: var(--accent); color: #fff; }
+
 body {
   background: var(--bg); color: var(--text);
   font-family: var(--font); overflow: hidden;

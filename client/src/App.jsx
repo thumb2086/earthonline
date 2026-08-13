@@ -63,6 +63,11 @@ export default function App() {
 
   const handleLogin = (t) => { localStorage.setItem('eo_token', t); setToken(t) }
   const logout = () => { localStorage.removeItem('eo_token'); setToken(null); setUser(null) }
+  const [uiTheme, setUiTheme] = useState(() => localStorage.getItem('eo_theme_ui') || 'dark')
+  useEffect(() => {
+    document.documentElement.dataset.theme = uiTheme
+    localStorage.setItem('eo_theme_ui', uiTheme)
+  }, [uiTheme])
   const renameUser = async () => {
     const name = (prompt(`輸入新名稱（與 admin 等系統名稱相衝突的不可使用，最多 20 字）：`, user?.username) || '').trim()
     if (!name || name === user?.username) return
@@ -121,6 +126,7 @@ export default function App() {
             )}
           </div>
           <span className="text-dim" style={{fontWeight:500}}>{user?.username ?? '載入中...'}{user?.role === 'admin' ? ' ⭐' : ''}</span>
+          <button className="btn btn-sm" onClick={() => setUiTheme(t => t === 'dark' ? 'light' : 'dark')} title={uiTheme === 'dark' ? '切換淺色' : '切換深色'}>{uiTheme === 'dark' ? '☀️' : '🌙'}</button>
           <button className="btn btn-sm" onClick={renameUser} title="改名">✏️</button>
           <button className="btn btn-sm btn-danger" onClick={logout}>登出</button>
         </div>
@@ -1180,7 +1186,7 @@ function Stock({ api, toast, prompt, user }) {
           <span className="text-dim">趨勢 <span style={{color: report.trend === 'up' ? 'var(--danger)' : report.trend === 'down' ? 'var(--accent)' : 'var(--text-secondary)'}}>{report.trend === 'up' ? '▲強' : report.trend === 'down' ? '▼弱' : '—持平'}</span></span>
           <span className="text-dim">24h量 {(report.volume24h || 0).toLocaleString()}</span>
         </div>
-        {report.analysis && <div className="text-dim" style={{marginTop:8, fontSize:12, lineHeight:1.6, background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:6}}>🔍 {report.analysis}</div>}
+        {report.analysis && <div className="text-dim" style={{marginTop:8, fontSize:12, lineHeight:1.6, background:'var(--bg2)', padding:'8px 10px', borderRadius:6}}>🔍 {report.analysis}</div>}
       </div>}
 
       {/* IPO 認購 */}
