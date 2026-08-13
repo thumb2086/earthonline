@@ -303,7 +303,7 @@ function Bank({ act, api, toast }) {
       </div>
       <div className="grid-2">
         <div className="card card-accent">
-          <div className="card-title">活期存款 {(info?.savingsRate || 0.0005) * 1440 * 100}%/天 <span className="text-dim text-sm">（央行依市場熱度升降息）</span></div>
+          <div className="card-title">活期存款 {((info?.savingsRate || 0.0005) * 1440 * 100).toFixed(2)}%/天 <span className="text-dim text-sm">（央行依市場熱度升降息）</span></div>
           <div className="text-dim text-sm" style={{marginTop:4}}>利息 <span className="text-accent">${Math.floor((info?.savings || 0) * (info?.savingsRate || 0.0005) * 1440).toLocaleString()}/天</span></div>
           <form onSubmit={e => { act(e, '/api/bank/deposit'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
             <input name="amount" type="number" placeholder="存入金額" /><button className="btn btn-primary btn-sm">存入</button></form>

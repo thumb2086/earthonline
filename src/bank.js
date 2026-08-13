@@ -1,7 +1,8 @@
 import { logTransaction, logHourly } from './utils.js';
 import { getRates } from './rates.js';
 
-const LOAN_BASE_RATE = 0.0015;
+// 0.01%/分 ≈ 14.4%/天 (略高於房地產 11.52%/天, 無套利空間)
+const LOAN_BASE_RATE = 0.0001;
 
 export async function handleBank(env, request, path, user) {
   const db = env.DB;
@@ -42,7 +43,7 @@ export async function handleBank(env, request, path, user) {
     const active = await db.prepare('SELECT COALESCE(SUM(remaining), 0) as total FROM loans WHERE user_id = ? AND status = ?').bind(user.id, 'active').first();
     if (active.total + amount > maxLoan) return { error: '已超過總信用額度' };
 
-    const rate = Math.min(LOAN_BASE_RATE * (1 + amount / 100000), 0.01);
+    const rate = Math.min(LOAN_BASE_RATE * (1 + amount / 100000), 0.0002); // 上限 0.02%/分 ≈ 28.8%/天
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(amount, user.id).run();
     await db.prepare('INSERT INTO loans (user_id, amount, interest_rate, remaining, borrowed_at) VALUES (?, ?, ?, ?, ?)').bind(user.id, amount, rate, amount, Date.now()).run();
     await logTransaction(db, user.id, 'loan', amount, `借貸 $${amount.toLocaleString()}`);
