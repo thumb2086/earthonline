@@ -338,7 +338,7 @@ function Bank({ act, api, toast }) {
         </div>
       </div>
       <div className="card card-warn mt-12">
-        <div className="card-title">貸款 0.15%/分</div>
+        <div className="card-title">貸款 0.01%/分（約 14.4%/天）</div>
         <form onSubmit={e => { act(e, '/api/bank/borrow'); setTimeout(load, 600) }} className="flex gap-8 mt-12">
           <input name="amount" type="number" placeholder="借款金額" /><button className="btn btn-sm">借款</button></form>
         {(info?.loans || []).length > 0 && <div className="divider" />}
