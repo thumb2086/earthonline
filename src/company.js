@@ -213,6 +213,20 @@ export async function handleCompany(env, request, path, user) {
     }
   }
 
+  if (path === '/api/company/ipo/cancel' && request.method === 'POST') {
+    const { companyId } = await request.json();
+    if (!companyId) return { error: '請選擇公司' };
+    const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
+    if (!company) return { error: '公司不存在或非owner' };
+    const ipo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
+    if (!ipo) return { error: '公司無 IPO 狀態' };
+    if (ipo.phase === 'trading') return { error: '已上市交易中，無法取消' };
+    await db.prepare('DELETE FROM ipo_state WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM stock_inventory WHERE company_id = ?').bind(companyId).run();
+    await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).run();
+    return { success: true };
+  }
+
   if (path === '/api/company/ipo/list') {
     const url = new URL(request.url);
     const myOnly = url.searchParams.get('my') === '1';

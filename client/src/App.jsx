@@ -630,6 +630,11 @@ const splitCompany = (c) => prompt(`拆分「${c.name}」？(股價÷N、持股�
       if (r.success) { refresh(); toast(`IPO啟動 $${price} × ${totalShares.toLocaleString()}股 / ${minutes}分鐘（創辦人保留 ${founderRatio}%）`, 'success') } else toast(r.error, 'error')
     })
   }
+  const cancelIpo = (c) => prompt(`取消「${c.name}」的 IPO？(輸入 yes 確認)`, async (v) => {
+    if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
+    const r = await api('/api/company/ipo/cancel', { companyId: c.id })
+    if (r.success) { refresh(); toast('IPO 已取消', 'success') } else toast(r.error, 'error')
+  })
   const liquidate = (c) => prompt(`清算「${c.name}」可得 $${(c.liquidationValue || 0).toLocaleString()}？(公司將解散且股票下市，輸入 yes 確認)`, async (v) => {
     if ((v || '').trim().toLowerCase() !== 'yes') return toast('已取消', 'info')
     const r = await api('/api/company/liquidate', { companyId: c.id })
@@ -660,6 +665,7 @@ const splitCompany = (c) => prompt(`拆分「${c.name}」？(股價÷N、持股�
         <div className="flex gap-8 mt-12">
           <button className={`btn btn-sm ${selectedCompany===c.id?'btn-primary':''}`} onClick={() => setSelectedCompany(c.id)}>選擇此公司</button>
           {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
+          {(c.phase === 'ipo' || c.phase === 'queued') && <button className="btn btn-sm btn-danger" onClick={() => cancelIpo(c)}>❌ 取消IPO</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => diluteCompany(c)}>＋ 增資</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => forceBuy(c)}>💼 強制收購</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => splitCompany(c)}>✂️ 拆分</button>}
