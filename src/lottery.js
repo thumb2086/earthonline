@@ -52,13 +52,16 @@ export async function getLotteryStatus(db, userId) {
 
 export async function buyTicket(db, userId, numbers, isFree) {
   const round = await getCurrentRound(db);
-  if (isFree) {
+    if (isFree) {
     const today = todayUTC();
     const row = await db.prepare('SELECT * FROM lottery_daily WHERE user_id = ?').bind(userId).first();
     const freeUsed = (row && row.date === today) ? (row.free_used || 0) : 0;
     if (freeUsed >= 5) return { error: '今日免費次數已用完' };
-    await db.prepare(`INSERT INTO lottery_daily (user_id, date, free_used) VALUES (?, ?, 1)
-      ON CONFLICT(user_id) DO UPDATE SET date = excluded.date, free_used = 1`).bind(userId, today).run();
+    if (row && row.date === today) {
+      await db.prepare('UPDATE lottery_daily SET free_used = free_used + 1 WHERE user_id = ?').bind(userId).run();
+    } else {
+      await db.prepare('INSERT INTO lottery_daily (user_id, date, free_used) VALUES (?, ?, 1) ON CONFLICT(user_id) DO UPDATE SET date = excluded.date, free_used = 1').bind(userId, today).run();
+    }
   } else {
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(userId).first();
     if (!wallet || wallet.cash < COST_PER_TICKET) return { error: '餘額不足' };

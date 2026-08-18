@@ -27,8 +27,11 @@ export async function scratch(db, userId, tier, isFree) {
 
   if (isFree) {
     if (freeUsed >= 5) return { error: '今日免費次數已用完' };
-    await db.prepare(`INSERT INTO scratch_daily (user_id, date, free_used) VALUES (?, ?, 1)
-      ON CONFLICT(user_id) DO UPDATE SET date = excluded.date, free_used = 1`).bind(userId, today).run();
+    if (row && row.date === today) {
+      await db.prepare('UPDATE scratch_daily SET free_used = free_used + 1 WHERE user_id = ?').bind(userId).run();
+    } else {
+      await db.prepare('INSERT INTO scratch_daily (user_id, date, free_used) VALUES (?, ?, 1) ON CONFLICT(user_id) DO UPDATE SET date = excluded.date, free_used = 1').bind(userId, today).run();
+    }
   } else {
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(userId).first();
     if (!wallet || wallet.cash < info.cost) return { error: '餘額不足' };
