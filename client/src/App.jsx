@@ -2,6 +2,8 @@
 import LoginGateway from './components/LoginGateway'
 import Watermark from './components/Watermark'
 import { useToast } from './components/Toast.jsx'
+import DailyLogin from './components/DailyLogin'
+import LaunchBanner from './components/LaunchBanner'
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('eo_token'))
@@ -139,7 +141,7 @@ export default function App() {
           ))}
         </div>
         <div className="content">
-          {view === 'dashboard' && <Dashboard user={user} api={api} />}
+          {view === 'dashboard' && <Dashboard user={user} api={api} toast={toast} />}
           {view === 'income' && <Income api={api} toast={toast} />}
           {view === 'bank' && <Bank act={act} api={api} toast={toast} />}
           {view === 'invest' && <Invest api={api} toast={toast} prompt={prompt} />}
@@ -178,6 +180,8 @@ function Dashboard({ user, api }) {
   const netWorth = (user?.cash || 0) + (user?.savings || 0) + depTotal + sv + invTotal - debt
   return (
     <>
+      <LaunchBanner api={api} />
+      <DailyLogin api={api} />
       {(user?.offlineEarnings > 0 && showOffline) && <div className="card mb-12" style={{borderColor:'var(--accent)',background:'rgba(0,255,65,0.05)'}}>
         <div className="flex justify-between items-center">
           <div><span className="text-accent" style={{fontWeight:600}}>⚡ 離線收益</span>

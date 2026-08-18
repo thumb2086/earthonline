@@ -16,12 +16,14 @@ import { handleAdmin } from './admin.js';
 import { handleInteractions, setupDiscordBot, listGuildBots, kickGuildBot, checkCryptoSupport, checkBodyEcho, listAppCommands, clearGuildCommands } from './discord_bot.js';
 import { checkVoiceBoost, weeklySettlement, rankIdxFromPct, RANK_LABELS } from './community.js';
 import { DiscordGateway } from './gateway.js';
+import { getDailyLoginStatus, claimDailyLogin } from './daily_login.js';
+import { handleLaunchEvent, getLaunchEventStatus, giveNewbieGift, maybeDistributeDailyLeaderboard } from './launch_event.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
 const ADMIN_ROLE_NAME = '地球管理團隊';
 
 // 與 client/index.html 的 meta CSP 一致; 這裡用 header 傳送才能支援 frame-ancestors
-const CSP_HEADER = "default-src 'self'; script-src 'self' https://pagead2.googlesyndication.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://discord.com https://www.googleapis.com https://static.cloudflareinsights.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep1.adtrafficquality.google; frame-src https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com; frame-ancestors 'none'";
+const CSP_HEADER = "default-src 'self'; script-src 'self' https://pagead2.googlesyndication.com https://static.cloudflareinsights.com https://ep1.adtrafficquality.google https://ep2.adtrafficquality.google; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://discord.com https://www.googleapis.com https://static.cloudflareinsights.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep1.adtrafficquality.google https://ep2.adtrafficquality.google; frame-src https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com; frame-ancestors 'none'";
 
 async function isAdmin(discordId, env) {
   if (!env.DISCORD_BOT_TOKEN) return false;
@@ -384,6 +386,20 @@ export default {
         return json({ success: true }, headers);
       }
 
+      if (path === '/api/daily-login/status') {
+        return json(await getDailyLoginStatus(env.DB, user.id), headers);
+      }
+      if (path === '/api/daily-login/claim' && request.method === 'POST') {
+        const r = await claimDailyLogin(env.DB, user.id, (uid, type, msg) => notify(env.DB, uid, type, msg));
+        return json(r, headers);
+      }
+      if (path === '/api/launch/newbie-gift' && request.method === 'POST') {
+        return json(await giveNewbieGift(env.DB, user.id), headers);
+      }
+
+      const launchResult = await handleLaunchEvent(env, request, path, user);
+      if (launchResult !== null) return json(launchResult, headers);
+
       const routes = [
         ['/api/income', handleIncome],
         ['/api/bank', handleBank],
@@ -528,9 +544,10 @@ export default {
       }
     }
     const now = new Date();
-    // 每日 00:00~00:04 UTC (台灣 08:00) 社會階級清算
+    // 每日 00:00~00:04 UTC (台灣 08:00) 社會階級清算 + 開服排行榜每日發獎
     if (now.getHours() === 0 && now.getMinutes() < 5) {
       try { await weeklySettlement(db, env); } catch (e) {}
+      try { await maybeDistributeDailyLeaderboard(db); } catch (e) {}
     }
     // 最後才 flush 小時彙總 log (收集所有 tick 後一次 batch 寫入)
     try { await hourlyLogger.flush(); } catch (err) { console.error('Scheduled hourly log flush error:', err.message); }

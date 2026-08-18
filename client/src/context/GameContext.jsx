@@ -1,18 +1,13 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import useTimer from '../hooks/useTimer';
 import useSocket from '../hooks/useSocket';
 import useGameState from '../hooks/useGameState';
-import GameEngine from '../engine/GameEngine';
-import { loadGameState, saveGameState, startAutoSave } from '../engine/StorageAdapter';
 import { getTranslation } from '../i18n';
 
 const GameContext = createContext(null);
 
 export function GameProvider({ children, token, onLogout, region, SOCKET_URL, API_URL, BASE_URL }) {
   const { socket, isConnected, ping } = useSocket(SOCKET_URL, region, token, onLogout);
-  const [engineReady, setEngineReady] = useState(false);
-  const engineRef = useRef(null);
-  const autoStopRef = useRef(null);
 
   const gameStateResult = useGameState(socket, API_URL, BASE_URL);
   const { myNode, setMyNode } = gameStateResult;
@@ -40,89 +35,12 @@ export function GameProvider({ children, token, onLogout, region, SOCKET_URL, AP
     });
   }, []);
 
-  useEffect(() => {
-    const engine = new GameEngine();
-    engineRef.current = engine;
-
-    loadGameState().then((saved) => {
-      if (saved) {
-        engine.importState(saved);
-        addLog(`[SYS] 已從本地存檔恢復 (${new Date(saved.savedAt).toLocaleTimeString()})`);
-      }
-      engine.init({}, region);
-      engine.onTick = (state) => {
-        saveGameState(state);
-      };
-      const stopAutoSave = startAutoSave(engine);
-      autoStopRef.current = stopAutoSave;
-      setEngineReady(true);
-    });
-
-    return () => {
-      engine.destroy();
-      if (autoStopRef.current) autoStopRef.current();
-      engineRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!engineRef.current || !myNode) return;
-    engineRef.current.updateFromServer(myNode);
-  }, [myNode]);
-
-  useEffect(() => {
-    if (!engineRef.current) return;
-    if (!isConnected && engineReady) {
-      engineRef.current.running = true;
-      engineRef.current.startTicker();
-      addLog('[SYS] 伺服器斷線，啟動離線模式 — 本地引擎持續運作');
-    }
-  }, [isConnected, engineReady]);
-
-  const getEngineState = useCallback(() => {
-    return engineRef.current ? engineRef.current.exportState() : null;
-  }, []);
-
-  const isOfflineMode = !isConnected && engineReady;
-
-  const survivalTime = myNode?.survivalTime || 0;
-  const health = myNode?.health ?? 100;
-  const pt = myNode?.pt ?? 0;
-
-  useEffect(() => {
-    if (!window.electronAPI || !myNode) return;
-    const sendPresence = () => {
-      const hrs = Math.floor(survivalTime / 3600);
-      const mins = Math.floor((survivalTime % 3600) / 60);
-      if (window.electronAPI?.updatePresence) {
-        window.electronAPI.updatePresence({
-          details: `${myNode.nickname || 'Node'} | ${region.toUpperCase()} | ${pt.toLocaleString()} PT`,
-          state: `存活 ${hrs}h ${mins}m | 健康度 ${Math.round(health)}%`,
-          startTimestamp: Date.now(),
-          smallImageKey: 'user_icon',
-          smallImageText: myNode.nickname || 'Survivor',
-          buttons: [{ label: '加入遊戲', url: 'https://earthonline.qzz.io' }],
-        });
-      }
-      if (window.electronAPI?.setProgress) {
-        window.electronAPI.setProgress(health / 100);
-      }
-    };
-    sendPresence();
-    const interval = setInterval(sendPresence, 20000);
-    return () => clearInterval(interval);
-  }, [myNode, region, survivalTime, health, pt]);
-
   return (
     <GameContext.Provider value={{
       socket, isConnected, ping,
       ...gameStateResult,
       lifespan, sessionTime,
       logs, addLog, setLogs,
-      engine: engineRef.current,
-      engineReady,
-      isOfflineMode,
-      getEngineState,
     }}>
       {children}
     </GameContext.Provider>

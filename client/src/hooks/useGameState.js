@@ -45,11 +45,6 @@ export default function useGameState(socket, API_URL, BASE_URL) {
       setMyNode(data);
       setMyRole(data.role || 'user');
       if (data.currentGlobalEvent) setCurrentEvent(data.currentGlobalEvent);
-      if (data.offlineEarnings && data.offlineEarnings.pts > 0) {
-        setTimeout(() => {
-          alert(`離線收益：${data.offlineEarnings.minutes} 分鐘，獲得 ${data.offlineEarnings.pts} PT`);
-        }, 500);
-      }
     });
 
     s.on('user_state_update', (data) => {

@@ -1,4 +1,5 @@
 import { logHourly } from './utils.js';
+import { isDoubleIncomeActive } from './launch_event.js';
 
 const BASE_INCOME = 20;
 
@@ -22,6 +23,7 @@ export async function getIncomePerMin(db, userId, subs) {
   total += UPGRADE_INCOME.server[levels.server] || 0;
   total += UPGRADE_INCOME.ai_assistant[levels.ai_assistant] || 0;
   if (subs?.home) total = Math.floor(total * 1.1);
+  if (await isDoubleIncomeActive(db)) total = Math.floor(total * 2);
   return total;
 }
 
