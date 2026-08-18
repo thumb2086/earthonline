@@ -244,13 +244,17 @@ export async function handleAdmin(env, request, path, user) {
     const startAt = startTime ? new Date(startTime).getTime() : Date.now();
     if (isNaN(startAt) || startAt < Date.now() - 60000) return { error: '開始時間無效' };
 
-    // 檢查是否已有正在進行的 IPO
-    const currentIpo = await db.prepare("SELECT company_id FROM ipo_state WHERE phase = 'ipo'").first();
-    if (currentIpo && startAt <= Date.now()) {
-      // 立即開始且已有 IPO 進行中: 排隊
-      await db.prepare("UPDATE ipo_state SET phase = 'queued', started_at = ?, duration_minutes = ? WHERE company_id = ?").bind(startAt, duration, companyId).run();
+    // 檢查是否已有正在進行的系統公司 IPO（玩家公司不受此限）
+    const ipoOwner = await db.prepare('SELECT owner_id FROM companies WHERE id = ?').bind(companyId).first();
+    const isSystemCompany = !ipoOwner || ipoOwner.owner_id === 0;
+    if (isSystemCompany) {
+      const currentIpo = await db.prepare("SELECT company_id FROM ipo_state i JOIN companies c ON c.id = i.company_id WHERE i.phase = 'ipo' AND c.owner_id = 0").first();
+      if (currentIpo && startAt <= Date.now()) {
+        await db.prepare("UPDATE ipo_state SET phase = 'queued', started_at = ?, duration_minutes = ? WHERE company_id = ?").bind(startAt, duration, companyId).run();
+      } else {
+        await db.prepare("UPDATE ipo_state SET phase = 'ipo', started_at = ?, duration_minutes = ? WHERE company_id = ?").bind(startAt, duration, companyId).run();
+      }
     } else {
-      // 設定時間或立即開始(無其他IPO): 直接開始
       await db.prepare("UPDATE ipo_state SET phase = 'ipo', started_at = ?, duration_minutes = ? WHERE company_id = ?").bind(startAt, duration, companyId).run();
     }
 

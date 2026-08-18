@@ -705,7 +705,7 @@ export async function finalizeIPO(db) {
   // 2. 啟動排隊中的 IPO: 如果目前沒有 'ipo' 階段的公司, 啟動下一家排隊公司
   const currentIpo = await db.prepare("SELECT company_id FROM ipo_state WHERE phase = 'ipo'").first();
   if (!currentIpo) {
-    const nextQueued = await db.prepare("SELECT company_id, duration_minutes FROM ipo_state WHERE phase = 'queued' ORDER BY company_id ASC LIMIT 1").first();
+    const nextQueued = await db.prepare("SELECT i.company_id, i.duration_minutes FROM ipo_state i JOIN companies c ON c.id = i.company_id WHERE i.phase = 'queued' AND c.owner_id = 0 ORDER BY i.company_id ASC LIMIT 1").first();
     if (nextQueued) {
       await db.prepare("UPDATE ipo_state SET phase = 'ipo', started_at = ? WHERE company_id = ? AND phase = 'queued'").bind(Date.now(), nextQueued.company_id).run();
       const company = await db.prepare('SELECT name, code FROM companies WHERE id = ?').bind(nextQueued.company_id).first();

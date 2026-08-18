@@ -180,13 +180,16 @@ export async function handleCompany(env, request, path, user) {
     await db.prepare('UPDATE companies SET total_shares = ?, share_price = ?, issue_cap = ? WHERE id = ?').bind(totalShares, price, totalShares * 2, companyId).run();
     const ipoShares = Math.floor(totalShares * (1 - founderKeep));
 
-    // 檢查是否有正在進行的 IPO
-    const currentIpo = await db.prepare("SELECT company_id FROM ipo_state WHERE phase = 'ipo'").first();
-    if (currentIpo) {
-      // 有進行中: 排隊等候
-      await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'queued', Date.now(), minutes).run();
+    // 玩家公司直接 IPO，不需排隊；系統公司才排隊
+    const isSystemCompany = company.owner_id === 0;
+    if (isSystemCompany) {
+      const currentIpo = await db.prepare("SELECT company_id FROM ipo_state WHERE phase = 'ipo'").first();
+      if (currentIpo) {
+        await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'queued', Date.now(), minutes).run();
+      } else {
+        await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'ipo', Date.now(), minutes).run();
+      }
     } else {
-      // 無進行中: 立即開始 IPO
       await db.prepare('INSERT INTO ipo_state (company_id, phase, started_at, duration_minutes) VALUES (?, ?, ?, ?)').bind(companyId, 'ipo', Date.now(), minutes).run();
     }
 

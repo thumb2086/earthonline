@@ -276,7 +276,7 @@ function Income({ api, toast }) {
     <>
       <div className="stat-card mb-12">
         <div className="card-title">每分鐘收入</div>
-        <div className="text-lg">${info.income || 0} {launch?.doubleActive && <span style={{fontSize:13, color:'var(--warning-color)', fontWeight:600}}>🚀 開服慶典 x2</span>}</div>
+        <div className="text-lg">${info.income || 0} {launch?.doubleActive && <span style={{fontSize:13, color:'#f59e0b', fontWeight:600}}>🚀 開服慶典 x2</span>}</div>
         <div className="text-dim text-sm" style={{marginTop:4}}>離線時收入減半（50%）</div>
       </div>
       <div className="grid-2">
@@ -1411,7 +1411,7 @@ function Leaderboard({ api }) {
       <div className="card-title">🏆 身價排行榜</div>
       {(data || []).map((u, i) => (
         <div className="stat" key={u.username}>
-          <span><span className="text-accent" style={{fontWeight:700}}>#{i+1}</span> {u.rank && <span style={{marginRight:4, color:'var(--warning-color)', fontSize:12}}>{u.rank}</span>} <span>{u.username}</span> {u.online ? <span style={{color:'var(--accent)',fontSize:11}}>●線上</span> : <span className="text-dim" style={{fontSize:11}}>●離線</span>}</span>
+          <span><span className="text-accent" style={{fontWeight:700}}>#{i+1}</span> {u.rank && <span style={{marginRight:4, color:'#f59e0b', fontSize:12}}>{u.rank}</span>} <span>{u.username}</span> {u.online ? <span style={{color:'var(--accent)',fontSize:11}}>●線上</span> : <span className="text-dim" style={{fontSize:11}}>●離線</span>}</span>
           <span className="text-dim">💎${(u.worth||0).toLocaleString()} 📊{u.stocks} 股</span>
         </div>
       ))}
@@ -1830,7 +1830,7 @@ function AdminPanel({ api }) {
 function History({ api }) {
   const [txs, setTxs] = useState([])
   useEffect(() => { api('/api/transactions?limit=100').then(d => setTxs(Array.isArray(d) ? d : [])) }, [])
-  const typeLabels = { income: '⬆️ 基礎收入(本小時)', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', margin_open: '⚡ 槓桿開倉', margin_close: '⚡ 平倉', ipo_subscribe: '🚀 IPO認購', ipo_revenue: '🚀 IPO募集', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', bank_interest: '🏦 活存利息(本小時)', loan: '🏦 借貸', loan_interest: '🏦 貸款利息(本小時)', employee_hire: '👥 僱用', employee_salary: '👥 薪資', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', investment_interest: '💼 投資利息(本小時)', investment_loss: '💼 投資虧損', company_profit: '🏢 公司利潤(本小時)', company_loss: '🏢 公司虧損(本小時)', dividend: '💰 股利(本小時)', living_cost: '🏠 生活費(本小時)', subscription: '📦 訂閱月費(本小時)', lottery_cost: '🎱 樂透購票', lottery_prize: '🎱 樂透中獎', scratch_cost: '🎰 刮刮樂購買', scratch_reward: '🎰 刮刮樂中獎' }
+  const typeLabels = { income: '⬆️ 基礎收入(本小時)', expense: '⬇️ 支出', stock_buy: '📈 買股', stock_sell: '📉 賣股', margin_open: '⚡ 槓桿開倉', margin_close: '⚡ 平倉', ipo_subscribe: '🚀 IPO認購', ipo_revenue: '🚀 IPO募集', bank_deposit: '🏦 存款', bank_withdraw: '🏦 提款', bank_interest: '🏦 活存利息(本小時)', loan: '🏦 借貸', loan_interest: '🏦 貸款利息(本小時)', employee_hire: '👥 僱用', employee_salary: '👥 薪資', company_create: '🏢 創建公司', upgrade: '⬆️ 升級', investment: '💼 投資', investment_interest: '💼 投資利息(本小時)', investment_loss: '💼 投資虧損', company_profit: '🏢 公司利潤(本小時)', company_loss: '🏢 公司虧損(本小時)', dividend: '💰 股利(本小時)', living_cost: '🏠 生活費(本小時)', subscription: '📦 訂閱月費(本小時)', lottery_cost: '🎱 樂透購票', lottery_prize: '🎱 樂透中獎', scratch_cost: '🎰 刮刮樂購買', scratch_reward: '🎰 刮刮樂中獎', admin_grant: '⭐ 管理員發放' }
   const typeColors = { income: 'var(--accent)', expense: 'var(--danger)', stock_buy: 'var(--danger)', stock_sell: 'var(--accent)', ipo_subscribe: 'var(--warn)', employee_hire: 'var(--danger)', company_create: 'var(--danger)', upgrade: 'var(--danger)' }
   return (
     <div className="card">
