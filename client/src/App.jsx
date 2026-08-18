@@ -466,7 +466,7 @@ function Invest({ api, toast, prompt }) {
                 <div>
                   <div style={{fontWeight:700, fontSize:15, color: colors[t.type] || 'var(--text)'}}>{icons[t.type]} {t.label}</div>
                   <div className="text-dim text-sm" style={{marginTop:4}}>每日 {(t.rateMin*1440*100).toFixed(2)}~{(t.rateMax*1440*100).toFixed(2)}%</div>
-                  <div className="text-dim text-sm">風險 {t.type === 'startup' ? '⚡ 高' : '🛡️ 低'}</div>
+                  <div className="text-dim text-sm">風險 {t.type === 'startup' ? '⚡ 高（每分鐘 0.3% 機率虧損 5~20% 本金，不可贖回）' : '🛡️ 低'}</div>
                 </div>
                 {t.unlocked
                   ? <div style={{display:'flex', gap:6, alignItems:'center'}}>
@@ -1867,7 +1867,7 @@ function Help() {
     { title: '💼 投資', items: [
       '債券/指數基金/房地產/新創：依累計收入解鎖',
       '投資利率會隨金額遞減（越大越慢）',
-      '新創投資有虧損風險（可能損失本金 5~20%）',
+      '新創投資：每分鐘 0.3% 機率虧損 5~20% 本金（從現金扣除），不可提前贖回',
       '贖回收 1% 手續費（定存免費）',
     ]},
     { title: '🏢 公司', items: [
