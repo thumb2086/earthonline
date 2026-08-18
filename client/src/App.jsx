@@ -266,7 +266,7 @@ function Income({ api, toast }) {
     <>
       <div className="stat-card mb-12">
         <div className="card-title">每分鐘收入</div>
-        <div className="text-lg">${info.income || 0} {launch?.doubleActive && <span style={{fontSize:13, color:'var(--accent)', fontWeight:600}}>🚀 開服慶典 x2</span>}</div>
+        <div className="text-lg">${info.income || 0} {launch?.doubleActive && <span style={{fontSize:13, color:'var(--warning)', fontWeight:600}}>🚀 開服慶典 x2</span>}</div>
         <div className="text-dim text-sm" style={{marginTop:4}}>離線時收入減半（50%）</div>
       </div>
       <div className="grid-2">
@@ -1940,6 +1940,28 @@ function Help() {
       '交易類（買賣股/投資/僱用等）即時顯示',
       '每分鐘收支（收入/生活費/利息/股利）按小時彙總顯示',
       '頁面標示 (本小時) 的即為彙總值',
+    ]},
+    { title: '📅 每日登入', items: [
+      '每天登入可領取獎勵，7 天一個循環（$500 → $1,000 → $1,500 → $2,000 → $3,000 → $5,000 → $10,000）',
+      '連續登入第 7/14/30 天有額外 streak 獎勵（+$5,000 / +$15,000 / +$50,000）',
+      '每天只能領一次，錯過則 streak 重置',
+    ]},
+    { title: '🎰 刮刮樂', items: [
+      '三種等級：銅級 $500（最高 3x）、銀級 $1,000（最高 5x）、金級 $5,000（最高 10x）',
+      '花費購票後刮開 3 格符號，中越多獎越大',
+      '開服慶典期間每日免費刮 1 次',
+    ]},
+    { title: '🎱 樂透', items: [
+      '每注 $100，選 6 個號碼（1~39）',
+      '每天 08:00 自動開獎，中 3/4/5/6 號依序獲得獎池 10%/15%/20%/50%',
+      '同號碼中獎者平分該獎級獎金',
+      '開服慶典期間每日免費 1 注（自動隨機選號，也可手動選）',
+    ]},
+    { title: '🚀 開服慶典', items: [
+      '雙倍收入：開服後 72 小時所有玩家收入 x2',
+      '排行榜獎勵：活動期間每日自動發放 Top 10 獎金（第 1 名 $50,000）',
+      '新手禮包：新玩家領取 $5,000 起始資金',
+      '開服限定比特幣：每位玩家限領 1 顆 BTC（用途即將公布）',
     ]},
   ]
   return (
