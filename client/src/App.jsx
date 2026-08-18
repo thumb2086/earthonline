@@ -1294,14 +1294,14 @@ function Stock({ api, toast, prompt, user }) {
               <span style={{fontWeight:600, fontSize:13}}>📋 掛單</span>
               <span className="text-dim text-sm">{orders.filter(o => o.status === 'open').length}/20</span>
             </div>
-            <div style={{display:'flex', gap:6, marginBottom:8, alignItems:'center', maxWidth:420}}>
-              <select value={ordType} onChange={e => setOrdType(e.target.value)} className="select-sm" style={{width:65}}>
+            <div style={{display:'flex', gap:6, marginBottom:8, alignItems:'center'}}>
+              <select value={ordType} onChange={e => setOrdType(e.target.value)} className="select-sm" style={{width:75}}>
                 <option value="buy">買入</option>
                 <option value="sell">賣出</option>
               </select>
-              <input type="number" placeholder="價格 $" value={ordPrice} onChange={e => setOrdPrice(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
-              <input type="number" placeholder="數量 股" value={ordQty} onChange={e => setOrdQty(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
-              <button className="btn btn-primary btn-sm" onClick={placeOrder} style={{padding:'5px 12px', fontWeight:600, flexShrink:0}}>掛</button>
+              <input type="number" placeholder="價格 $" value={ordPrice} onChange={e => setOrdPrice(e.target.value)} style={{width:120, fontSize:12, padding:'5px 8px'}} />
+              <input type="number" placeholder="數量 股" value={ordQty} onChange={e => setOrdQty(e.target.value)} style={{width:120, fontSize:12, padding:'5px 8px'}} />
+              <button className="btn btn-primary btn-sm" onClick={placeOrder} style={{fontWeight:600}}>掛</button>
             </div>
             {orders.filter(o => o.company_id === selectedStock).slice(0, 5).map(o => (
               <div key={o.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderTop:'1px solid var(--border)', fontSize:12}}>
@@ -1318,16 +1318,16 @@ function Stock({ api, toast, prompt, user }) {
           {/* 槓桿 */}
           <div className="card" style={{marginBottom:12}}>
             <div style={{fontWeight:600, fontSize:13, marginBottom:8}}>⚡ 槓桿</div>
-            <div style={{display:'flex', gap:6, marginBottom:6, alignItems:'center', maxWidth:420}}>
-              <select value={marginType} onChange={e => setMarginType(e.target.value)} className="select-sm" style={{width:65}}>
+            <div style={{display:'flex', gap:6, marginBottom:6, alignItems:'center'}}>
+              <select value={marginType} onChange={e => setMarginType(e.target.value)} className="select-sm" style={{width:75}}>
                 <option value="long">做多</option>
                 <option value="short">做空</option>
               </select>
-              <input type="number" placeholder="數量 股" value={marginQty} onChange={e => setMarginQty(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
+              <input type="number" placeholder="數量 股" value={marginQty} onChange={e => setMarginQty(e.target.value)} style={{width:140, fontSize:12, padding:'5px 8px'}} />
               <select value={marginLev} onChange={e => setMarginLev(e.target.value)} className="select-sm" style={{width:55}}>
                 <option value="2">2x</option><option value="3">3x</option><option value="5">5x</option>
               </select>
-              <button className="btn btn-primary btn-sm" onClick={openMargin} style={{padding:'5px 12px', fontWeight:600, flexShrink:0}}>開</button>
+              <button className="btn btn-primary btn-sm" onClick={openMargin} style={{fontWeight:600}}>開</button>
             </div>
             {positions.filter(p => p.company_id === selectedStock).map(p => {
               const cur = q?.price || 0;
