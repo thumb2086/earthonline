@@ -184,11 +184,26 @@ const ThemeContext = createContext(null);
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(() => {
     try {
-      return localStorage.getItem('eo_theme') || 'light';
+      return localStorage.getItem('eo_theme') || 'system';
     } catch {
-      return 'light';
+      return 'system';
     }
   });
+
+  const [systemDark, setSystemDark] = useState(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => setSystemDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   const setTheme = useCallback((name) => {
     setThemeState(name);
@@ -197,7 +212,8 @@ export function ThemeProvider({ children }) {
     } catch {}
   }, []);
 
-  const currentTheme = THEMES[theme] || THEMES.cyberpunk;
+  const resolvedTheme = theme === 'system' ? (systemDark ? 'cyberpunk' : 'light') : theme;
+  const currentTheme = THEMES[resolvedTheme] || THEMES.cyberpunk;
 
   useEffect(() => {
     const root = document.documentElement;

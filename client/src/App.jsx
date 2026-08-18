@@ -67,11 +67,20 @@ export default function App() {
 
   const handleLogin = (t) => { localStorage.setItem('eo_token', t); setToken(t) }
   const logout = () => { localStorage.removeItem('eo_token'); setToken(null); setUser(null) }
-  const [uiTheme, setUiTheme] = useState(() => localStorage.getItem('eo_theme_ui') || 'dark')
+  const [uiTheme, setUiTheme] = useState(() => localStorage.getItem('eo_theme_ui') || 'system')
+  const [sysDark, setSysDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
   useEffect(() => {
-    document.documentElement.dataset.theme = uiTheme
+    if (!window.matchMedia) return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const h = (e) => setSysDark(e.matches)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [])
+  useEffect(() => {
+    const resolved = uiTheme === 'system' ? (sysDark ? 'dark' : 'light') : uiTheme
+    document.documentElement.dataset.theme = resolved
     localStorage.setItem('eo_theme_ui', uiTheme)
-  }, [uiTheme])
+  }, [uiTheme, sysDark])
   const renameUser = async () => {
     const name = (prompt(`輸入新名稱（與 admin 等系統名稱相衝突的不可使用，最多 20 字）：`, user?.username) || '').trim()
     if (!name || name === user?.username) return
@@ -132,7 +141,7 @@ export default function App() {
             )}
           </div>
           <span className="text-dim" style={{fontWeight:500}}>{user?.username ?? '載入中...'}{user?.role === 'admin' ? ' ⭐' : ''}</span>
-          <button className="btn btn-sm" onClick={() => setUiTheme(t => t === 'dark' ? 'light' : 'dark')} title={uiTheme === 'dark' ? '切換淺色' : '切換深色'}>{uiTheme === 'dark' ? '☀️' : '🌙'}</button>
+          <button className="btn btn-sm" onClick={() => setUiTheme(t => t === 'dark' ? 'light' : t === 'light' ? 'system' : 'dark')} title="切換主題">{uiTheme === 'dark' ? '☀️' : uiTheme === 'light' ? '💻' : '🖥️'}</button>
           <button className="btn btn-sm" onClick={renameUser} title="改名">✏️</button>
           <button className="btn btn-sm btn-danger" onClick={logout}>登出</button>
         </div>
@@ -1295,13 +1304,13 @@ function Stock({ api, toast, prompt, user }) {
               <span className="text-dim text-sm">{orders.filter(o => o.status === 'open').length}/20</span>
             </div>
             <div style={{display:'flex', gap:6, marginBottom:8, alignItems:'center'}}>
-              <select value={ordType} onChange={e => setOrdType(e.target.value)} className="select-sm" style={{width:75}}>
+              <select value={ordType} onChange={e => setOrdType(e.target.value)} className="select-sm" style={{width:75, flexShrink:0}}>
                 <option value="buy">買入</option>
                 <option value="sell">賣出</option>
               </select>
-              <input type="number" placeholder="價格 $" value={ordPrice} onChange={e => setOrdPrice(e.target.value)} style={{width:120, fontSize:12, padding:'5px 8px'}} />
-              <input type="number" placeholder="數量 股" value={ordQty} onChange={e => setOrdQty(e.target.value)} style={{width:120, fontSize:12, padding:'5px 8px'}} />
-              <button className="btn btn-primary btn-sm" onClick={placeOrder} style={{fontWeight:600}}>掛</button>
+              <input type="number" placeholder="價格 $" value={ordPrice} onChange={e => setOrdPrice(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
+              <input type="number" placeholder="數量 股" value={ordQty} onChange={e => setOrdQty(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
+              <button className="btn btn-primary btn-sm" onClick={placeOrder} style={{flexShrink:0}}>掛</button>
             </div>
             {orders.filter(o => o.company_id === selectedStock).slice(0, 5).map(o => (
               <div key={o.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderTop:'1px solid var(--border)', fontSize:12}}>
@@ -1319,15 +1328,15 @@ function Stock({ api, toast, prompt, user }) {
           <div className="card" style={{marginBottom:12}}>
             <div style={{fontWeight:600, fontSize:13, marginBottom:8}}>⚡ 槓桿</div>
             <div style={{display:'flex', gap:6, marginBottom:6, alignItems:'center'}}>
-              <select value={marginType} onChange={e => setMarginType(e.target.value)} className="select-sm" style={{width:75}}>
+              <select value={marginType} onChange={e => setMarginType(e.target.value)} className="select-sm" style={{width:75, flexShrink:0}}>
                 <option value="long">做多</option>
                 <option value="short">做空</option>
               </select>
-              <input type="number" placeholder="數量 股" value={marginQty} onChange={e => setMarginQty(e.target.value)} style={{width:140, fontSize:12, padding:'5px 8px'}} />
-              <select value={marginLev} onChange={e => setMarginLev(e.target.value)} className="select-sm" style={{width:55}}>
+              <input type="number" placeholder="數量 股" value={marginQty} onChange={e => setMarginQty(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
+              <select value={marginLev} onChange={e => setMarginLev(e.target.value)} className="select-sm" style={{width:55, flexShrink:0}}>
                 <option value="2">2x</option><option value="3">3x</option><option value="5">5x</option>
               </select>
-              <button className="btn btn-primary btn-sm" onClick={openMargin} style={{fontWeight:600}}>開</button>
+              <button className="btn btn-primary btn-sm" onClick={openMargin} style={{flexShrink:0}}>開</button>
             </div>
             {positions.filter(p => p.company_id === selectedStock).map(p => {
               const cur = q?.price || 0;
