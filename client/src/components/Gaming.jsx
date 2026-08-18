@@ -220,7 +220,7 @@ function Lottery({ api, user }) {
   };
 
   const buy = async (free) => {
-    const nums = free ? null : selected;
+    const nums = selected.length === 6 ? selected : null;
     if (!free && selected.length < 6) return toast('請選擇 6 個號碼', 'error');
     setLoading(true);
     const r = await api('/api/lottery/buy', { numbers: nums, free });
