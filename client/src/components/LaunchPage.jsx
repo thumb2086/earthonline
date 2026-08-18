@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from './Toast.jsx';
 
-export default function LaunchPage({ api, user }) {
+export default function LaunchPage({ api, user, onNavigate }) {
   const { toast } = useToast();
   const [btc, setBtc] = useState(null);
   const [launch, setLaunch] = useState(null);
@@ -81,24 +81,27 @@ export default function LaunchPage({ api, user }) {
         <div className="card-title">🎁 開服慶典活動</div>
         <div style={{display:'flex', flexDirection:'column', gap:10, marginTop:8}}>
           {[
-            { icon: '💰', title: '雙倍收入', desc: '所有玩家收入 x2', active: launch?.doubleActive, time: '72 小時' },
-            { icon: '📅', title: '每日登入獎勵', desc: '7 天循環制，連續登入額外獎勵', active: true, time: '常駐' },
-            { icon: '🎰', title: '刮刮樂', desc: '銅/銀/金三種等級，每日免費 1 次', active: true, time: '每日重置' },
-            { icon: '🎱', title: '樂透', desc: '選 6 個號碼，每天開獎', active: true, time: '每天 08:00 開獎' },
-            { icon: '🏆', title: '排行榜獎勵', desc: '每日自動發放 Top 10 獎金', active: launch?.active, time: '活動期間' },
+            { icon: '💰', title: '雙倍收入', desc: '所有玩家收入 x2', active: launch?.doubleActive, time: '72 小時', link: 'dashboard' },
+            { icon: '📅', title: '每日登入獎勵', desc: '7 天循環制，連續登入額外獎勵', active: true, time: '常駐', link: 'dashboard' },
+            { icon: '🎰', title: '刮刮樂', desc: '銅/銀/金三種等級，每日免費 1 次', active: true, time: '每日重置', link: 'gaming' },
+            { icon: '🎱', title: '樂透', desc: '選 6 個號碼，每天開獎', active: true, time: '每天 08:00 開獎', link: 'gaming' },
+            { icon: '🏆', title: '排行榜獎勵', desc: '每日自動發放 Top 10 獎金', active: launch?.active, time: '活動期間', link: 'leaderboard' },
           ].map((item, i) => (
-            <div key={i} style={{display:'flex', gap:12, alignItems:'center', padding:'10px 12px', borderRadius:8, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)'}}>
+            <div key={i} onClick={() => onNavigate && onNavigate(item.link)} style={{display:'flex', gap:12, alignItems:'center', padding:'10px 12px', borderRadius:8, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)', cursor: onNavigate ? 'pointer' : 'default', transition:'background 0.15s'}}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.05)'}
+              onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.02)'}>
               <div style={{fontSize:28, minWidth:36, textAlign:'center'}}>{item.icon}</div>
               <div style={{flex:1}}>
                 <div style={{fontWeight:600, fontSize:14}}>{item.title}</div>
                 <div className="text-dim text-sm">{item.desc}</div>
               </div>
-              <div style={{textAlign:'right'}}>
+              <div style={{textAlign:'right', display:'flex', alignItems:'center', gap:6}}>
                 {item.active !== undefined && (
                   <div style={{fontSize:10, padding:'2px 8px', borderRadius:4, background: item.active ? 'rgba(0,255,65,0.15)' : 'rgba(255,255,255,0.05)', color: item.active ? 'var(--accent)' : 'var(--text-dim)', fontWeight:600}}>
                     {item.active ? '進行中' : item.time}
                   </div>
                 )}
+                <span className="text-dim" style={{fontSize:12}}>→</span>
               </div>
             </div>
           ))}

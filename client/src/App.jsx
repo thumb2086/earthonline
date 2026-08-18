@@ -146,7 +146,7 @@ export default function App() {
         </div>
         <div className="content">
           {view === 'dashboard' && <Dashboard user={user} api={api} toast={toast} />}
-          {view === 'launch' && <LaunchPage api={api} user={user} />}
+          {view === 'launch' && <LaunchPage api={api} user={user} onNavigate={setView} />}
           {view === 'income' && <Income api={api} toast={toast} />}
           {view === 'bank' && <Bank act={act} api={api} toast={toast} />}
           {view === 'invest' && <Invest api={api} toast={toast} prompt={prompt} />}
