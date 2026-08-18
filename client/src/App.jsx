@@ -478,9 +478,15 @@ function Invest({ api, toast, prompt }) {
                       <div style={{fontWeight:600, color:'var(--warn)'}}>${(t.unlockEarned || 0).toLocaleString()}</div>
                     </div>}
               </div>
-              {investments.filter(i => i.type === t.type).length > 0 && <div style={{marginTop:8, paddingTop:8, borderTop:'1px solid var(--border)'}}>
-                <span className="text-dim text-sm">持有 <span style={{color:'var(--accent)', fontWeight:600}}>${investments.filter(i => i.type === t.type).reduce((s, i) => s + (i.amount||0), 0).toLocaleString()}</span></span>
-              </div>}
+              {(() => { const filtered = investments.filter(i => i.type === t.type); if (filtered.length === 0) return null; const amt = filtered.reduce((s, i) => s + (i.amount||0), 0); const paid = filtered.reduce((s, i) => s + (i.totalPaid||0), 0); const pending = filtered.reduce((s, i) => s + (i.pending_interest||0), 0); return (
+                <div style={{marginTop:8, paddingTop:8, borderTop:'1px solid var(--border)'}}>
+                  <div style={{display:'flex', gap:16, flexWrap:'wrap'}}>
+                    <span className="text-dim text-sm">持有 <span style={{color:'var(--accent)', fontWeight:600}}>${amt.toLocaleString()}</span></span>
+                    <span className="text-dim text-sm">已賺 <span style={{color:'#10b981', fontWeight:600}}>${paid.toLocaleString()}</span></span>
+                    <span className="text-dim text-sm">待領 <span style={{color:'#f59e0b', fontWeight:600}}>${pending.toLocaleString()}</span></span>
+                  </div>
+                </div>
+              ); })()}
             </div>
           ))}
         </div>
