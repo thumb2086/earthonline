@@ -1,4 +1,4 @@
-import { notify } from './utils.js';
+import { notify, requireAdmin } from './utils.js';
 
 const LAUNCH_DURATION_MS = 72 * 3600 * 1000;
 
@@ -34,10 +34,12 @@ export async function giveNewbieGift(db, userId) {
   const startingCash = 5000;
   const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(userId).first();
   if (!wallet) return { error: '錢包不存在' };
+  const existing = await db.prepare("SELECT value FROM game_meta WHERE key = ?").bind(`newbie_${userId}`).first();
+  if (existing) return { skip: true };
   if (wallet.cash > startingCash) return { skip: true };
-
   await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?')
     .bind(startingCash, startingCash, userId).run();
+  await db.prepare("INSERT INTO game_meta (key, value) VALUES (?, '1')").bind(`newbie_${userId}`).run();
   return { success: true, amount: startingCash };
 }
 
@@ -109,17 +111,17 @@ export async function handleLaunchEvent(env, request, path, user) {
   }
 
   if (path === '/api/launch/start' && method === 'POST') {
-    if (user.role !== 'admin') return { error: '需要管理員權限' };
+    if (!await requireAdmin(user, db)) return { error: '需要管理員權限' };
     return await startLaunchEvent(db);
   }
 
   if (path === '/api/launch/end' && method === 'POST') {
-    if (user.role !== 'admin') return { error: '需要管理員權限' };
+    if (!await requireAdmin(user, db)) return { error: '需要管理員權限' };
     return await endLaunchEvent(db);
   }
 
   if (path === '/api/launch/leaderboard-rewards' && method === 'POST') {
-    if (user.role !== 'admin') return { error: '需要管理員權限' };
+    if (!await requireAdmin(user, db)) return { error: '需要管理員權限' };
     return await distributeLeaderboardRewards(db);
   }
 

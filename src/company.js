@@ -208,10 +208,10 @@ export async function handleCompany(env, request, path, user) {
     await logTransaction(db, company.owner_id, 'ipo_revenue', 0, `創辦人持有 ${founderShares.toLocaleString()} 股 (IPO發行 ${ipoShares.toLocaleString()} 股)`);
     const isQueued = !!currentIpo;
     if (isQueued) {
-      await broadcast(db, `📋 「${company.code} ${company.name}」加入 IPO 排隊！發行價 $${price} · 等候上市中`);
+      try { await broadcast(db, `📋 「${company.code} ${company.name}」加入 IPO 排隊！發行價 $${price} · 等候上市中`); } catch {}
       return { success: true, message: `已加入排隊（創辦人保留 ${(founderKeep*100).toFixed(0)}%），等候上市中` };
     } else {
-      await broadcast(db, `🚀 「${company.code} ${company.name}」啟動 IPO！發行價 $${price} · 對外發行 ${ipoShares.toLocaleString()} 股 · 認購期 ${minutes} 分鐘（滿額立即上市）`);
+      try { await broadcast(db, `🚀 「${company.code} ${company.name}」啟動 IPO！發行價 $${price} · 對外發行 ${ipoShares.toLocaleString()} 股 · 認購期 ${minutes} 分鐘（滿額立即上市）`); } catch {}
       return { success: true, message: `IPO已啟動，${minutes}分鐘後自動上市（創辦人保留 ${(founderKeep*100).toFixed(0)}%）` };
     }
   }
@@ -224,9 +224,18 @@ export async function handleCompany(env, request, path, user) {
     const ipo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
     if (!ipo) return { error: '公司無 IPO 狀態' };
     if (ipo.phase === 'trading') return { error: '已上市交易中，無法取消' };
+    // 退還認購者款項
+    const subs = await db.prepare('SELECT user_id, shares, total_cost FROM ipo_subscriptions WHERE company_id = ?').bind(companyId).all();
+    for (const s of (subs.results || [])) {
+      await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(s.total_cost, s.user_id).run();
+      await logTransaction(db, s.user_id, 'subscription', s.total_cost, `IPO 認購退款（${company.name} 取消 IPO）`);
+      await notify(db, s.user_id, 'ipo_refund', `💰「${company.name}」IPO 已取消，認購款 $${s.total_cost.toLocaleString()} 已退還`);
+    }
+    await db.prepare('DELETE FROM ipo_subscriptions WHERE company_id = ?').bind(companyId).run();
     await db.prepare('DELETE FROM ipo_state WHERE company_id = ?').bind(companyId).run();
     await db.prepare('DELETE FROM stock_inventory WHERE company_id = ?').bind(companyId).run();
     await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).run();
+    await db.prepare('UPDATE companies SET last_delisted_at = ? WHERE id = ?').bind(Date.now(), companyId).run();
     return { success: true };
   }
 
@@ -341,8 +350,9 @@ export async function handleCompany(env, request, path, user) {
     // 全部原子更新 (市值不變: 股本×N, 股價÷N)
     const newPrice = Math.max(1, Math.round((company.share_price || 100) / n));
     await db.prepare('UPDATE wallets SET cash = cash - 50000 WHERE user_id = ?').bind(user.id).run();
-    await db.prepare('UPDATE companies SET total_shares = total_shares * ?, share_price = ?, issue_cap = issue_cap * ?, last_split_at = ? WHERE id = ?')
-      .bind(n, newPrice, n, Date.now(), companyId).run();
+    const newTotalShares = company.total_shares * n;
+    await db.prepare('UPDATE companies SET total_shares = ?, share_price = ?, issue_cap = ?, last_split_at = ? WHERE id = ?')
+      .bind(newTotalShares, newPrice, newTotalShares * 2, Date.now(), companyId).run();
     await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity * ? WHERE company_id = ?').bind(n, companyId).run();
     await db.prepare('UPDATE stock_holdings SET quantity = quantity * ? WHERE company_id = ?').bind(n, companyId).run();
     // 歷史成交與K線: 價÷N、量×N (avgCost/損益與走勢圖自動正確)

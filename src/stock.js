@@ -448,16 +448,20 @@ const price = await getCurrentPrice(db, companyId);
     const ipoMax = inv?.stock_quantity || 0;
     if ((totalSubs?.total || 0) + shares > ipoMax) return { error: `IPO 額度已滿 (${ipoMax.toLocaleString()})` };
 
-    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(totalCost, user.id).run();
+    // 原子操作: 扣款 + 認購在同一 batch
+    const stmts = [
+      db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ? AND cash >= ?').bind(totalCost, user.id, totalCost),
+      db.prepare('INSERT INTO ipo_subscriptions (user_id, company_id, shares, total_cost, subscribed_at) VALUES (?, ?, ?, ?, ?)').bind(user.id, companyId, shares, totalCost, Date.now()),
+    ];
+    const batchRes = await db.batch(stmts);
+    if (batchRes[0].meta.changes === 0) return { error: '餘額不足' };
 
     // 玩家公司 IPO: 錢給 owner; 系統公司: 錢銷毀(回收經濟)
-    const owner = await db.prepare('SELECT owner_id FROM companies WHERE id = ?').bind(companyId).first();
     if (owner && owner.owner_id > 0) {
       await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(totalCost, totalCost, owner.owner_id).run();
       await logTransaction(db, owner.owner_id, 'ipo_revenue', totalCost, `IPO募集 ${shares} 股 × $${company?.share_price || 100}`);
     }
 
-    await db.prepare('INSERT INTO ipo_subscriptions (user_id, company_id, shares, total_cost, subscribed_at) VALUES (?, ?, ?, ?, ?)').bind(user.id, companyId, shares, totalCost, Date.now()).run();
     await logTransaction(db, user.id, 'ipo_subscribe', -totalCost, `IPO認購 ${shares} 股 @ $${company?.share_price || 100}`);
     return { success: true, shares, totalCost };
   }

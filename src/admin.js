@@ -180,6 +180,28 @@ export async function handleAdmin(env, request, path, user) {
     return { success: true };
   }
 
+  if (path === '/api/admin/ban' && request.method === 'POST') {
+    const { userId, reason } = await request.json();
+    if (!userId) return { error: '請指定用戶' };
+    const target = await db.prepare('SELECT id, username, role FROM users WHERE id = ?').bind(userId).first();
+    if (!target) return { error: '用戶不存在' };
+    if (target.role === 'admin') return { error: '無法停權管理員' };
+    await db.prepare('INSERT OR REPLACE INTO blacklist (user_id, reason, banned_by, banned_at) VALUES (?, ?, ?, ?)').bind(userId, reason || '管理員停權', user.id, Date.now()).run();
+    return { success: true, message: `已停權 ${target.username}` };
+  }
+
+  if (path === '/api/admin/unban' && request.method === 'POST') {
+    const { userId } = await request.json();
+    if (!userId) return { error: '請指定用戶' };
+    await db.prepare('DELETE FROM blacklist WHERE user_id = ?').bind(userId).run();
+    return { success: true };
+  }
+
+  if (path === '/api/admin/banned-list' && request.method === 'GET') {
+    const rows = await db.prepare('SELECT b.user_id, b.reason, b.banned_at, u.username FROM blacklist b JOIN users u ON u.id = b.user_id ORDER BY b.banned_at DESC').all();
+    return rows.results;
+  }
+
   if (path === '/api/admin/dilute' && request.method === 'POST') {
     const { companyId, shares } = await request.json();
     if (!companyId || !shares || shares <= 0) return { error: '參數無效' };

@@ -1738,6 +1738,11 @@ function AdminPanel({ api }) {
             <div className="flex gap-8 items-center">
               <button className="btn btn-sm" onClick={() => setExpanded(expanded === u.id ? null : u.id)}>{expanded === u.id ? '收起' : '資產配置'}</button>
               <button className="btn btn-sm btn-warn" onClick={() => grantMoney(u)}>💰 加錢</button>
+              <button className="btn btn-sm btn-danger" onClick={() => prompt(`停權 ${u.username}？輸入理由`, async (reason) => {
+                if (!reason) return
+                const r = await api('/api/admin/ban', { userId: u.id, reason })
+                if (r.success) { toast(r.message, 'success'); loadAll(exclude) } else toast(r.error, 'error')
+              })}>🚫 停權</button>
             </div>
           </div>
           {expanded === u.id && <div className="card" style={{padding:12, marginTop:4}}>

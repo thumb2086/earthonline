@@ -194,3 +194,9 @@ export async function maybeSystemTakeover(db, companyId) {
   await notify(db, prevOwner, 'company_takeover', `🌐 你的「${company.name}」已無任何股東持股，移交由系統管理`);
   return true;
 }
+
+export async function requireAdmin(user, db) {
+  if (!user) return false;
+  const row = await db.prepare('SELECT role FROM users WHERE id = ?').bind(user.id).first();
+  return row?.role === 'admin';
+}

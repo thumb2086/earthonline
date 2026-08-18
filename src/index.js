@@ -27,6 +27,17 @@ const ADMIN_ROLE_NAME = '地球管理團隊';
 // 與 client/index.html 的 meta CSP 一致; 這裡用 header 傳送才能支援 frame-ancestors
 const CSP_HEADER = "default-src 'self'; script-src 'self' https://pagead2.googlesyndication.com https://static.cloudflareinsights.com https://ep1.adtrafficquality.google https://ep2.adtrafficquality.google; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://discord.com https://www.googleapis.com https://static.cloudflareinsights.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep1.adtrafficquality.google https://ep2.adtrafficquality.google; frame-src https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com; frame-ancestors 'none'";
 
+const rateLimitMap = new Map();
+function checkRateLimit(key, limit = 30, windowMs = 60000) {
+  const now = Date.now();
+  let entry = rateLimitMap.get(key);
+  if (!entry || now - entry.start > windowMs) { entry = { start: now, count: 0 }; rateLimitMap.set(key, entry); }
+  entry.count++;
+  if (entry.count > limit) return false;
+  if (rateLimitMap.size > 10000) { for (const [k, v] of rateLimitMap) { if (now - v.start > windowMs) rateLimitMap.delete(k); } }
+  return true;
+}
+
 async function isAdmin(discordId, env) {
   if (!env.DISCORD_BOT_TOKEN) return false;
   try {
@@ -222,6 +233,8 @@ export default {
 
       // 一次性 bot 設定 (註冊指令 + 查 public key + 改名)
       if (path === '/api/bot/setup' && request.method === 'GET') {
+        const au = await authCheck(request, env);
+        if (!au || au.role !== 'admin') return json({ error: 'Unauthorized' }, headers, 401);
         const renameTo = url.searchParams.get('rename');
         const result = await setupDiscordBot(env, renameTo);
         return json(result, headers, result.error ? 400 : 200);
@@ -229,24 +242,32 @@ export default {
 
       // 列出伺服器中的 bots
       if (path === '/api/bot/guild-bots' && request.method === 'GET') {
+        const au = await authCheck(request, env);
+        if (!au || au.role !== 'admin') return json({ error: 'Unauthorized' }, headers, 401);
         const result = await listGuildBots(env);
         return json(result, headers, result.error ? 400 : 200);
       }
 
       // 列出應用指令
       if (path === '/api/bot/commands' && request.method === 'GET') {
+        const au = await authCheck(request, env);
+        if (!au || au.role !== 'admin') return json({ error: 'Unauthorized' }, headers, 401);
         const result = await listAppCommands(env);
         return json(result, headers, result.error ? 400 : 200);
       }
 
       // 清除 guild commands 殘留
       if (path === '/api/bot/clear-guild-cmds' && request.method === 'GET') {
+        const au = await authCheck(request, env);
+        if (!au || au.role !== 'admin') return json({ error: 'Unauthorized' }, headers, 401);
         const result = await clearGuildCommands(env);
         return json(result, headers, result.error ? 400 : 200);
       }
 
       // 踢除舊 bot
       if (path === '/api/bot/kick' && request.method === 'GET') {
+        const au = await authCheck(request, env);
+        if (!au || au.role !== 'admin') return json({ error: 'Unauthorized' }, headers, 401);
         const botId = url.searchParams.get('botId');
         const result = await kickGuildBot(env, botId);
         return json(result, headers, result.error ? 400 : 200);
@@ -325,6 +346,9 @@ export default {
 
       const user = await authCheck(request, env);
       if (!user) return json({ error: 'Unauthorized' }, headers, 401);
+      const banned = await env.DB.prepare('SELECT reason FROM blacklist WHERE user_id = ?').bind(user.id).first();
+      if (banned) return json({ error: `帳號已被停權：${banned.reason}` }, headers, 403);
+      if (!checkRateLimit(`user:${user.id}`, 60)) return json({ error: '請求過於頻繁，請稍後再試' }, headers, 429);
       // Track last active
       await env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(Date.now(), user.id).run();
 
