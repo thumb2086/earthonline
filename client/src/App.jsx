@@ -4,6 +4,8 @@ import Watermark from './components/Watermark'
 import { useToast } from './components/Toast.jsx'
 import DailyLogin from './components/DailyLogin'
 import LaunchBanner from './components/LaunchBanner'
+import Gaming from './components/Gaming'
+import LaunchPage from './components/LaunchPage'
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('eo_token'))
@@ -81,12 +83,14 @@ export default function App() {
   if (!token) return <><LoginGateway onLogin={handleLogin} /><Watermark /></>
 
   const tabs = [
+    { id: 'launch', label: '🚀 開服' },
     { id: 'dashboard', label: '📊 儀表板' },
     { id: 'income', label: '⬆️ 升級' },
     { id: 'bank', label: '🏦 銀行' },
     { id: 'invest', label: '💼 投資' },
     { id: 'company', label: '🏢 公司' },
     { id: 'trading', label: '📈 交易' },
+    { id: 'gaming', label: '🎰 娛樂' },
     { id: 'subscription', label: '📦 訂閱' },
     { id: 'history', label: '💰 明細' },
     { id: 'leaderboard', label: '🏆 排行' },
@@ -142,11 +146,13 @@ export default function App() {
         </div>
         <div className="content">
           {view === 'dashboard' && <Dashboard user={user} api={api} toast={toast} />}
+          {view === 'launch' && <LaunchPage api={api} user={user} />}
           {view === 'income' && <Income api={api} toast={toast} />}
           {view === 'bank' && <Bank act={act} api={api} toast={toast} />}
           {view === 'invest' && <Invest api={api} toast={toast} prompt={prompt} />}
           {view === 'company' && <Company api={api} toast={toast} prompt={prompt} promptMulti={promptMulti} />}
           {view === 'trading' && <Trading api={api} toast={toast} prompt={prompt} user={user} />}
+          {view === 'gaming' && <Gaming api={api} user={user} />}
           {view === 'history' && <History api={api} />}
           {view === 'subscription' && <Subscription api={api} toast={toast} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}

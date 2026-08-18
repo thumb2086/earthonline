@@ -86,6 +86,19 @@ export async function maybeDistributeDailyLeaderboard(db) {
   return await distributeLeaderboardRewards(db);
 }
 
+export async function claimBitcoin(db, userId) {
+  const existing = await db.prepare('SELECT * FROM user_btc WHERE user_id = ?').bind(userId).first();
+  if (existing) return { error: '已經領取過了', claimed: true, amount: existing.amount };
+  const btcAmount = 1;
+  await db.prepare('INSERT INTO user_btc (user_id, amount, claimed_at) VALUES (?, ?, ?)').bind(userId, btcAmount, Date.now()).run();
+  return { success: true, amount: btcAmount };
+}
+
+export async function getBitcoinStatus(db, userId) {
+  const row = await db.prepare('SELECT * FROM user_btc WHERE user_id = ?').bind(userId).first();
+  return { claimed: !!row, amount: row?.amount || 0, claimedAt: row?.claimed_at || 0 };
+}
+
 export async function handleLaunchEvent(env, request, path, user) {
   const db = env.DB;
   const url = new URL(request.url);
@@ -112,6 +125,13 @@ export async function handleLaunchEvent(env, request, path, user) {
 
   if (path === '/api/launch/newbie-gift' && method === 'POST') {
     return await giveNewbieGift(db, user.id);
+  }
+
+  if (path === '/api/launch/btc/status') {
+    return await getBitcoinStatus(db, user.id);
+  }
+  if (path === '/api/launch/btc/claim' && method === 'POST') {
+    return await claimBitcoin(db, user.id);
   }
 
   return null;

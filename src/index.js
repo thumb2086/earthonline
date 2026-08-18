@@ -18,6 +18,8 @@ import { checkVoiceBoost, weeklySettlement, rankIdxFromPct, RANK_LABELS } from '
 import { DiscordGateway } from './gateway.js';
 import { getDailyLoginStatus, claimDailyLogin } from './daily_login.js';
 import { handleLaunchEvent, getLaunchEventStatus, giveNewbieGift, maybeDistributeDailyLeaderboard } from './launch_event.js';
+import { getScratchStatus, scratch, getScratchHistory } from './scratch.js';
+import { getLotteryStatus, buyTicket, drawLottery, getLotteryHistory } from './lottery.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
 const ADMIN_ROLE_NAME = '地球管理團隊';
@@ -400,6 +402,27 @@ export default {
       const launchResult = await handleLaunchEvent(env, request, path, user);
       if (launchResult !== null) return json(launchResult, headers);
 
+      if (path === '/api/scratch/status') {
+        return json(await getScratchStatus(env.DB, user.id), headers);
+      }
+      if (path === '/api/scratch/buy' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        return json(await scratch(env.DB, user.id, body.tier, !!body.free), headers);
+      }
+      if (path === '/api/scratch/history') {
+        return json(await getScratchHistory(env.DB, user.id), headers);
+      }
+      if (path === '/api/lottery/status') {
+        return json(await getLotteryStatus(env.DB, user.id), headers);
+      }
+      if (path === '/api/lottery/buy' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        return json(await buyTicket(env.DB, user.id, body.numbers, !!body.free), headers);
+      }
+      if (path === '/api/lottery/history') {
+        return json(await getLotteryHistory(env.DB), headers);
+      }
+
       const routes = [
         ['/api/income', handleIncome],
         ['/api/bank', handleBank],
@@ -548,6 +571,7 @@ export default {
     if (now.getHours() === 0 && now.getMinutes() < 5) {
       try { await weeklySettlement(db, env); } catch (e) {}
       try { await maybeDistributeDailyLeaderboard(db); } catch (e) {}
+      try { await drawLottery(db); } catch (e) { console.error('Lottery draw error:', e.message); }
     }
     // 最後才 flush 小時彙總 log (收集所有 tick 後一次 batch 寫入)
     try { await hourlyLogger.flush(); } catch (err) { console.error('Scheduled hourly log flush error:', err.message); }
