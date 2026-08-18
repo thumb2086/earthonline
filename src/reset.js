@@ -39,6 +39,8 @@ async function doReset(db) {
     'ipo_state', 'ipo_subscriptions', 'stock_limit_orders', 'investments', 'loans',
     'futures', 'etf_trades', 'etf_holdings', 'etf_inventory',
     'employees', 'departments', 'companies', 'notifications', 'transaction_history', 'community_announcements',
+    'scratch_cards', 'scratch_daily', 'lottery_rounds', 'lottery_tickets', 'lottery_daily',
+    'daily_logins', 'daily_tasks', 'user_btc', 'contracts', 'user_contracts',
   ];
   for (const t of tables) {
     try { await db.prepare(`DELETE FROM ${t}`).run(); } catch (e) {}
@@ -77,6 +79,11 @@ async function doReset(db) {
 
   // ETF 庫存
   await db.prepare('INSERT INTO etf_inventory (etf_id, cash, stock_quantity) VALUES (1, 0, 1000000) ON CONFLICT(etf_id) DO UPDATE SET stock_quantity = 1000000').run();
+
+  // 重置開服活動狀態
+  await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('launch_event_start', '0')").run();
+  await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('launch_double_income', '0')").run();
+  await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('launch_last_lb_date', '')").run();
 
   return true;
 }
