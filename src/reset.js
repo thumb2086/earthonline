@@ -84,6 +84,10 @@ async function doReset(db) {
   await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('launch_event_start', '0')").run();
   await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('launch_double_income', '0')").run();
   await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('launch_last_lb_date', '')").run();
+  // 清除新手禮包記錄（讓所有人重新領）
+  await db.prepare("DELETE FROM game_meta WHERE key LIKE 'newbie_%'").run();
+  // 清除已公告狀態
+  await db.prepare("DELETE FROM game_meta WHERE key = 'v2_announced'").run();
 
   return true;
 }
