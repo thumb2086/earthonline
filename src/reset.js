@@ -100,8 +100,13 @@ export async function maybeResetGame(db) {
 
   await doReset(db);
 
-  await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('v2_reset_done', ?)").bind(String(Date.now())).run();
-  await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind('🚀 正式版已上線！所有玩家已從 0 開始，祝各位在地球在線順利生存！', Date.now()).run();
+  // 自動啟動開服慶典
+  const now = Date.now();
+  await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('launch_event_start', ?)").bind(String(now)).run();
+  await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('launch_double_income', '1')").run();
+
+  await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('v2_reset_done', ?)").bind(String(now)).run();
+  await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind('🚀 正式版已上線！所有玩家已從 0 開始，祝各位在地球在線順利生存！雙倍收入 72 小時啟動！', now).run();
   return true;
 }
 
