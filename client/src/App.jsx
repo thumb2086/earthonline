@@ -664,8 +664,8 @@ const splitCompany = (c) => prompt(`拆分「${c.name}」？(股價÷N、持股�
         <div className="stat"><span className="stat-label">你持股</span><span className="stat-value">{(heldOf(c.id) || 0).toLocaleString()} 股</span></div>
         <div className="flex gap-8 mt-12">
           <button className={`btn btn-sm ${selectedCompany===c.id?'btn-primary':''}`} onClick={() => setSelectedCompany(c.id)}>選擇此公司</button>
-          {!c.phase && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
-          {(c.phase === 'ipo' || c.phase === 'queued') && <button className="btn btn-sm btn-danger" onClick={() => cancelIpo(c)}>❌ 取消IPO</button>}
+          {(!c.phase || c.phase === 'pending') && <button className="btn btn-sm btn-warn" onClick={() => startIpo(c)}>🚀 IPO上市</button>}
+          {(c.phase === 'ipo' || c.phase === 'queued' || c.phase === 'pending') && <button className="btn btn-sm btn-danger" onClick={() => cancelIpo(c)}>❌ 取消IPO</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => diluteCompany(c)}>＋ 增資</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => forceBuy(c)}>💼 強制收購</button>}
           {c.phase === 'trading' && <button className="btn btn-sm" onClick={() => splitCompany(c)}>✂️ 拆分</button>}

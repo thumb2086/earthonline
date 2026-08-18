@@ -156,7 +156,10 @@ export async function handleCompany(env, request, path, user) {
     const company = await db.prepare('SELECT * FROM companies WHERE id = ? AND owner_id = ?').bind(companyId, user.id).first();
     if (!company) return { error: '公司不存在或非owner' };
     const existingIpo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(companyId).first();
-    if (existingIpo && existingIpo.phase !== null) return { error: '已有IPO記錄' };
+    if (existingIpo && existingIpo.phase !== null && existingIpo.phase !== 'pending') return { error: '已有IPO記錄' };
+    if (existingIpo && existingIpo.phase === 'pending') {
+      await db.prepare('DELETE FROM ipo_state WHERE company_id = ?').bind(companyId).run();
+    }
     // 下市冷卻: 下市後 24h 內不可重新 IPO (防 IPO→下市→IPO 循環印鈔)
     if (company.last_delisted_at && Date.now() - company.last_delisted_at < 24 * 3600000) {
       return { error: `下市後需等待 24 小時才可重新上市` };
