@@ -26,7 +26,7 @@ export async function scratch(db, userId, tier, isFree) {
   const freeUsed = (row && row.date === today) ? (row.free_used || 0) : 0;
 
   if (isFree) {
-    if (freeUsed >= 1) return { error: '今日免費次數已用完' };
+    if (freeUsed >= 5) return { error: '今日免費次數已用完' };
     await db.prepare(`INSERT INTO scratch_daily (user_id, date, free_used) VALUES (?, ?, 1)
       ON CONFLICT(user_id) DO UPDATE SET date = excluded.date, free_used = 1`).bind(userId, today).run();
   } else {

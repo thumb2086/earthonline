@@ -69,11 +69,11 @@ function ScratchCard({ api, user }) {
         ))}
       </div>
 
-      {status.freeUsed < 1 && <div className="card mb-12" style={{borderLeft:'3px solid var(--accent)', background:'rgba(0,255,65,0.05)'}}>
+      {status.freeUsed < 5 && <div className="card mb-12" style={{borderLeft:'3px solid var(--accent)', background:'rgba(0,255,65,0.05)'}}>
         <div className="flex justify-between items-center">
           <div>
             <div style={{fontWeight:600}}>🎁 今日免費刮刮樂</div>
-            <div className="text-dim text-sm">開服慶典每日 1 次免費</div>
+            <div className="text-dim text-sm">每日 5 次免費（剩餘 {5 - status.freeUsed} 次）</div>
           </div>
           <button className="btn btn-primary btn-sm" disabled={loading} onClick={() => buy('bronze', true)}>免費刮</button>
         </div>
@@ -246,13 +246,13 @@ function Lottery({ api, user }) {
         </div>
       </div>
 
-      {status.freeUsed < 1 && <div className="card mb-12" style={{borderLeft:'3px solid var(--accent)', background:'rgba(0,255,65,0.05)'}}>
+      {status.freeUsed < 5 && <div className="card mb-12" style={{borderLeft:'3px solid var(--accent)', background:'rgba(0,255,65,0.05)'}}>
         <div className="flex justify-between items-center">
           <div>
             <div style={{fontWeight:600}}>🎁 今日免費投注</div>
-            <div className="text-dim text-sm">隨機選號，開服慶典每日 1 次</div>
+            <div className="text-dim text-sm">每日 5 次免費（剩餘 {5 - status.freeUsed} 次）</div>
           </div>
-          <button className="btn btn-primary btn-sm" disabled={loading} onClick={() => buy(true)}>免費投</button>
+          <button className="btn btn-primary btn-sm" disabled={loading || selected.length < 6} onClick={() => buy(true)}>免費投</button>
         </div>
       </div>}
 

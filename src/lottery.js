@@ -56,7 +56,7 @@ export async function buyTicket(db, userId, numbers, isFree) {
     const today = todayUTC();
     const row = await db.prepare('SELECT * FROM lottery_daily WHERE user_id = ?').bind(userId).first();
     const freeUsed = (row && row.date === today) ? (row.free_used || 0) : 0;
-    if (freeUsed >= 1) return { error: '今日免費次數已用完' };
+    if (freeUsed >= 5) return { error: '今日免費次數已用完' };
     await db.prepare(`INSERT INTO lottery_daily (user_id, date, free_used) VALUES (?, ?, 1)
       ON CONFLICT(user_id) DO UPDATE SET date = excluded.date, free_used = 1`).bind(userId, today).run();
   } else {
