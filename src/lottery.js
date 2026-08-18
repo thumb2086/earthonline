@@ -33,12 +33,18 @@ export async function getLotteryStatus(db, userId) {
   const freeUsed = (dailyRow && dailyRow.date === today) ? (dailyRow.free_used || 0) : 0;
   const myTickets = await db.prepare('SELECT COUNT(*) as c FROM lottery_tickets WHERE round_id = ? AND user_id = ?').bind(round.id, userId).first();
   const totalTickets = await db.prepare('SELECT COUNT(*) as c FROM lottery_tickets WHERE round_id = ?').bind(round.id).first();
+  const myTicketsList = await db.prepare('SELECT numbers, prize, matches FROM lottery_tickets WHERE round_id = ? AND user_id = ? ORDER BY created_at DESC').bind(round.id, userId).all();
   return {
     roundId: round.id,
     drawNumber: round.draw_number,
     totalPool: round.total_pool,
     totalTickets: totalTickets?.c || 0,
     myTickets: myTickets?.c || 0,
+    myTicketsList: (myTicketsList?.results || []).map(t => ({
+      numbers: t.numbers,
+      prize: t.prize,
+      matches: t.matches,
+    })),
     freeUsed,
     cost: COST_PER_TICKET,
   };
