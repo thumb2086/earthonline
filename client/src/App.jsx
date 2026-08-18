@@ -141,7 +141,17 @@ export default function App() {
             )}
           </div>
           <span className="text-dim" style={{fontWeight:500}}>{user?.username ?? '載入中...'}{user?.role === 'admin' ? ' ⭐' : ''}</span>
-          <button className="btn btn-sm" onClick={() => setUiTheme(t => t === 'dark' ? 'light' : t === 'light' ? 'system' : 'dark')} title="切換主題">{uiTheme === 'dark' ? '☀️' : uiTheme === 'light' ? '💻' : '🖥️'}</button>
+          <div style={{display:'flex', gap:2}}>
+            {[
+              { key: 'dark', icon: '🌙', label: '深色' },
+              { key: 'light', icon: '☀️', label: '淺色' },
+              { key: 'system', icon: '💻', label: '自動' },
+            ].map(t => (
+              <button key={t.key} className={`btn btn-sm ${uiTheme === t.key ? 'btn-primary' : ''}`}
+                onClick={() => setUiTheme(t.key)} title={t.label}
+                style={{fontSize:12, padding:'2px 6px'}}>{t.icon}</button>
+            ))}
+          </div>
           <button className="btn btn-sm" onClick={renameUser} title="改名">✏️</button>
           <button className="btn btn-sm btn-danger" onClick={logout}>登出</button>
         </div>
@@ -266,7 +276,7 @@ function Income({ api, toast }) {
     <>
       <div className="stat-card mb-12">
         <div className="card-title">每分鐘收入</div>
-        <div className="text-lg">${info.income || 0} {launch?.doubleActive && <span style={{fontSize:13, color:'var(--warning)', fontWeight:600}}>🚀 開服慶典 x2</span>}</div>
+        <div className="text-lg">${info.income || 0} {launch?.doubleActive && <span style={{fontSize:13, color:'var(--warning-color)', fontWeight:600}}>🚀 開服慶典 x2</span>}</div>
         <div className="text-dim text-sm" style={{marginTop:4}}>離線時收入減半（50%）</div>
       </div>
       <div className="grid-2">
@@ -1401,7 +1411,7 @@ function Leaderboard({ api }) {
       <div className="card-title">🏆 身價排行榜</div>
       {(data || []).map((u, i) => (
         <div className="stat" key={u.username}>
-          <span><span className="text-accent" style={{fontWeight:700}}>#{i+1}</span> {u.rank && <span style={{marginRight:4, color:'var(--warning)', fontSize:12}}>{u.rank}</span>} <span>{u.username}</span> {u.online ? <span style={{color:'var(--accent)',fontSize:11}}>●線上</span> : <span className="text-dim" style={{fontSize:11}}>●離線</span>}</span>
+          <span><span className="text-accent" style={{fontWeight:700}}>#{i+1}</span> {u.rank && <span style={{marginRight:4, color:'var(--warning-color)', fontSize:12}}>{u.rank}</span>} <span>{u.username}</span> {u.online ? <span style={{color:'var(--accent)',fontSize:11}}>●線上</span> : <span className="text-dim" style={{fontSize:11}}>●離線</span>}</span>
           <span className="text-dim">💎${(u.worth||0).toLocaleString()} 📊{u.stocks} 股</span>
         </div>
       ))}
