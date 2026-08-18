@@ -1401,7 +1401,7 @@ function Leaderboard({ api }) {
       <div className="card-title">🏆 身價排行榜</div>
       {(data || []).map((u, i) => (
         <div className="stat" key={u.username}>
-          <span><span className="text-accent" style={{fontWeight:700}}>#{i+1}</span> {u.rank && <span style={{marginRight:4}}>{u.rank}</span>} {u.username} {u.online ? <span style={{color:'var(--accent)',fontSize:11}}>●線上</span> : <span className="text-dim" style={{fontSize:11}}>●離線</span>}</span>
+          <span><span className="text-accent" style={{fontWeight:700}}>#{i+1}</span> {u.rank && <span style={{marginRight:4, color:'var(--warning)', fontSize:12}}>{u.rank}</span>} <span>{u.username}</span> {u.online ? <span style={{color:'var(--accent)',fontSize:11}}>●線上</span> : <span className="text-dim" style={{fontSize:11}}>●離線</span>}</span>
           <span className="text-dim">💎${(u.worth||0).toLocaleString()} 📊{u.stocks} 股</span>
         </div>
       ))}

@@ -288,10 +288,9 @@ export default {
           FROM users u JOIN wallets w ON w.user_id = u.id
         `).all();
         const now = Date.now();
-        // 身份計算基數 = 有綁 Discord 的玩家, 與每週身分組清算完全一致 (分母相同 → 標籤=實際身分組)
-        const dcUsers = users.results.filter(u => u.has_dc);
-        const total = dcUsers.length || 1;
-        const earnedOrder = [...dcUsers].sort((a, b) => (b.total_earned || 0) - (a.total_earned || 0));
+        // 身份計算基數 = 所有玩家
+        const total = users.results.length || 1;
+        const earnedOrder = [...users.results].sort((a, b) => (b.total_earned || 0) - (a.total_earned || 0));
         const earnedIdx = new Map(earnedOrder.map((u, i) => [u.id, i]));
         const rows = users.results.map(u => {
           const i = earnedIdx.get(u.id);
