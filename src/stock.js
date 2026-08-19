@@ -703,7 +703,7 @@ export async function finalizeIPO(db) {
     if (owner && owner.owner_id > 0) {
       await notify(db, owner.owner_id, 'ipo_listed', `🚀 你的公司「${companyName?.name || ''}」已完成 IPO 上市！`);
     }
-    await broadcast(db, `🎉 「${companyName?.name || '公司'}」IPO 結束，正式上市！發行價 $${owner?.share_price || 100}，${subTotal?.t || 0 ? `全體認購 ${(subTotal?.t || 0).toLocaleString()} 股` : '認購未滿額'}，開始掛牌交易`);
+    try { await broadcast(db, `🎉 「${companyName?.name || '公司'}」IPO 結束，正式上市！發行價 $${owner?.share_price || 100}，${subTotal?.t || 0 ? `全體認購 ${(subTotal?.t || 0).toLocaleString()} 股` : '認購未滿額'}，開始掛牌交易`); } catch {}
   }
 
   // 2. 啟動排隊中的 IPO: 如果目前沒有 'ipo' 階段的公司, 啟動下一家排隊公司
@@ -713,7 +713,7 @@ export async function finalizeIPO(db) {
     if (nextQueued) {
       await db.prepare("UPDATE ipo_state SET phase = 'ipo', started_at = ? WHERE company_id = ? AND phase = 'queued'").bind(Date.now(), nextQueued.company_id).run();
       const company = await db.prepare('SELECT name, code FROM companies WHERE id = ?').bind(nextQueued.company_id).first();
-      await broadcast(db, `📢 「${company?.code || ''} ${company?.name || '公司'}」IPO 開始！認購期 ${(nextQueued.duration_minutes || 4320) / 1440} 天`);
+      try { await broadcast(db, `📢 「${company?.code || ''} ${company?.name || '公司'}」IPO 開始！認購期 ${(nextQueued.duration_minutes || 4320) / 1440} 天`); } catch {}
     }
   }
 }

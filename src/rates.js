@@ -39,7 +39,7 @@ export async function adjustInterestRates(db) {
     const mult = newRate / BASE_SAVINGS;
     await db.prepare('UPDATE market_rates SET savings_rate = ?, deposit_mult = ?, adjusted_at = ? WHERE id = 1').bind(newRate, mult, now).run();
     const hot = heat >= 1.5;
-    await broadcast(db, `🏦 央行決議${hot ? '升息' : '降息'}：市場${hot ? '過熱' : '冷卻'}，活存利率調整為 ${(newRate * 1440 * 100).toFixed(2)}%/天（${(newRate * 100).toFixed(4)}%/分），定存利率同步${hot ? '調升' : '調降'}`);
+    try { await broadcast(db, `🏦 央行決議${hot ? '升息' : '降息'}：市場${hot ? '過熱' : '冷卻'}，活存利率調整為 ${(newRate * 1440 * 100).toFixed(2)}%/天（${(newRate * 100).toFixed(4)}%/分），定存利率同步${hot ? '調升' : '調降'}`); } catch {}
   }
   return { heat, savings_rate: newRate, action };
 }
