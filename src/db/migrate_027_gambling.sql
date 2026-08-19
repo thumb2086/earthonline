@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS lottery_daily (
   free_used     INTEGER DEFAULT 0
 );
 
+INSERT OR IGNORE INTO game_meta (key, value) VALUES ('lottery_rollover', '0');
+
 CREATE TABLE IF NOT EXISTS user_btc (
   user_id       INTEGER PRIMARY KEY REFERENCES users(id),
   amount        REAL NOT NULL DEFAULT 0,

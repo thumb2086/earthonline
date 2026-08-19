@@ -4,6 +4,7 @@ const COST_PER_TICKET = 100;
 const NUM_COUNT = 6;
 const NUM_MAX = 39;
 const PRIZE_TABLE = { 6: 0.5, 5: 0.2, 4: 0.15, 3: 0.1 };
+const SYSTEM_BONUS_POOL = 10000;
 
 function todayUTC() { return new Date().toISOString().slice(0, 10); }
 
@@ -20,7 +21,12 @@ export async function getCurrentRound(db) {
   if (!round) {
     const last = await db.prepare('SELECT MAX(draw_number) as n FROM lottery_rounds').first();
     const drawNum = (last?.n || 0) + 1;
-    await db.prepare("INSERT INTO lottery_rounds (draw_number, winning_numbers, status) VALUES (?, '', 'open')").bind(drawNum).run();
+    // 系統底池 + 上期滾入獎金
+    const rolloverRow = await db.prepare("SELECT value FROM game_meta WHERE key = 'lottery_rollover'").first();
+    const rollover = parseInt(rolloverRow?.value || '0');
+    const bonusPool = SYSTEM_BONUS_POOL + rollover;
+    await db.prepare("INSERT INTO lottery_rounds (draw_number, winning_numbers, total_pool, status) VALUES (?, '', ?, 'open')").bind(drawNum, bonusPool).run();
+    if (rollover > 0) await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('lottery_rollover', '0')").run();
     round = await db.prepare("SELECT * FROM lottery_rounds WHERE status = 'open' ORDER BY id DESC LIMIT 1").first();
   }
   return round;
@@ -106,7 +112,16 @@ export async function drawLottery(db) {
     }
   }
 
-  return { winning, totalPool: round.total_pool, winners, totalWinners: winners.length };
+  // 計算未發放金額，滾入下期
+  const totalDistributed = winners.reduce((s, w) => s + w.prize, 0);
+  const rollover = Math.max(0, round.total_pool - totalDistributed);
+  if (rollover > 0) {
+    const prevRow = await db.prepare("SELECT value FROM game_meta WHERE key = 'lottery_rollover'").first();
+    const prevRollover = parseInt(prevRow?.value || '0');
+    await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('lottery_rollover', ?)").bind(String(prevRollover + rollover)).run();
+  }
+
+  return { winning, totalPool: round.total_pool, winners, totalWinners: winners.length, rollover };
 }
 
 export async function getLotteryHistory(db, limit = 10) {

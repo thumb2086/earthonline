@@ -241,7 +241,7 @@ function Lottery({ api, user }) {
           <div className="text-dim text-sm">每天 08:00 開獎</div>
         </div>
         <div className="grid-2">
-          <div><div className="text-dim text-sm">獎池</div><div style={{fontSize:20, fontWeight:700, color:'var(--accent)'}}>${status.totalPool.toLocaleString()}</div></div>
+          <div><div className="text-dim text-sm">獎池</div><div style={{fontSize:20, fontWeight:700, color:'var(--accent)'}}>${status.totalPool.toLocaleString()}<span className="text-dim" style={{fontSize:11, marginLeft:4}}>含系統底池 $10,000</span></div></div>
           <div><div className="text-dim text-sm">我的投注</div><div style={{fontSize:20, fontWeight:700}}>{status.myTickets} 注</div></div>
         </div>
       </div>
@@ -252,7 +252,7 @@ function Lottery({ api, user }) {
             <div style={{fontWeight:600}}>🎁 今日免費投注</div>
             <div className="text-dim text-sm">每日 5 次免費（剩餘 {5 - status.freeUsed} 次）</div>
           </div>
-          <button className="btn btn-primary btn-sm" disabled={loading || selected.length < 6} onClick={() => buy(true)}>免費投</button>
+          <button className="btn btn-primary btn-sm" disabled={loading} onClick={() => buy(true)}>免費投</button>
         </div>
       </div>}
 

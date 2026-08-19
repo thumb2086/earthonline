@@ -348,7 +348,7 @@ export default {
       if (!user) return json({ error: 'Unauthorized' }, headers, 401);
       const banned = await env.DB.prepare('SELECT reason FROM blacklist WHERE user_id = ?').bind(user.id).first();
       if (banned) return json({ error: `帳號已被停權：${banned.reason}` }, headers, 403);
-      if (!checkRateLimit(`user:${user.id}`, 60)) return json({ error: '請求過於頻繁，請稍後再試' }, headers, 429);
+      if (!checkRateLimit(`user:${user.id}`, 300)) return json({ error: '請求過於頻繁，請稍後再試' }, headers, 429);
       // Track last active
       await env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(Date.now(), user.id).run();
 
