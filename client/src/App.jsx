@@ -6,6 +6,7 @@ import DailyLogin from './components/DailyLogin'
 import LaunchBanner from './components/LaunchBanner'
 import Gaming from './components/Gaming'
 import LaunchPage from './components/LaunchPage'
+import OnboardingGuide from './components/OnboardingGuide'
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('eo_token'))
@@ -187,6 +188,7 @@ export default function App() {
 function Dashboard({ user, api }) {
   const [data, setData] = useState({})
   const [showOffline, setShowOffline] = useState(true)
+  const [onboardCollapsed, setOnboardCollapsed] = useState(false)
   useEffect(() => {
     api('/api/stock/quote').then(d => setData(p => ({ ...p, q: d }))).catch(()=>{})
     api('/api/stock/holdings').then(d => setData(p => ({ ...p, h: Array.isArray(d) ? d : [] }))).catch(()=>{})
@@ -206,6 +208,7 @@ function Dashboard({ user, api }) {
   return (
     <>
       <LaunchBanner api={api} />
+      <OnboardingGuide user={user} collapsed={onboardCollapsed} onCollapse={() => setOnboardCollapsed(c => !c)} />
       <DailyLogin api={api} />
       {(user?.offlineEarnings > 0 && showOffline) && <div className="card mb-12" style={{borderColor:'var(--accent)',background:'rgba(0,255,65,0.05)'}}>
         <div className="flex justify-between items-center">
@@ -1349,7 +1352,7 @@ function Stock({ api, toast, prompt, user }) {
                 <option value="short">做空</option>
               </select>
               <input type="number" placeholder="數量 股" value={marginQty} onChange={e => setMarginQty(e.target.value)} style={{flex:1, minWidth:0, fontSize:12, padding:'5px 8px'}} />
-              <select value={marginLev} onChange={e => setMarginLev(e.target.value)} className="select-sm" style={{width:55, flexShrink:0}}>
+              <select value={marginLev} onChange={e => setMarginLev(e.target.value)} className="select-sm" style={{width:60, flexShrink:0}}>
                 <option value="2">2x</option><option value="3">3x</option><option value="5">5x</option>
               </select>
               <button className="btn btn-primary btn-sm" onClick={openMargin} style={{flexShrink:0}}>開</button>

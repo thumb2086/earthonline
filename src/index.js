@@ -656,8 +656,8 @@ async function processPriceWave(db) {
 
       // 回歸: 偏離移動平均越多拉回越多
       const deviation = basePrice > 0 ? (price - basePrice) / basePrice : 0;
-      const drift = (Math.random() * 2 - 1) * 0.005;
-      const revert = -deviation * 0.003;
+      const drift = (Math.random() * 2 - 1) * 0.015;
+      const revert = -deviation * 0.005;
       const newPrice = Math.max(1, Math.round(price * (1 + drift + revert)));
 
       stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, Math.max(price, newPrice), Math.min(price, newPrice), newPrice, blockTime));
