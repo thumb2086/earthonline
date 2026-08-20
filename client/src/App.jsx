@@ -1899,106 +1899,63 @@ function Subscription({ api, toast }) {
 }
 
 function Help() {
+  const [expanded, setExpanded] = useState(null);
   const sections = [
-    { title: '⬆️ 升級', items: [
-      '基礎收入 $20/分，可升級電腦/伺服器/AI助手提升收入',
-      '離線時收入減半（訂閱雲端備份可提升到 80%）',
-    ]},
-    { title: '🏦 銀行', items: [
-      '活存：隨時存取，利率由央行依市場熱度調整（0.01~0.3%/分，基準 0.05%）',
-      '定存：選擇期限（1hr/6hr/24hr/7天），利率隨央行升降息同步調整，到期自動贖回',
-      '貸款：可借總收入 50% 額度，0.15%/分利息（利息滾入欠款）',
-      '🏦 央行：每 30 分鐘依市場成交量決策升/降息，熱→升息吸金降溫，冷→降息刺激投資（發系統公告）',
-    ]},
-    { title: '💼 投資', items: [
-      '債券/指數基金/房地產/新創：依累計收入解鎖',
-      '投資利率會隨金額遞減（越大越慢）',
-      '新創投資：每分鐘 0.3% 機率虧損 5~20% 本金（從現金扣除），不可提前贖回',
-      '贖回收 1% 手續費（定存免費）',
-    ]},
-    { title: '🏢 公司', items: [
-      '創建 $200,000，可選產業（tech/finance/manufacturing/service）',
-      '收入 = base × 產業倍率 × 員工產出 × 部門加成 × 光環',
-      '部門：開設成本遞增，升級提升該部門員工效率，不同部門加成不同職位',
-      '員工：同職位邊際效率遞減（第N人×0.8^N），經理/專家有光環加成',
-      '員工薪資計入公司成本，公司虧損會扣你的現金',
-      '設備有折舊成本（equipment_level × 2/分）',
-    ]},
-    { title: '📈 股票', items: [
-      '系統做市商：買入向系統買，賣出賣回系統',
-      '成交價 = 影響後價格（大單會推高買價/壓低賣價），手續費 0.5% 另計',
-      '影響公式：0.15 × √(單量/供應量)，上限 5%；小單影響約 0.5%',
-      '單筆上限 = 可交易供應量（流通+可賣庫存）的 20%，全部買入/賣出以單筆上限為準',
-      '漲跌停：價格 1 分鐘內最多 ±20%，觸及即停止交易（漲停不能買、跌停不能賣）',
-      '掛單交易（自動條件）：掛買單市價跌到目標自動買入；掛賣單漲過目標自動賣出；每分鐘撮合、成交自動通知',
-      '槓桿：做多/做空 2x/3x/5x，維持率 115% 追繳，100% 強制平倉',
-      '公司 owner 可：增資（單次上限總股本5%，價格≤市價，受發行上限約束）、強制收購（市價×1.2）、下市（自動強制收購）、拆分（×2/×5/×10，$50,000，24h冷卻）、清算',
-      '發行上限：總股本最多長到發行量 × 2（系統限量回補庫存，不再無限增資稀釋股東）',
-      '財報與基本面：每家公司有即時財報（收入/成本/淨利潤/本益比/殖利率/市值/成長率/60分均線），系統自動給出 S~E 評價與分析文字，並保留每小時歷史財報',
-    ]},
-    { title: '📦 ETF（封閉式）', items: [
-      '追蹤大盤指數：單位價 = 指數 × $0.01（指數 1000 → $10）',
-      '與系統交易，手續費 0.5%，單筆上限 20%，影響價結算',
-      '系統庫存買完即停止賣出（限量回補至發行上限）',
-    ]},
-    { title: '⏳ 指數期貨', items: [
-      '做多/做空大盤指數，期限 1hr / 6hr / 24hr',
-      '權利金 = 契約值 5%（契約值 = 指數 × $1/點 × 張數）',
-      '到期自動結算：payout = max(0, 指數差 × 乘數 × 張數)，最大虧損 = 權利金',
-      '結算結果自動通知，歷史損益可查',
-    ]},
-    { title: '🚀 IPO', items: [
-      '公司 owner 可設定 IPO 價格/發行股數/認購時間',
-      '玩家公司 IPO 募集資金歸 owner；系統公司 IPO 資金銷毀（回收經濟）',
-      '認購滿 30% 立即上市；未滿等期限到期自動上市',
-      '上市後認購的股票入帳到持股，剩餘留系統庫存',
-      '🔔 IPO 啟動與結束都會全體廣播（系統公告 + 每位玩家通知）',
-    ]},
-    { title: '🏠 生活費 & 📦 訂閱', items: [
-      '生活費：每分收入越高扣越多（10~25%），現金為 0 不懲罰',
-      '訂閱：高級住宅/雲端備份/資產保險/AI/財經資訊/企業顧問',
-      '訂閱每分鐘扣費，現金不足自動停用',
-      '資產保險：生活費扣款時現金最低保留 $200',
-    ]},
-    { title: '💰 收支明細', items: [
-      '交易類（買賣股/投資/僱用等）即時顯示',
-      '每分鐘收支（收入/生活費/利息/股利）按小時彙總顯示',
-      '頁面標示 (本小時) 的即為彙總值',
-    ]},
-    { title: '📅 每日登入', items: [
-      '每天登入可領取獎勵，7 天一個循環（$500 → $1,000 → $1,500 → $2,000 → $3,000 → $5,000 → $10,000）',
-      '連續登入第 7/14/30 天有額外 streak 獎勵（+$5,000 / +$15,000 / +$50,000）',
-      '每天只能領一次，錯過則 streak 重置',
-    ]},
-    { title: '🎰 刮刮樂', items: [
-      '三種等級：銅級 $500（最高 3x）、銀級 $1,000（最高 5x）、金級 $5,000（最高 10x）',
-      '花費購票後刮開 3 格符號，中越多獎越大',
-      '每日免費 5 次',
-    ]},
-    { title: '🎱 樂透', items: [
-      '每注 $100，選 6 個號碼（1~39）',
-      '每天 08:00 自動開獎，中 3/4/5/6 號依序獲得獎池 10%/15%/20%/50%',
-      '同號碼中獎者平分該獎級獎金',
-      '每日免費 5 注（自動隨機選號，也可手動選）',
-    ]},
-    { title: '🚀 開服慶典', items: [
-      '雙倍收入：開服後 72 小時所有玩家收入 x2',
-      '排行榜獎勵：活動期間每日自動發放 Top 10 獎金（第 1 名 $50,000）',
-      '新手禮包：新玩家領取 $5,000 起始資金',
-      '開服限定比特幣：每位玩家限領 1 顆 BTC（用途即將公布）',
-    ]},
-  ]
+    { icon: '⬆️', title: '升級', color: '#3b82f6', desc: '升級設備提高每分鐘收入', detail: '電腦/伺服器/AI 助手，三條線各自升級。離線時收入減半。' },
+    { icon: '🏦', title: '銀行', color: '#10b981', desc: '存錢賺利息、借錢渡難關', detail: '活存利率由央行自動升降息調整。定存有 1hr~7 天期限。貸款利息 0.15%/分。' },
+    { icon: '💼', title: '投資', color: '#8b5cf6', desc: '被動收入，風險越高報酬越大', detail: '債券→基金→房地產→新創，依累計收入解鎖。新創有虧損風險。' },
+    { icon: '🏢', title: '公司', color: '#f59e0b', desc: '僱人開公司，衝上市 IPO', detail: '花 $200,000 創建。開部門、僱員工、升級設備，淨利潤歸你。' },
+    { icon: '📈', title: '股票', color: '#ef4444', desc: '買低賣高、做多做空', detail: '影響價交易（大單會推高買價），手續費 0.5%。可掛單、槓桿 2~5x。' },
+    { icon: '📦', title: 'ETF', color: '#06b6d4', desc: '追蹤大盤指數', detail: '單位價 = 指數 × $0.01。系統做市，手續費 0.5%。' },
+    { icon: '⏳', title: '期貨', color: '#ec4899', desc: '做多做空大盤指數', detail: '1hr/6hr/24hr 期限，權利金 5%，到期自動結算。' },
+    { icon: '🏠', title: '生活費 & 訂閱', color: '#64748b', desc: '收入越高扣越多，訂閱享折扣', detail: '生活費 10~25%。6 種訂閱服務各有加成。' },
+    { icon: '📅', title: '每日登入', color: '#22c55e', desc: '7 天循環，連續獎勵加倍', detail: '$500→$10,000 循環。第 7/14/30 天額外 +$5K/$15K/$50K。' },
+    { icon: '🎰', title: '刮刮樂', color: '#f59e0b', desc: '銅銀金三等級，最高 10x', detail: '花 $500~$5,000 刮 3 格符號。每日免費 5 次。' },
+    { icon: '🎱', title: '樂透', color: '#8b5cf6', desc: '選 6 號碼，系統底池 $10,000', detail: '每注 $100，每天 08:00 開獎。中 3~6 號分獎池。未領獎金滾入下期。每日免費 5 注。' },
+    { icon: '🚀', title: '開服慶典', color: '#f97316', desc: '72 小時限定活動', detail: '雙倍收入、排行榜 Top 10 每日發獎、新手 $5,000、每人 1 顆 BTC。' },
+  ];
+
   return (
-    <div className="card">
-      <div className="card-title">📖 遊戲說明</div>
-      {sections.map(s => (
-        <div key={s.title} style={{marginBottom: 16}}>
-          <div className="text-accent" style={{fontWeight: 700, fontSize: 14, marginBottom: 6}}>{s.title}</div>
-          {s.items.map((item, i) => (
-            <div key={i} className="text-dim" style={{fontSize: 13, lineHeight: 1.6, marginBottom: 2}}>• {item}</div>
-          ))}
-        </div>
-      ))}
+    <div>
+      <div className="card mb-12" style={{borderLeft:'3px solid #3b82f6', textAlign:'center', padding:'20px 16px'}}>
+        <div style={{fontSize:32, marginBottom:8}}>🌍</div>
+        <div style={{fontWeight:800, fontSize:18, marginBottom:4}}>地球在線 Earth Online</div>
+        <div className="text-dim" style={{fontSize:13}}>從零開始，征服全球經濟</div>
+      </div>
+      <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:8}}>
+        {sections.map((s, i) => {
+          const isOpen = expanded === i;
+          return (
+            <div key={i} onClick={() => setExpanded(isOpen ? null : i)}
+              style={{
+                borderLeft: `3px solid ${s.color}`,
+                background: isOpen ? `${s.color}10` : 'var(--surface)',
+                border: `1px solid ${isOpen ? s.color : 'var(--border)'}`,
+                borderRadius: 8, padding: '12px 14px', cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                transform: isOpen ? 'scale(1.02)' : 'scale(1)',
+              }}>
+              <div style={{display:'flex', alignItems:'center', gap:10}}>
+                <div style={{fontSize:28, transition:'transform 0.3s', transform: isOpen ? 'scale(1.2) rotate(10deg)' : 'scale(1)'}}>{s.icon}</div>
+                <div>
+                  <div style={{fontWeight:700, fontSize:14, color: isOpen ? s.color : 'var(--text)'}}>{s.title}</div>
+                  <div className="text-dim" style={{fontSize:12}}>{s.desc}</div>
+                </div>
+                <div style={{marginLeft:'auto', fontSize:11, color:'var(--text-dim)', transition:'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : ''}}>▼</div>
+              </div>
+              <div style={{
+                maxHeight: isOpen ? '200px' : '0', overflow: 'hidden',
+                transition: 'max-height 0.3s ease, opacity 0.2s ease, margin 0.2s ease',
+                opacity: isOpen ? 1 : 0, marginTop: isOpen ? 8 : 0,
+              }}>
+                <div className="text-dim" style={{fontSize:12, lineHeight:1.6, borderTop:`1px solid ${s.color}30`, paddingTop:8}}>
+                  {s.detail}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   )
 }
