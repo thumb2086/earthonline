@@ -721,94 +721,146 @@ export async function finalizeIPO(db) {
 // ===== 掛單撮合 (每分鐘執行): 市價到達掛單門檻自動成交 =====
 export async function matchLimitOrders(db) {
   const orders = await db.prepare("SELECT * FROM stock_limit_orders WHERE status = 'open' ORDER BY id ASC").all();
+  if (orders.results.length === 0) return;
+
+  // 1. 一次性預載全部需要的資料
+  const companyIds = [...new Set(orders.results.map(o => o.company_id))];
+  const userIds = [...new Set(orders.results.map(o => o.user_id))];
+
+  const preloadStmts = [
+    db.prepare("SELECT company_id, phase FROM ipo_state"),
+    db.prepare('SELECT id, share_price, total_shares, name FROM companies'),
+    db.prepare('SELECT company_id, stock_quantity, cash FROM stock_inventory'),
+    db.prepare('SELECT user_id, cash FROM wallets'),
+    db.prepare('SELECT user_id, company_id, quantity FROM stock_holdings'),
+  ];
+  for (const cid of companyIds) {
+    preloadStmts.push(db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(cid, Date.now() - 60000));
+  }
+  const preloadRes = await db.batch(preloadStmts);
+
+  const ipoPhase = {};
+  for (const r of preloadRes.results[0]) ipoPhase[r.company_id] = r.phase;
+  const companies = {};
+  for (const r of preloadRes.results[1]) companies[r.id] = r;
+  const invMap = {};
+  for (const r of preloadRes.results[2]) invMap[r.company_id] = r;
+  const walletMap = {};
+  for (const r of preloadRes.results[3]) walletMap[r.user_id] = r;
+  const holdingsMap = {};
+  for (const r of preloadRes.results[4]) {
+    const key = `${r.user_id}_${r.company_id}`;
+    holdingsMap[key] = r.quantity;
+  }
+  const refTrades = {};
+  for (let i = 0; i < companyIds.length; i++) {
+    refTrades[companyIds[i]] = preloadRes.results[5 + i]?.price || null;
+  }
+
+  // 2. 所有成交操作收集到 stmts 裡，最後一次 batch 執行
+  const stmts = [];
+  const now = Date.now();
+
   for (const o of orders.results) {
     try {
-      const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(o.company_id).first();
-      if (!ipo || ipo.phase !== 'trading') continue;
-      const price = await getCurrentPrice(db, o.company_id);
+      if (ipoPhase[o.company_id] !== 'trading') continue;
+
+      const price = companies[o.company_id]?.share_price;
       if (!price) continue;
-      // 條件: 買單 → 市價 ≤ 掛單價; 賣單 → 市價 ≥ 掛單價
       if (o.type === 'buy' && price > o.price) continue;
       if (o.type === 'sell' && price < o.price) continue;
 
-      // 漲跌停檢查: 成交不破限價, 貼邊則暫緩
-      const refTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(o.company_id, Date.now() - 60000).first();
-      if (refTrade) {
-        const maxP = Math.ceil(refTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-        const minP = Math.floor(refTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
+      const refPrice = refTrades[o.company_id];
+      if (refPrice) {
+        const maxP = Math.ceil(refPrice * (1 + MAX_PRICE_CHANGE_PER_MIN));
+        const minP = Math.floor(refPrice * (1 - MAX_PRICE_CHANGE_PER_MIN));
         if (o.type === 'buy' && price >= maxP) continue;
         if (o.type === 'sell' && price <= minP) continue;
       }
 
-      const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(o.company_id).first();
-      const comp = await db.prepare('SELECT total_shares, name FROM companies WHERE id = ?').bind(o.company_id).first();
+      const inv = invMap[o.company_id];
+      const comp = companies[o.company_id];
       if (!inv || !comp) continue;
       const circulating = comp.total_shares - inv.stock_quantity;
       const maxTrade = getMaxTrade(circulating, inv.stock_quantity, Math.floor(comp.total_shares * 0.03));
       if (o.quantity > maxTrade) continue;
-      const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(o.user_id).first();
-      if (!wallet) continue;
-      const now = Date.now();
 
-      // 掛單成交也承受市場影響 (與市價單一致, 防拆單規避滑點) — 成交價不超過 limit price
+      const walletCash = walletMap[o.user_id]?.cash ?? 0;
+
       const impact = getPriceImpact(o.quantity, circulating, comp.total_shares);
       const rawFill = o.type === 'buy'
         ? Math.round(price * (1 + impact))
         : Math.max(1, Math.round(price * (1 - impact)));
       const fillPrice = o.type === 'buy' ? Math.min(rawFill, o.price) : Math.max(rawFill, o.price);
-      // 漲跌停檢查: 影響後價格仍須在 ±20% 帶內
-      const refTrade2 = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(o.company_id, now - 60000).first();
-      if (refTrade2) {
-        const maxP2 = Math.ceil(refTrade2.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-        const minP2 = Math.floor(refTrade2.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
-        if (fillPrice > maxP2) continue;
-        if (fillPrice < minP2) continue;
+
+      if (refPrice) {
+        const maxP2 = Math.ceil(refPrice * (1 + MAX_PRICE_CHANGE_PER_MIN));
+        const minP2 = Math.floor(refPrice * (1 - MAX_PRICE_CHANGE_PER_MIN));
+        if (fillPrice > maxP2 || fillPrice < minP2) continue;
       }
+
       let ok = false;
 
       if (o.type === 'buy') {
         if (inv.stock_quantity < o.quantity) continue;
         const cost = fillPrice * o.quantity;
         const fee = Math.floor(cost * FEE_RATE);
-        if (wallet.cash < cost + fee) continue;
-        await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(cost + fee, o.user_id).run();
-        await db.prepare('UPDATE stock_inventory SET cash = cash + ?, stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(cost + fee, o.quantity, o.company_id).run();
-        const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(o.user_id, o.company_id).first();
-        if (holding) {
-          await db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(o.quantity, o.user_id, o.company_id).run();
+        if (walletCash < cost + fee) continue;
+        const hKey = `${o.user_id}_${o.company_id}`;
+        const newQty = (holdingsMap[hKey] || 0) + o.quantity;
+
+        stmts.push(db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(cost + fee, o.user_id));
+        stmts.push(db.prepare('UPDATE stock_inventory SET cash = cash + ?, stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(cost + fee, o.quantity, o.company_id));
+        if (holdingsMap[hKey]) {
+          stmts.push(db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(o.quantity, o.user_id, o.company_id));
         } else {
-          await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(o.user_id, o.company_id, o.quantity).run();
+          stmts.push(db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(o.user_id, o.company_id, o.quantity));
         }
-        await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(o.company_id, o.user_id, 'buy', fillPrice, o.quantity, now).run();
-        await updateKline(db, o.company_id, fillPrice, o.quantity, now, 'buy');
-        await logTransaction(db, o.user_id, 'stock_buy', -(cost + fee), `掛單買入 ${o.quantity} 股 @ $${fillPrice} (限價 $${o.price})`);
-        await notify(db, o.user_id, 'limit_order', `✅ 掛單買入「${comp.name}」成交 ${o.quantity.toLocaleString()} 股 @ $${fillPrice}（掛單價 $${o.price}）`);
+        stmts.push(db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(o.company_id, o.user_id, 'buy', fillPrice, o.quantity, now));
+        stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(o.company_id, fillPrice, fillPrice, fillPrice, fillPrice, o.quantity, o.quantity, 0, Math.floor(now / 60000) * 60000));
+        stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(fillPrice, o.company_id));
+        stmts.push(db.prepare("UPDATE stock_limit_orders SET status = 'filled', filled_quantity = ?, filled_at = ? WHERE id = ?").bind(o.quantity, now, o.id));
+        holdingsMap[hKey] = newQty;
         ok = true;
       } else {
-        const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(o.user_id, o.company_id).first();
-        if (!holding || holding.quantity < o.quantity) continue;
+        const hKey = `${o.user_id}_${o.company_id}`;
+        const held = holdingsMap[hKey] || 0;
+        if (held < o.quantity) continue;
         const revenue = fillPrice * o.quantity;
         const fee = Math.floor(revenue * FEE_RATE);
         const net = revenue - fee;
-        await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(net, o.user_id).run();
-        await db.prepare('UPDATE stock_inventory SET cash = cash - ?, stock_quantity = MIN(stock_quantity + ?, ?) WHERE company_id = ?').bind(revenue, o.quantity, comp.total_shares, o.company_id).run();
-        if (holding.quantity === o.quantity) {
-          await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(o.user_id, o.company_id).run();
+
+        stmts.push(db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(net, o.user_id));
+        stmts.push(db.prepare('UPDATE stock_inventory SET cash = cash - ?, stock_quantity = MIN(stock_quantity + ?, ?) WHERE company_id = ?').bind(revenue, o.quantity, comp.total_shares, o.company_id));
+        if (held === o.quantity) {
+          stmts.push(db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(o.user_id, o.company_id));
+          holdingsMap[hKey] = 0;
         } else {
-          await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(o.quantity, o.user_id, o.company_id).run();
+          stmts.push(db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(o.quantity, o.user_id, o.company_id));
+          holdingsMap[hKey] = held - o.quantity;
         }
-        await db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(o.company_id, o.user_id, 'sell', fillPrice, o.quantity, now).run();
-        await updateKline(db, o.company_id, fillPrice, o.quantity, now, 'sell');
-        await logTransaction(db, o.user_id, 'stock_sell', net, `掛單賣出 ${o.quantity} 股 @ $${fillPrice} (限價 $${o.price})`);
-        await notify(db, o.user_id, 'limit_order', `✅ 掛單賣出「${comp.name}」成交 ${o.quantity.toLocaleString()} 股 @ $${fillPrice}（掛單價 $${o.price}）`);
+        stmts.push(db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(o.company_id, o.user_id, 'sell', fillPrice, o.quantity, now));
+        stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(o.company_id, fillPrice, fillPrice, fillPrice, fillPrice, o.quantity, 0, o.quantity, Math.floor(now / 60000) * 60000));
+        stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(fillPrice, o.company_id));
+        stmts.push(db.prepare("UPDATE stock_limit_orders SET status = 'filled', filled_quantity = ?, filled_at = ? WHERE id = ?").bind(o.quantity, now, o.id));
         ok = true;
       }
-if (ok) {
-        await db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(fillPrice, o.company_id).run();
-        await db.prepare("UPDATE stock_limit_orders SET status = 'filled', filled_quantity = ?, filled_at = ? WHERE id = ?").bind(o.quantity, now, o.id).run();
+
+      if (ok) {
+        // updateKline 改為內聯 (已在上面 INSERT)
+        const logAmt = o.type === 'buy' ? -(fillPrice * o.quantity + Math.floor(fillPrice * o.quantity * FEE_RATE)) : (fillPrice * o.quantity - Math.floor(fillPrice * o.quantity * FEE_RATE));
+        stmts.push(db.prepare('INSERT INTO transaction_history (user_id, type, amount, description, created_at) VALUES (?, ?, ?, ?, ?)').bind(o.user_id, o.type === 'buy' ? 'stock_buy' : 'stock_sell', logAmt, `掛單${o.type === 'buy' ? '買入' : '賣出'} ${o.quantity} 股 @ $${fillPrice} (限價 $${o.price})`, now));
+        stmts.push(db.prepare('INSERT INTO notifications (user_id, type, message, created_at) VALUES (?, ?, ?, ?)').bind(o.user_id, 'limit_order', `✅ 掛單${o.type === 'buy' ? '買入' : '賣出'}「${comp.name}」成交 ${o.quantity.toLocaleString()} 股 @ $${fillPrice}（掛單價 $${o.price}）`, now));
       }
     } catch (e) {
       console.error('matchLimitOrders error:', e.message);
+    }
+  }
+
+  // 3. 一次 batch 執行所有成交
+  if (stmts.length > 0) {
+    for (let i = 0; i < stmts.length; i += 50) {
+      try { await db.batch(stmts.slice(i, i + 50)); } catch (e) { console.error('matchLimitOrders batch error:', e.message); }
     }
   }
 }

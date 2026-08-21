@@ -466,28 +466,106 @@ export async function getCompanyProfit(db, company, subs) {
 
 export async function processCompanyTick(db, logger) {
   const companies = await db.prepare('SELECT * FROM companies').all();
+  if (companies.results.length === 0) return;
   const stmts = [];
   const logs = [];
+
+  // 一次性預載全部: 訂閱、員工、部門、ipo_state、持股、用戶名
+  const ownerIds = [...new Set(companies.results.map(c => c.owner_id).filter(id => id > 0))];
+  const preloadStmts = [
+    db.prepare('SELECT user_id, key, enabled FROM subscriptions'),
+    db.prepare('SELECT user_id, company_id, position, salary, output, efficiency, morale, department_id FROM employees'),
+    db.prepare('SELECT id, company_id, type FROM departments'),
+    db.prepare('SELECT company_id, phase FROM ipo_state'),
+    db.prepare('SELECT user_id, company_id, quantity FROM stock_holdings'),
+    db.prepare('SELECT id, cash FROM wallets'),
+  ];
+  const pRes = await db.batch(preloadStmts);
+
+  const subMap = {};
+  for (const r of pRes.results[0]) { (subMap[r.user_id] ||= {})[r.key] = !!r.enabled; }
+  const empByCompany = {};
+  for (const r of pRes.results[1]) { (empByCompany[r.company_id] ||= []).push(r); }
+  const deptByCompany = {};
+  for (const r of pRes.results[2]) { (deptByCompany[r.company_id] ||= []).push(r); }
+  const ipoPhase = {};
+  for (const r of pRes.results[3]) ipoPhase[r.company_id] = r.phase;
+  const holdingsByCompany = {};
+  for (const r of pRes.results[4]) {
+    const key = `${r.user_id}_${r.company_id}`;
+    (holdingsByCompany[key] = (holdingsByCompany[key] || 0) + r.quantity);
+  }
+  const walletCash = {};
+  for (const r of pRes.results[5]) walletCash[r.user_id] = r.cash;
+
   for (const c of companies.results) {
     try {
       // 自有公司驗傷: 上市中且玩家持股歸零 → 移交系統管理
-      await maybeSystemTakeover(db, c.id);
-      const subs = await getUserSubscriptions(db, c.owner_id);
-      const data = await getCompanyProfit(db, c, subs);
-      const profit = data.profit;
+      if (ipoPhase[c.id] === 'trading' && c.owner_id > 0) {
+        const totalHeld = Object.entries(holdingsByCompany)
+          .filter(([k]) => k.endsWith(`_${c.id}`))
+          .reduce((s, [, q]) => s + q, 0);
+        // 檢查是否為系統公司(已被接管) — 只處理玩家公司
+        if (totalHeld === 0 && c.owner_id > 0) {
+          const prevOwner = c.owner_id;
+          stmts.push(db.prepare('UPDATE companies SET owner_id = 0 WHERE id = ?').bind(c.id));
+          logs.push([prevOwner, 'company_takeover', 0, `${c.name} 移交系統管理`]);
+        }
+      }
+
+      const subs = subMap[c.owner_id] || {};
+      const employees = empByCompany[c.id] || [];
+      const depts = deptByCompany[c.id] || [];
+
+      // getCompanyProfit inlined
+      const deptTypeMap = {};
+      for (const d of depts) deptTypeMap[d.type] = d;
+      const posBoost = {};
+      for (const d of depts) {
+        const boosts = { engineering: { manager: 1.15, engineer: 1.2 }, marketing: { manager: 1.15, sales: 1.2 }, hr: { manager: 1.15, sales: 0.9 }, finance: { manager: 1.15, engineer: 0.9 } };
+        if (boosts[d.type]) Object.assign(posBoost, boosts[d.type]);
+      }
+      const allDepts = depts.length > 0 ? 1 + depts.length * 0.05 : 1;
+
+      const managerCount = employees.filter(e => e.position === 'manager').length;
+      const expertCount = employees.filter(e => e.position === 'expert').length;
+      const haloEff = 1 + Math.min(managerCount * 0.02, 0.20);
+      const haloIncome = 1 + Math.min(expertCount * 0.015, 0.15);
+      const aiBonus = subs.ai ? 1.1 : 1;
+
+      let totalOutput = 0;
+      for (const e of employees) {
+        const pb = posBoost[e.position] || 1;
+        totalOutput += Math.floor(e.output * e.efficiency * (e.morale / 100) * pb * aiBonus * haloEff);
+      }
+
+      const mult = INDUSTRY_MULT[c.industry] || 1.0;
+      const equipBonus = 1 + 0.1 * (c.equipment_level - 1);
+      const brandBonus = 1 + 0.05 * (c.brand_level - 1);
+      const marketFactor = 0.7 + Math.random() * 0.6;
+      const consultantBonus = subs.consultant ? 1.1 : 1;
+
+      const income = Math.floor(c.base_income * mult * (1 + totalOutput / 1000) * equipBonus * brandBonus * marketFactor * haloIncome * consultantBonus * allDepts);
+      const salaries = employees.reduce((s, e) => s + e.salary, 0);
+      const rent = Math.floor(10 * Math.pow(0.95, c.office_level - 1));
+      const depreciation = c.equipment_level * 2;
+      const costs = salaries + rent + depreciation + 5 + 3;
+      const profit = income - costs;
+
       if (profit > 0) {
         stmts.push(db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(profit, profit, c.owner_id));
         logs.push([c.owner_id, 'company_profit', profit, `公司利潤 ${c.name}`]);
-      } else {
-        const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(c.owner_id).first();
-        if (wallet && wallet.cash > 0) {
-          stmts.push(db.prepare('UPDATE wallets SET cash = MAX(cash + ?, 0) WHERE user_id = ?').bind(profit, c.owner_id));
-          logs.push([c.owner_id, 'company_loss', profit, `公司虧損 ${c.name}`]);
-        }
+      } else if (walletCash[c.owner_id] > 0) {
+        stmts.push(db.prepare('UPDATE wallets SET cash = MAX(cash + ?, 0) WHERE user_id = ?').bind(profit, c.owner_id));
+        logs.push([c.owner_id, 'company_loss', profit, `公司虧損 ${c.name}`]);
       }
     } catch (e) {}
   }
-  if (stmts.length > 0) await db.batch(stmts);
+  if (stmts.length > 0) {
+    for (let i = 0; i < stmts.length; i += 50) {
+      try { await db.batch(stmts.slice(i, i + 50)); } catch (e) {}
+    }
+  }
   if (logger) {
     for (const [u, t, a, d] of logs) logger.log(u, t, a, d);
   } else {
