@@ -334,7 +334,7 @@ export default {
       }
 
       // Static assets — no auth required
-      if (!path.startsWith('/api/')) {
+      if (!path.startsWith('/api/') && !path.startsWith('/ws/')) {
         let res = await env.ASSETS.fetch(request);
         if (res.status === 404 && path !== '/') {
           res = await env.ASSETS.fetch(new URL('/index.html', url.origin));

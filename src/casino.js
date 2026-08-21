@@ -90,9 +90,13 @@ export async function handleCasino(env, request, path, user) {
   if (path === '/api/casino/games') return GAMES;
 
   if (path === '/api/casino/stats') {
-    const stats = await db.prepare('SELECT type, COUNT(*) as games, SUM(amount) as wagered, SUM(CASE WHEN payout > amount THEN payout - amount ELSE 0 END) as player_won FROM casino_history WHERE user_id = ?').bind(user.id).first();
-    const total = await db.prepare('SELECT COUNT(*) as games, SUM(amount) as wagered FROM casino_history WHERE user_id = ?').bind(user.id).first();
-    return { games: total?.games || 0, wagered: total?.wagered || 0 };
+    try {
+      const total = await db.prepare('SELECT COUNT(*) as games, COALESCE(SUM(amount), 0) as wagered FROM casino_history WHERE user_id = ?').bind(user.id).first();
+      const wins = await db.prepare('SELECT COUNT(*) as w, COALESCE(SUM(payout - amount), 0) as profit FROM casino_history WHERE user_id = ? AND payout > amount').bind(user.id).first();
+      return { games: total?.games || 0, wagered: total?.wagered || 0, wins: wins?.w || 0, netProfit: wins?.profit || 0 };
+    } catch (e) {
+      return { games: 0, wagered: 0, wins: 0, netProfit: 0 };
+    }
   }
 
   if (path === '/api/casino/play' && method === 'POST') {
