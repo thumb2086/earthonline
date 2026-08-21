@@ -85,10 +85,12 @@ export async function buyTicket(db, userId, numbers, isFree) {
 
 export async function drawLottery(db) {
   const round = await db.prepare("SELECT * FROM lottery_rounds WHERE status = 'open' ORDER BY id DESC LIMIT 1").first();
-  if (!round || round.total_tickets === 0) {
-    if (round) await db.prepare("UPDATE lottery_rounds SET status = 'drawn', drawn_at = ? WHERE id = ?").bind(Date.now(), round.id).run();
-    return { skip: true };
-  }
+  if (!round) return { skip: true };
+  if (round.total_tickets === 0) return { skip: true };
+
+  // 距離上一次開獎至少 12 小時才開
+  const prevDrawn = await db.prepare("SELECT drawn_at FROM lottery_rounds WHERE status = 'drawn' ORDER BY id DESC LIMIT 1").first();
+  if (prevDrawn && Date.now() - prevDrawn.drawn_at < 43200000) return { skip: true };
 
   const winning = generateNumbers();
   await db.prepare("UPDATE lottery_rounds SET winning_numbers = ?, status = 'drawn', drawn_at = ? WHERE id = ?")
