@@ -296,6 +296,7 @@ export async function handleAdmin(env, request, path, user) {
   }
 
   if (path === '/api/admin/margin') {
+    try {
     const excludeIds = await resolveExclude(db, request);
     const excl = excludeIds.length > 0 ? ` AND mp.user_id NOT IN (${excludeIds.join(',')})` : '';
     const rows = await db.prepare(`
@@ -339,6 +340,7 @@ export async function handleAdmin(env, request, path, user) {
       byUser: Object.values(byUser).sort((a, b) => b.exposure - a.exposure),
       byCompany: Object.values(byCompany).sort((a, b) => b.exposure - a.exposure),
     };
+    } catch (e) { return { positions: [], byUser: [], byCompany: [], error: e.message }; }
   }
 
   if (path === '/api/admin/ipo') {

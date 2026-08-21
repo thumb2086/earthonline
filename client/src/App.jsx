@@ -1519,7 +1519,7 @@ function AdminPanel({ api }) {
     api('/api/admin/stocks' + q).then(d => setStockDist(Array.isArray(d) ? d : []));
     api('/api/admin/ipo' + q).then(d => setIpoList(Array.isArray(d) ? d : []));
     api('/api/admin/trades' + q).then(d => setTradeData(d || { trades: [], stats: [] }));
-    api('/api/admin/margin' + q).then(d => setMarginData(d || { positions: [], byUser: [], byCompany: [] }));
+    api('/api/admin/margin' + q).then(d => setMarginData(d && d.positions ? d : { positions: [], byUser: [], byCompany: [] }));
     api('/api/admin/announcements').then(d => setAnnouncements(Array.isArray(d) ? d : []));
     api('/api/admin/reset/status').then(d => setResetReq(d?.request || null));
     api('/api/admin/ipo/schedule').then(d => setIpoSchedule(Array.isArray(d) ? d : []));
