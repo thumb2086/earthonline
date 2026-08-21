@@ -8,6 +8,7 @@ import { handleStock, processMarginTick, finalizeIPO, matchLimitOrders } from '.
 import { handleEtf, etfTick } from './etf.js';
 import { handleFutures, settleFutures } from './futures.js';
 import { computeMarketIndex } from './stock.js';
+import { MarketWS } from './market_ws.js';
 import { adjustInterestRates } from './rates.js';
 import { postV2Announcement, maybeResetGame } from './reset.js';
 import { snapshotCompanyReports } from './reports.js';
@@ -345,6 +346,12 @@ export default {
         return withCsp;
       }
 
+      // Market WebSocket: /ws/market/subscribe (不需要 auth, DO 自己處理)
+      if (path === '/ws/market/subscribe' || path === '/ws/market/update' || path === '/ws/market/prices') {
+        const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
+        return stub.fetch(request);
+      }
+
       const user = await authCheck(request, env);
       if (!user) return json({ error: 'Unauthorized' }, headers, 401);
       const banned = await env.DB.prepare('SELECT reason FROM blacklist WHERE user_id = ?').bind(user.id).first();
@@ -506,9 +513,19 @@ export default {
     try { await processSubscriptionTick(db, hourlyLogger); } catch (err) { console.error('Scheduled subscription error:', err.message); }
     try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
 
-    // 輕量波動: 每分鐘, 只更新價格 (1查詢/公司)
+    // 輕量波動: 每分鐘, 只更新價格
     try {
       await processPriceWave(db);
+      // 即時推送股價給所有連線玩家
+      if (env.MARKET_WS) {
+        try {
+          const companies = await db.prepare('SELECT id, share_price FROM companies').all();
+          const prices = {};
+          for (const c of companies.results) prices[c.id] = c.share_price;
+          const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
+          await stub.fetch('https://market/update', { method: 'POST', body: JSON.stringify({ type: 'prices', prices }) });
+        } catch {}
+      }
     } catch (err) {
       console.error('Scheduled wave error:', err.message);
     }
@@ -611,7 +628,7 @@ export default {
   },
 };
 
-export { DiscordGateway };
+export { DiscordGateway, MarketWS };
 
 // 輕量價格波動: 每分鐘 ±1.5% + 回歸力(基準=近60分鐘移動平均)
 async function processPriceWave(db) {

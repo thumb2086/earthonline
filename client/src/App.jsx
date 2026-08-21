@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import LoginGateway from './components/LoginGateway'
 import Watermark from './components/Watermark'
+import useMarketStream from './hooks/useMarketStream'
 import { useToast } from './components/Toast.jsx'
 import DailyLogin from './components/DailyLogin'
 import LaunchBanner from './components/LaunchBanner'
@@ -49,7 +50,7 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return
-    const id = setInterval(() => setRev(r => r + 1), 5000)
+    const id = setInterval(() => setRev(r => r + 1), 15000)
     return () => clearInterval(id)
   }, [token])
 
@@ -1052,6 +1053,16 @@ function Stock({ api, toast, prompt, user }) {
   const [stockList, setStockList] = useState([])
   const [indexData, setIndexData] = useState(null)
 
+  // 即時股價 WebSocket
+  const wsUrl = typeof window !== 'undefined' ? `wss://${window.location.host}/ws/market/subscribe` : null
+  const { prices: livePrices, connected: wsConnected } = useMarketStream(wsUrl)
+
+  // 即時更新股價到 stockList (不用等 5 秒 polling)
+  useEffect(() => {
+    if (!livePrices || Object.keys(livePrices).length === 0) return
+    setStockList(prev => prev.map(s => livePrices[s.id] ? { ...s, price: livePrices[s.id] } : s))
+  }, [livePrices])
+
   const stockNames = { 1: '地球互動科技 001', 10: '深海科技 002', 12: '銀河金融 003', 13: '星雲生技 004', 14: '黑洞能源 005', 15: '元界科技 006' }
 
   const fmtRemain = (ms) => {
@@ -1103,7 +1114,7 @@ function Stock({ api, toast, prompt, user }) {
   }
   useEffect(() => { refreshStock(); refreshHeavy() }, [selectedStock])
   useEffect(() => {
-    const fast = setInterval(refreshStock, 5000)
+    const fast = setInterval(refreshStock, 15000)
     const slow = setInterval(refreshHeavy, 30000)
     return () => { clearInterval(fast); clearInterval(slow) }
   }, [selectedStock])
@@ -1205,7 +1216,8 @@ function Stock({ api, toast, prompt, user }) {
           </span>
         </div>
       </div>}
-      <div style={{display:'flex', gap:6, marginBottom:12, overflowX:'auto', paddingBottom:4}}>
+      <div style={{display:'flex', gap:6, marginBottom:12, overflowX:'auto', paddingBottom:4, alignItems:'center'}}>
+        <span title={wsConnected ? '即時連線中' : '輪詢模式'} style={{width:8, height:8, borderRadius:'50%', background: wsConnected ? '#22c55e' : '#ef4444', flexShrink:0}} />
         {stockList.map(s => (
           <button key={s.id} className={`btn btn-sm ${selectedStock === s.id ? 'btn-primary' : ''}`} onClick={() => setSelectedStock(s.id)} style={{whiteSpace:'nowrap', fontSize:11}}>
             {s.code ? `${s.code} ` : ''}{s.name.split(' ')[0]}{s.phase === 'ipo' ? ' 🚀' : s.phase === 'queued' ? ' 📋' : ''}

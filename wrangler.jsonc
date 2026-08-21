@@ -17,11 +17,13 @@
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {
     "bindings": [
-      { "name": "GATEWAY", "class_name": "DiscordGateway" }
+      { "name": "GATEWAY", "class_name": "DiscordGateway" },
+      { "name": "MARKET_WS", "class_name": "MarketWS" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["DiscordGateway"] }
+    { "tag": "v1", "new_sqlite_classes": ["DiscordGateway"] },
+    { "tag": "v2", "new_sqlite_classes": ["MarketWS"] }
   ],
   "d1_databases": [
     {
