@@ -23,6 +23,7 @@ import { handleLaunchEvent, getLaunchEventStatus, giveNewbieGift, maybeDistribut
 import { getScratchStatus, scratch, getScratchHistory } from './scratch.js';
 import { getLotteryStatus, buyTicket, drawLottery, getLotteryHistory } from './lottery.js';
 import { handleMining, processMiningTick, loadMiningModels } from './mining.js';
+import { handleCasino } from './casino.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
 const ADMIN_ROLE_NAME = '地球管理團隊';
@@ -474,6 +475,10 @@ export default {
       }
       if (path.startsWith('/api/mining')) {
         const r = await handleMining(env, request, path, user);
+        if (r !== null) return json(r, headers);
+      }
+      if (path.startsWith('/api/casino')) {
+        const r = await handleCasino(env, request, path, user);
         if (r !== null) return json(r, headers);
       }
 

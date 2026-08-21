@@ -3,13 +3,17 @@ import { INDUSTRY_MULT } from './company.js';
 import { getCompanyReport } from './reports.js';
 
 const SPREAD_BASE = 0.03;
-const FEE_RATE = 0.005; // 交易手續費 0.5%/邊 (分鐘沖可跑)
+const FEE_RATE = 0.005; // 交易手續費 0.5%/邊
 const LEVERAGE_OPTIONS = [2, 3, 5];
 const LIQUIDATION_RATE = 100;
-const MAX_TRADE_RATIO = 0.20; // max 20% of circulating per trade
-const MAX_PRICE_CHANGE_PER_MIN = 0.20; // ±20% per minute (防炒作但允許較大波動)
+const MAX_TRADE_RATIO = 0.20;
 
-const MAX_PRICE_IMPACT = 0.05; // 影響上限 5%
+// 熔斷: 單次交易造成 >15% 滑點時暫停 1 分鐘
+const CIRCUIT_BREAK_THRESHOLD = 0.15;
+const CIRCUIT_BREAK_DURATION_MS = 60000;
+const circuitBreakers = {}; // companyId -> breakUntil timestamp
+
+const MAX_PRICE_IMPACT = 0.50; // 影響上限 50% (不再用硬限制)
 const MIN_CIRCULATING_RATIO = 0.10;
 
 // 單筆上限 = 可交易供應量 (流通 + 系統可賣庫存) 的 20%
@@ -22,12 +26,34 @@ function getMaxTrade(circulating, inventory, minInventory) {
 function roundPrice(p) { return Math.round(p * 100) / 100; }
 
 function getPriceImpact(quantity, circulating, totalShares) {
-  // 分母 = 流通 + 本筆量; 流通為 0 (庫存=總股本) 時改用總股本為基準, 避免影響歸零
-  // 曲線已調軟: 0.15 × √ratio (小單影響 ~0.5%, 大單對倒仍虧)
-  const denom = (circulating > 0 ? circulating : totalShares) + quantity;
-  const ratio = quantity / denom;
-  const rawImpact = Math.sqrt(ratio) * 0.15;
-  return Math.min(rawImpact, MAX_PRICE_IMPACT);
+  const base = circulating > 0 ? circulating : totalShares;
+  if (base <= 0) return 0;
+  const impact = Math.pow(quantity / base, 1);
+  return Math.min(impact, MAX_PRICE_IMPACT);
+}
+
+// 掛單滑點: 根據市價偏離限價的程度混合
+function getLimitFillPrice(limitPrice, marketPrice, type) {
+  const ratio = Math.abs(marketPrice - limitPrice) / limitPrice;
+  let limitWeight, marketWeight;
+  if (ratio <= 0.05) {
+    limitWeight = 1; marketWeight = 0;
+  } else if (ratio <= 0.10) {
+    limitWeight = 0.7; marketWeight = 0.3;
+  } else {
+    limitWeight = 0.3; marketWeight = 0.7;
+  }
+  const fillPrice = Math.max(1, Math.round(limitPrice * limitWeight + marketPrice * marketWeight));
+  return fillPrice;
+}
+
+function checkCircuitBreak(companyId) {
+  const until = circuitBreakers[companyId] || 0;
+  return Date.now() < until;
+}
+
+function triggerCircuitBreak(companyId) {
+  circuitBreakers[companyId] = Date.now() + CIRCUIT_BREAK_DURATION_MS;
 }
 
 async function getCurrentPrice(db, companyId) {
@@ -71,15 +97,8 @@ export async function handleStock(env, request, path, user) {
     const company = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
     const circulating = (company?.total_shares || 1000000) - (inv?.stock_quantity || 0);
     const maxTrade = getMaxTrade(circulating, inv?.stock_quantity || 0, Math.floor((company?.total_shares || 0) * 0.03));
-    // 漲跌停狀態: 以近1分鐘第一筆成交為基準, 目前價貼住 ±20% 邊界即為漲/跌停
-    let limit = null;
-    const refTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, Date.now() - 60000).first();
-    if (refTrade) {
-      const maxP = Math.ceil(refTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-      const minP = Math.floor(refTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
-      if (price >= maxP) limit = 'up';
-      else if (price <= minP) limit = 'down';
-    }
+    // 熔斷狀態顯示
+    let limit = checkCircuitBreak(companyId) ? 'circuit_break' : null;
     return {
       price,
       buyPrice: Math.round(price),
@@ -248,24 +267,18 @@ export async function handleStock(env, request, path, user) {
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet) return { error: '錢包不存在' };
 
-const price = await getCurrentPrice(db, companyId);
+    const price = await getCurrentPrice(db, companyId);
     const buyPrice = Math.round(price);
 
-    // 影響基於近1分鐘累計買入量: 分次買與一次買效果一致 (防拆單套利)
+    // 影響基於近1分鐘累計買入量
     const oneMinAgo = Date.now() - 60000;
     const cumBuy = await db.prepare(`SELECT COALESCE(SUM(quantity),0) as q FROM stock_trades WHERE company_id = ? AND type = 'buy' AND traded_at >= ?`).bind(companyId, oneMinAgo).first();
     const impact = getPriceImpact((cumBuy?.q || 0) + quantity, circulating, companyData.total_shares);
     let newPrice = Math.round(price * (1 + impact));
-    let limitHit = false;
 
-    // Price change limit: ±20% per minute — 達限價即停止交易 (不擠價成交)
-    const recentTrades = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
-    if (recentTrades) {
-      const minPrice = Math.floor(recentTrades.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
-      const maxPrice = Math.ceil(recentTrades.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-      if (newPrice > maxPrice) return { error: '⚠️ 已達漲停板，交易暫停，1分鐘後恢復' };
-      newPrice = Math.max(minPrice, Math.min(maxPrice, newPrice));
-    }
+    // 熔斷檢查: 觸發時暫停交易 1 分鐘
+    if (checkCircuitBreak(companyId)) return { error: '⚠️ 該股已觸發熔斷，暫停交易 1 分鐘' };
+    if (impact >= CIRCUIT_BREAK_THRESHOLD) triggerCircuitBreak(companyId);
 
     // 影響價結算: 以影響後價格計價 (大買不再白嫖價格波動)
     const totalCost = newPrice * quantity;
@@ -317,20 +330,15 @@ const price = await getCurrentPrice(db, companyId);
     const price = await getCurrentPrice(db, companyId);
     const sellPrice = Math.round(price);
 
-    // 影響基於近1分鐘累計賣出量 (防拆單套利, 與買入對稱)
+    // 影響基於近1分鐘累計賣出量
     const oneMinAgo = Date.now() - 60000;
     const cumSell = await db.prepare(`SELECT COALESCE(SUM(quantity),0) as q FROM stock_trades WHERE company_id = ? AND type = 'sell' AND traded_at >= ?`).bind(companyId, oneMinAgo).first();
     const impact = getPriceImpact((cumSell?.q || 0) + quantity, circulatingS, companyS.total_shares);
     let newPrice = Math.max(1, Math.round(price * (1 - impact)));
-    let limitHit = false;
 
-    const recentTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
-    if (recentTrade) {
-      const minP = Math.floor(recentTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
-      const maxP = Math.ceil(recentTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-      if (newPrice < minP) return { error: '⚠️ 已達跌停板，交易暫停，1分鐘後恢復' };
-      newPrice = Math.max(minP, Math.min(maxP, newPrice));
-    }
+    // 熔斷檢查
+    if (checkCircuitBreak(companyId)) return { error: '⚠️ 該股已觸發熔斷，暫停交易 1 分鐘' };
+    if (impact >= CIRCUIT_BREAK_THRESHOLD) triggerCircuitBreak(companyId);
     // 影響價結算: 以影響後價格計價 (大賣不再白嫖價格波動)
     const totalRevenue = newPrice * quantity;
     const fee = Math.floor(totalRevenue * FEE_RATE);
@@ -483,17 +491,10 @@ const price = await getCurrentPrice(db, companyId);
 
     const impact = getPriceImpact(quantity, circulating, companyData.total_shares);
     const now = Date.now();
-    // 影響價結算: 以影響後價作為建倉價 (做多較貴/做空收回較少)
+    // 做多 = +impact (買壓推高), 做空 = -impact (賣壓推低)
     let newPrice = Math.round(price * (1 + (type === 'long' ? impact : -impact)));
-    const oneMinAgo = now - 60000;
-    const recentTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, oneMinAgo).first();
-    if (recentTrade) {
-      const minP = Math.floor(recentTrade.price * (1 - MAX_PRICE_CHANGE_PER_MIN));
-      const maxP = Math.ceil(recentTrade.price * (1 + MAX_PRICE_CHANGE_PER_MIN));
-      if (newPrice > maxP) return { error: '⚠️ 已達漲停板，交易暫停，1分鐘後恢復' };
-      if (newPrice < minP) return { error: '⚠️ 已達跌停板，交易暫停，1分鐘後恢復' };
-      newPrice = Math.max(minP, Math.min(maxP, newPrice));
-    }
+    if (checkCircuitBreak(companyId)) return { error: '⚠️ 該股已觸發熔斷，暫停交易 1 分鐘' };
+    if (impact >= CIRCUIT_BREAK_THRESHOLD) triggerCircuitBreak(companyId);
     // 交易上限: 單筆最多 20% 可交易供應量
     const maxTradeM = getMaxTrade(circulating, inv?.stock_quantity || 0, Math.floor(companyData.total_shares * 0.03));
     if (quantity > maxTradeM) {
@@ -753,9 +754,6 @@ export async function matchLimitOrders(db) {
     db.prepare('SELECT user_id, cash FROM wallets'),
     db.prepare('SELECT user_id, company_id, quantity FROM stock_holdings'),
   ];
-  for (const cid of companyIds) {
-    preloadStmts.push(db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(cid, Date.now() - 60000));
-  }
   const preloadRes = await db.batch(preloadStmts);
 
   const ipoPhase = {};
@@ -771,10 +769,6 @@ export async function matchLimitOrders(db) {
     const key = `${r.user_id}_${r.company_id}`;
     holdingsMap[key] = r.quantity;
   }
-  const refTrades = {};
-  for (let i = 0; i < companyIds.length; i++) {
-    refTrades[companyIds[i]] = preloadRes.results[5 + i]?.price || null;
-  }
 
   // 2. 所有成交操作收集到 stmts 裡，最後一次 batch 執行
   const stmts = [];
@@ -783,19 +777,12 @@ export async function matchLimitOrders(db) {
   for (const o of orders.results) {
     try {
       if (ipoPhase[o.company_id] !== 'trading') continue;
+      if (checkCircuitBreak(o.company_id)) continue;
 
       const price = companies[o.company_id]?.share_price;
       if (!price) continue;
       if (o.type === 'buy' && price > o.price) continue;
       if (o.type === 'sell' && price < o.price) continue;
-
-      const refPrice = refTrades[o.company_id];
-      if (refPrice) {
-        const maxP = Math.ceil(refPrice * (1 + MAX_PRICE_CHANGE_PER_MIN));
-        const minP = Math.floor(refPrice * (1 - MAX_PRICE_CHANGE_PER_MIN));
-        if (o.type === 'buy' && price >= maxP) continue;
-        if (o.type === 'sell' && price <= minP) continue;
-      }
 
       const inv = invMap[o.company_id];
       const comp = companies[o.company_id];
@@ -806,17 +793,8 @@ export async function matchLimitOrders(db) {
 
       const walletCash = walletMap[o.user_id]?.cash ?? 0;
 
-      const impact = getPriceImpact(o.quantity, circulating, comp.total_shares);
-      const rawFill = o.type === 'buy'
-        ? Math.round(price * (1 + impact))
-        : Math.max(1, Math.round(price * (1 - impact)));
-      const fillPrice = o.type === 'buy' ? Math.min(rawFill, o.price) : Math.max(rawFill, o.price);
-
-      if (refPrice) {
-        const maxP2 = Math.ceil(refPrice * (1 + MAX_PRICE_CHANGE_PER_MIN));
-        const minP2 = Math.floor(refPrice * (1 - MAX_PRICE_CHANGE_PER_MIN));
-        if (fillPrice > maxP2 || fillPrice < minP2) continue;
-      }
+      // 掛單成交價 = 限價 × 權重 + 市價 × 權重 (偏離越大越用市價)
+      const fillPrice = getLimitFillPrice(o.price, price, o.type);
 
       let ok = false;
 
