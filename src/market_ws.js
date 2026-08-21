@@ -1,5 +1,5 @@
-// Market WebSocket DO: 即時推送股價/交易/通知給所有連線玩家
-// 每次 priceWave 或交易發生時, broadcast 給所有連線客戶端
+// Market WebSocket DO: 即時推送股價給所有連線玩家
+// DO alarm 每 5 秒從 DB 拉最新股價 + 廣播
 
 export class MarketWS {
   constructor(state, env) {
@@ -29,9 +29,12 @@ export class MarketWS {
       server.addEventListener('close', () => this.clients.delete(server));
       server.addEventListener('error', () => this.clients.delete(server));
 
-      // 發送歡迎訊息 + 當前股價快照
       const prices = await this.state.storage.get('prices');
       server.send(JSON.stringify({ type: 'snapshot', prices: prices || {}, ts: Date.now() }));
+
+      // 啟動 alarm (只有第一個 client 連入時)
+      await this.ensureAlarm();
+
       return new Response(null, { status: 101, webSocket: client });
     }
 
@@ -41,33 +44,48 @@ export class MarketWS {
     }
 
     if (url.pathname === '/update' && request.method === 'POST') {
-      // 從 cron 或 API 呼叫, 推送更新
       const data = await request.json();
-      const payload = JSON.stringify(data);
-
-      // 廣播給所有連線玩家
-      const dead = [];
-      for (const ws of this.clients) {
-        try {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(payload);
-          } else {
-            dead.push(ws);
-          }
-        } catch {
-          dead.push(ws);
-        }
-      }
-      for (const ws of dead) this.clients.delete(ws);
-
-      // 快取最新股價
+      this.broadcast(data);
       if (data.type === 'prices') {
         await this.state.storage.put('prices', data.prices);
       }
-
       return Response.json({ ok: true, clients: this.clients.size });
     }
 
     return Response.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  async alarm() {
+    // 每 5 秒從 DB 拉最新股價
+    if (this.clients.size === 0) return;
+
+    try {
+      const res = await this.env.DB.prepare('SELECT id, share_price FROM companies').all();
+      const prices = {};
+      for (const r of res.results) prices[r.id] = r.share_price;
+      await this.state.storage.put('prices', prices);
+      this.broadcast({ type: 'prices', prices });
+    } catch {}
+
+    await this.ensureAlarm();
+  }
+
+  broadcast(data) {
+    const payload = JSON.stringify(data);
+    const dead = [];
+    for (const ws of this.clients) {
+      try {
+        if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+        else dead.push(ws);
+      } catch { dead.push(ws); }
+    }
+    for (const ws of dead) this.clients.delete(ws);
+  }
+
+  async ensureAlarm() {
+    const currentAlarm = await this.state.storage.getAlarm();
+    if (!currentAlarm) {
+      await this.state.storage.setAlarm(Date.now() + 5000);
+    }
   }
 }
