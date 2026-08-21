@@ -1,4 +1,4 @@
-// Market WebSocket DO: 每 5 秒波動股價 + 推送給所有連線玩家
+// Market WebSocket DO: 每 5 秒波動股價 + 生成K線 + 推送給所有連線玩家
 
 export class MarketWS {
   constructor(state, env) {
@@ -24,7 +24,6 @@ export class MarketWS {
       server.addEventListener('error', () => this.clients.delete(server));
       const prices = await this.state.storage.get('prices');
       server.send(JSON.stringify({ type: 'snapshot', prices: prices || {}, ts: Date.now() }));
-      // 確保 alarm 啟動
       await this.ensureAlarm();
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -42,7 +41,6 @@ export class MarketWS {
     }
 
     if (subPath === '/init' && request.method === 'POST') {
-      // cron 每分鐘呼叫，確保 alarm 持續運作
       await this.ensureAlarm();
       return Response.json({ ok: true });
     }
@@ -63,14 +61,28 @@ export class MarketWS {
       const stmts = [];
       const prices = {};
 
+      // K線 interval = 5秒
+      const interval = 5000;
+      const now = Date.now();
+      const blockMinute = Math.floor(now / interval) * interval;
+
       for (const c of companies.results) {
         if (ipoPhase[c.id] !== 'trading') { prices[c.id] = c.share_price; continue; }
         const price = c.share_price || 100;
         const drift = (Math.random() * 2 - 1) * 0.015;
         const newPrice = Math.max(1, Math.round(price * (1 + drift)));
         prices[c.id] = newPrice;
+
         if (newPrice !== price) {
           stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, c.id));
+        }
+
+        // K線合併: 同一 blockMinute 內合併
+        const existing = await db.prepare('SELECT id, open, high, low, close, volume FROM stock_klines WHERE company_id = ? AND minute = ?').bind(c.id, blockMinute).first();
+        if (existing) {
+          stmts.push(db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ?, volume = volume + 1 WHERE id = ?').bind(newPrice, newPrice, newPrice, existing.id));
+        } else {
+          stmts.push(db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 1, ?)').bind(c.id, newPrice, newPrice, newPrice, newPrice, blockMinute));
         }
       }
 
@@ -86,7 +98,6 @@ export class MarketWS {
       console.error('MarketWS alarm error:', e.message);
     }
 
-    // 無論成功失敗都重新排程，確保持續運作
     await this.ensureAlarm();
   }
 
