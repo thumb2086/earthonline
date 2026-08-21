@@ -10,8 +10,9 @@ export class MarketWS {
 
   async fetch(request) {
     const url = new URL(request.url);
+    const subPath = url.pathname.replace('/ws/market', '') || '/';
 
-    if (url.pathname === '/subscribe') {
+    if (subPath === '/subscribe') {
       const pair = request.headers.get('Upgrade');
       if (pair !== 'websocket') return new Response('Expected Upgrade: websocket', { status: 426 });
 
@@ -38,12 +39,12 @@ export class MarketWS {
       return new Response(null, { status: 101, webSocket: client });
     }
 
-    if (url.pathname === '/prices' && request.method === 'GET') {
+    if (subPath === '/prices' && request.method === 'GET') {
       const prices = await this.state.storage.get('prices');
       return Response.json({ prices: prices || {}, ts: Date.now() });
     }
 
-    if (url.pathname === '/update' && request.method === 'POST') {
+    if (subPath === '/update' && request.method === 'POST') {
       const data = await request.json();
       this.broadcast(data);
       if (data.type === 'prices') {

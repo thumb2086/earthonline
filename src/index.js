@@ -348,8 +348,8 @@ export default {
         return withCsp;
       }
 
-      // Market WebSocket: /ws/market/subscribe (不需要 auth, DO 自己處理)
-      if (path === '/ws/market/subscribe' || path === '/ws/market/update' || path === '/ws/market/prices') {
+      // Market WebSocket (不需要 auth, DO 自己處理)
+      if (path.startsWith('/ws/market/')) {
         const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
         return stub.fetch(request);
       }
