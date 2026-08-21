@@ -121,7 +121,11 @@ export async function processInvestmentTick(db, logger) {
   const stmts = [];
   const logs = [];
   const txLogs = [];
+
+  // 一次性預載全部訂閱（避免迴圈內逐筆查詢）
+  const allSubs = await db.prepare('SELECT user_id, key, enabled FROM subscriptions').all();
   const subCache = {};
+  for (const r of allSubs.results) { (subCache[r.user_id] ||= {})[r.key] = !!r.enabled; }
 
   for (const inv of investments.results) {
     // 定存: 到期自動贖回
@@ -148,12 +152,6 @@ export async function processInvestmentTick(db, logger) {
 
     const info = INVEST_TYPES[inv.type];
     if (!info) continue;
-    if (!subCache[inv.user_id]) {
-      const subRows = await db.prepare('SELECT key, enabled FROM subscriptions WHERE user_id = ?').bind(inv.user_id).all();
-      const m = {};
-      for (const r of subRows.results) m[r.key] = !!r.enabled;
-      subCache[inv.user_id] = m;
-    }
     const financeBonus = subCache[inv.user_id]?.finance ? 1.15 : 1;
     const totalInvested = inv.amount + (inv.pending_interest || 0);
     const baseRate = info.rateMin + Math.random() * (info.rateMax - info.rateMin);

@@ -607,27 +607,35 @@ export default {
 
 export { DiscordGateway };
 
-// 輕量價格波動: 每分鐘 ±0.5% + 回歸力(基準=近60分鐘移動平均, 純波動被抑制但買賣趨勢不被拉回)
+// 輕量價格波動: 每分鐘 ±1.5% + 回歸力(基準=近60分鐘移動平均)
 async function processPriceWave(db) {
-  const companies = await db.prepare('SELECT id, share_price, total_shares, issue_cap FROM companies').all();
+  const companies = await db.prepare('SELECT id, name, share_price, total_shares, issue_cap FROM companies').all();
   if (companies.results.length === 0) return;
   const now = Date.now();
   const interval = 5000;
 
-  // 1 次預載所有公司的 IPO 狀態與庫存, 迴圈內零查詢
-  const [ipoRes, invRes] = await db.batch([
+  const [ipoRes, invRes, klineRes] = await db.batch([
     db.prepare("SELECT company_id, phase FROM ipo_state"),
     db.prepare('SELECT company_id, stock_quantity FROM stock_inventory'),
+    db.prepare('SELECT company_id, close, minute FROM stock_klines WHERE minute > ? ORDER BY company_id, minute DESC').bind(now - 3600000),
   ]);
   const ipoPhase = {};
   for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
   const invQty = {};
   for (const r of invRes.results) invQty[r.company_id] = r.stock_quantity;
+  // 依 company_id 分組 klines
+  const klinesByCompany = {};
+  for (const r of klineRes.results) {
+    if (!klinesByCompany[r.company_id]) klinesByCompany[r.company_id] = [];
+    klinesByCompany[r.company_id].push(r);
+  }
+
+  const allStmts = [];
+  const announcements = [];
 
   for (const c of companies.results) {
     if (ipoPhase[c.id] !== 'trading') continue;
 
-    // 有上限溫和回補: 庫存 < 10% → 補到 20%, 總股本不得超過 issue_cap (稀釋有硬頂)
     const stockQty = invQty[c.id];
     const issueCap = c.issue_cap || (c.total_shares * 2);
     if (stockQty !== undefined) {
@@ -635,40 +643,42 @@ async function processPriceWave(db) {
       if (stockQty < floor && c.total_shares < issueCap) {
         const topUp = Math.min(Math.floor(c.total_shares * 0.2) - stockQty, issueCap - c.total_shares);
         if (topUp > 0) {
-          await db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, c.id).run();
-          await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, c.id).run();
-          await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(`${c.name} 庫存不足，系統限量回補 ${topUp.toLocaleString()} 股（發行上限內）`, Date.now()).run();
+          allStmts.push(db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, c.id));
+          allStmts.push(db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, c.id));
+          announcements.push(`${c.name} 庫存不足，系統限量回補 ${topUp.toLocaleString()} 股（發行上限內）`);
         }
       }
     }
 
-    // 基準 = 近60分鐘均價 (最後120根5秒K線)
-    const klines = await db.prepare('SELECT close, minute FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(c.id).all();
-    const closes = klines.results.map(k => k.close);
+    const klines = klinesByCompany[c.id] || [];
+    const closes = klines.map(k => k.close);
     const basePrice = closes.length > 0 ? closes.reduce((s, v) => s + v, 0) / closes.length : (c.share_price || 100);
     let price = c.share_price || basePrice;
 
-    // 找出最後一根 K 線的時間，補齊中間遺漏的 K 線 (無 K 線時從現在往前補, 避免 1970 時間戳)
-    const lastKlineTime = klines.results.length > 0 ? klines.results[0].minute : (Math.floor(now / interval) * interval - interval);
-    const stepsNeeded = Math.min(Math.floor((now - lastKlineTime) / interval), 12); // 最多補 12 根 (60 秒)
+    const lastKlineTime = klines.length > 0 ? klines[0].minute : (Math.floor(now / interval) * interval - interval);
+    const stepsNeeded = Math.min(Math.floor((now - lastKlineTime) / interval), 12);
 
-    // 全部 K 線 + 價格更新一次 batch (INSERT OR REPLACE 靠 UNIQUE(company_id, minute))
-    const stmts = [];
     for (let step = 0; step <= stepsNeeded; step++) {
       const blockTime = step < stepsNeeded ? (lastKlineTime + (step + 1) * interval) : (Math.floor(now / interval) * interval);
       if (blockTime > now) break;
-
-      // 回歸: 偏離移動平均越多拉回越多
       const deviation = basePrice > 0 ? (price - basePrice) / basePrice : 0;
       const drift = (Math.random() * 2 - 1) * 0.015;
       const revert = -deviation * 0.005;
       const newPrice = Math.max(1, Math.round(price * (1 + drift + revert)));
-
-      stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, Math.max(price, newPrice), Math.min(price, newPrice), newPrice, blockTime));
+      allStmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, Math.max(price, newPrice), Math.min(price, newPrice), newPrice, blockTime));
       price = newPrice;
     }
-    stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(price, c.id));
-    try { await db.batch(stmts); } catch (e) {}
+    allStmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(price, c.id));
+  }
+
+  for (const msg of announcements) {
+    allStmts.push(db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(msg, now));
+  }
+  if (allStmts.length > 0) {
+    // D1 batch 上限 50, 分批執行
+    for (let i = 0; i < allStmts.length; i += 50) {
+      try { await db.batch(allStmts.slice(i, i + 50)); } catch (e) {}
+    }
   }
 }
 
