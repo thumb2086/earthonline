@@ -538,22 +538,7 @@ export default {
     try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
     try { await processMiningTick(db, hourlyLogger); } catch (err) { console.error('Scheduled mining error:', err.message); }
 
-    // 輕量波動: 每分鐘, 只更新價格
-    try {
-      await processPriceWave(db);
-      // 即時推送股價給所有連線玩家
-      if (env.MARKET_WS) {
-        try {
-          const companies = await db.prepare('SELECT id, share_price FROM companies').all();
-          const prices = {};
-          for (const c of companies.results) prices[c.id] = c.share_price;
-          const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
-          await stub.fetch('https://market/update', { method: 'POST', body: JSON.stringify({ type: 'prices', prices }) });
-        } catch {}
-      }
-    } catch (err) {
-      console.error('Scheduled wave error:', err.message);
-    }
+    // 股價波動已改由 MarketWS DO alarm 每 5 秒處理，cron 不再負責
 
     // 掛單撮合: 每分鐘執行
     try {
