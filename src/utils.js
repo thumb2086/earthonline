@@ -174,11 +174,15 @@ export async function createHourlyLogger(db) {
   };
 }
 
-// 全體廣播: 系統公告 + 每位玩家通知
+// 全體廣播: 系統公告 + 每位玩家通知 (batch 分 50 筆)
 export async function broadcast(db, message) {
-  await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(message, Date.now()).run();
+  const now = Date.now();
+  await db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(message, now).run();
   const users = await db.prepare('SELECT id FROM users').all();
-  for (const u of users.results) await notify(db, u.id, 'system_announcement', message);
+  const stmts = users.results.map(u => db.prepare('INSERT INTO notifications (user_id, type, message, created_at) VALUES (?, ?, ?, ?)').bind(u.id, 'system_announcement', message, now));
+  for (let i = 0; i < stmts.length; i += 50) {
+    try { await db.batch(stmts.slice(i, i + 50)); } catch (e) {}
+  }
 }
 
 // 無股東接管: 上市交易中的公司若玩家持股歸零 → 歸系統管理 (owner_id = 0)

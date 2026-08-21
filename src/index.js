@@ -7,6 +7,7 @@ import { handleCompany, processCompanyTick } from './company.js';
 import { handleStock, processMarginTick, finalizeIPO, matchLimitOrders } from './stock.js';
 import { handleEtf, etfTick } from './etf.js';
 import { handleFutures, settleFutures } from './futures.js';
+import { computeMarketIndex } from './stock.js';
 import { adjustInterestRates } from './rates.js';
 import { postV2Announcement, maybeResetGame } from './reset.js';
 import { snapshotCompanyReports } from './reports.js';
@@ -349,8 +350,13 @@ export default {
       const banned = await env.DB.prepare('SELECT reason FROM blacklist WHERE user_id = ?').bind(user.id).first();
       if (banned) return json({ error: `帳號已被停權：${banned.reason}` }, headers, 403);
       if (!checkRateLimit(`user:${user.id}`, 300)) return json({ error: '請求過於頻繁，請稍後再試' }, headers, 429);
-      // Track last active
-      await env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(Date.now(), user.id).run();
+      // Track last active (每 60 秒才寫一次，省 DB 寫入)
+      const lastActiveKey = `la:${user.id}`;
+      if (!checkRateLimit(lastActiveKey, 1, 60000)) {
+        // skip
+      } else {
+        await env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(Date.now(), user.id).run();
+      }
 
       if (path === '/api/me') {
         const wallet = await env.DB.prepare('SELECT cash, savings, bank, total_earned FROM wallets WHERE user_id = ?').bind(user.id).first();
@@ -375,7 +381,6 @@ export default {
             }
           }
         }
-        await env.DB.prepare('UPDATE users SET last_active = ? WHERE id = ?').bind(now, user.id).run();
 
         return json({ id: user.id, username: user.username, role: dbUser?.role || 'user', discord: dbUser?.discord_username, ...wallet, levels: levels || {}, pendingInterest: investPending?.p || 0, offlineEarnings }, headers);
       }
@@ -515,10 +520,11 @@ export default {
       console.error('Scheduled limit orders error:', err.message);
     }
 
-    // ETF 定價/回補 + 期貨結算: 每分鐘執行
+    // ETF + 期貨結算: 共用一次 computeMarketIndex (省 ~41 查詢)
     try {
-      await etfTick(db);
-      await settleFutures(db);
+      const marketIndex = await computeMarketIndex(db);
+      await etfTick(db, marketIndex);
+      await settleFutures(db, marketIndex);
     } catch (err) {
       console.error('Scheduled derivatives error:', err.message);
     }

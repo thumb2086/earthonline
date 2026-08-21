@@ -1,0 +1,12 @@
+CREATE INDEX IF NOT EXISTS idx_stock_trades_company_time ON stock_trades(company_id, traded_at);
+CREATE INDEX IF NOT EXISTS idx_stock_trades_company_type ON stock_trades(company_id, type, traded_at);
+CREATE INDEX IF NOT EXISTS idx_stock_trades_user_company ON stock_trades(user_id, company_id, type);
+CREATE INDEX IF NOT EXISTS idx_employees_company ON employees(company_id);
+CREATE INDEX IF NOT EXISTS idx_employees_user_company ON employees(user_id, company_id);
+CREATE INDEX IF NOT EXISTS idx_investments_user ON investments(user_id);
+CREATE INDEX IF NOT EXISTS idx_loans_status ON loans(status);
+CREATE INDEX IF NOT EXISTS idx_stock_holdings_company ON stock_holdings(company_id, quantity);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_enabled ON subscriptions(enabled);
+CREATE INDEX IF NOT EXISTS idx_margin_positions_company ON margin_positions(company_id, type, status);
+CREATE INDEX IF NOT EXISTS idx_companies_owner ON companies(owner_id);
+CREATE INDEX IF NOT EXISTS idx_game_meta_key ON game_meta(key);

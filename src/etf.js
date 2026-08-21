@@ -117,8 +117,8 @@ export async function handleEtf(env, request, path, user) {
 }
 
 // 每分鐘 tick: 更新 ETF 單位價 (追蹤指數) + 有上限溫和回補
-export async function etfTick(db) {
-  const index = await computeMarketIndex(db);
+export async function etfTick(db, precomputedIndex) {
+  const index = precomputedIndex || await computeMarketIndex(db);
   const etfs = await db.prepare('SELECT * FROM etfs').all();
   for (const e of etfs.results) {
     const price = await etfUnitPrice(db, index.value);

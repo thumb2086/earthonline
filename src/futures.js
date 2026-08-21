@@ -44,11 +44,11 @@ export async function handleFutures(env, request, path, user) {
 // 每分鐘: 到期結算 (payout = max(0, pnl); 最大虧損 = 權利金)
 // 結算價 = 近10分鐘 VWAP 平均 (防開倉者結算前 1 分鐘自己拉抬/打壓指數)
 // payout 上限 = 權利金 × 10 (防無限槓桿)
-export async function settleFutures(db) {
+export async function settleFutures(db, precomputedIndex) {
   const now = Date.now();
   const due = await db.prepare("SELECT * FROM futures WHERE status = 'open' AND settle_at <= ?").bind(now).all();
   if (due.results.length === 0) return;
-  const index = await computeMarketIndex(db);
+  const index = precomputedIndex || await computeMarketIndex(db);
   // VWAP: 取近 10 分鐘 timeline 平均
   const tl = (index.timeline || []).slice(-10);
   const settleIndex = tl.length > 0 ? Math.round(tl.reduce((s, p) => s + p.value, 0) / tl.length) : index.value;
