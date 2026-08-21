@@ -1,0 +1,43 @@
+{
+  "name": "earthonline-dev",
+  "account_id": "2513d9129183c9319ad07b504251a69b",
+  "compatibility_date": "2026-07-29",
+  "main": "src/index.js",
+  "assets": {
+    "directory": "client/dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "routes": [
+    {
+      "pattern": "dev.twonline.dpdns.org",
+      "custom_domain": true
+    }
+  ],
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      { "name": "GATEWAY", "class_name": "DiscordGateway" },
+      { "name": "MARKET_WS", "class_name": "MarketWS" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["DiscordGateway"] },
+    { "tag": "v2", "new_sqlite_classes": ["MarketWS"] }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "earthonline-db-dev",
+      "database_id": "a885dc00-5c2d-4289-91f0-9ee5411d7c63"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/1 * * * *"]
+  },
+  "vars": {
+    "DISCORD_CLIENT_ID": "1513563333985304596",
+    "FRONTEND_URL": "https://dev.twonline.dpdns.org",
+    "DISCORD_GUILD_ID": "1512345209005015101"
+  }
+}
