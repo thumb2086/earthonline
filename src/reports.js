@@ -12,25 +12,72 @@ function dividendPerMinute(company) {
   return company.total_shares > 0 ? currentIncome / company.total_shares / 10 : 0;
 }
 
-// 每小時財報快照: 所有交易中公司
+// 每小時財報快照: 所有交易中公司 (一次預載全部資料)
 export async function snapshotCompanyReports(db) {
   const companies = await db.prepare('SELECT * FROM companies').all();
+  if (companies.results.length === 0) return;
   const now = Date.now();
+
+  // 一次性預載全部: ipo_state, 訂閱, 員工, 部門
+  const preloadRes = await db.batch([
+    db.prepare("SELECT company_id, phase FROM ipo_state"),
+    db.prepare('SELECT user_id, key, enabled FROM subscriptions'),
+    db.prepare('SELECT user_id, company_id, position, salary, output, efficiency, morale, department_id FROM employees'),
+    db.prepare('SELECT id, company_id, type FROM departments'),
+  ]);
+  const ipoPhase = {};
+  for (const r of preloadRes.results[0]) ipoPhase[r.company_id] = r.phase;
+  const subMap = {};
+  for (const r of preloadRes.results[1]) { (subMap[r.user_id] ||= {})[r.key] = !!r.enabled; }
+  const empByCompany = {};
+  for (const r of preloadRes.results[2]) { (empByCompany[r.company_id] ||= []).push(r); }
+  const deptByCompany = {};
+  for (const r of preloadRes.results[3]) { (deptByCompany[r.company_id] ||= []).push(r); }
+
+  const stmts = [];
   for (const c of companies.results) {
     try {
-      const ipo = await db.prepare("SELECT phase FROM ipo_state WHERE company_id = ?").bind(c.id).first();
-      if (!ipo || ipo.phase !== 'trading') continue;
-      const subs = c.owner_id > 0 ? await getOwnerSubs(db, c.owner_id) : {};
-      const data = await getCompanyProfit(db, c, subs);
-      await db.prepare('INSERT INTO company_reports (company_id, period_start, income_rate, cost_rate, profit_rate, dividend_rate, price, total_shares, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(c.id, Math.floor(now / 3600000) * 3600000, data.income, data.costs, data.profit, dividendPerMinute(c), c.share_price || 100, c.total_shares, now).run();
-      // 只保留最近 N 筆 (避免無限累積)
-      const old = await db.prepare('SELECT id FROM company_reports WHERE company_id = ? ORDER BY created_at DESC LIMIT 1 OFFSET ?').bind(c.id, SNAPSHOT_KEEP).first();
-      if (old) await db.prepare('DELETE FROM company_reports WHERE company_id = ? AND id <= ?').bind(c.id, old.id).run();
-    } catch (e) {
-      console.error('snapshotCompanyReports error:', e.message);
+      if (ipoPhase[c.id] !== 'trading') continue;
+      const subs = subMap[c.owner_id] || {};
+      const employees = empByCompany[c.id] || [];
+      const depts = deptByCompany[c.id] || [];
+
+      const posBoost = {};
+      for (const d of depts) {
+        const boosts = { engineering: { manager: 1.15, engineer: 1.2 }, marketing: { manager: 1.15, sales: 1.2 }, hr: { manager: 1.15, sales: 0.9 }, finance: { manager: 1.15, engineer: 0.9 } };
+        if (boosts[d.type]) Object.assign(posBoost, boosts[d.type]);
+      }
+      const allDepts = depts.length > 0 ? 1 + depts.length * 0.05 : 1;
+      const managerCount = employees.filter(e => e.position === 'manager').length;
+      const expertCount = employees.filter(e => e.position === 'expert').length;
+      const haloEff = 1 + Math.min(managerCount * 0.02, 0.20);
+      const haloIncome = 1 + Math.min(expertCount * 0.015, 0.15);
+      const aiBonus = subs.ai ? 1.1 : 1;
+      let totalOutput = 0;
+      for (const e of employees) totalOutput += Math.floor(e.output * e.efficiency * (e.morale / 100) * (posBoost[e.position] || 1) * aiBonus * haloEff);
+      const { INDUSTRY_MULT } = await import('./company.js');
+      const mult = INDUSTRY_MULT[c.industry] || 1.0;
+      const income = Math.floor(c.base_income * mult * (1 + totalOutput / 1000) * (1 + 0.1 * (c.equipment_level - 1)) * (1 + 0.05 * (c.brand_level - 1)) * (0.7 + Math.random() * 0.6) * haloIncome * (subs.consultant ? 1.1 : 1) * allDepts);
+      const salaries = employees.reduce((s, e) => s + e.salary, 0);
+      const costs = salaries + Math.floor(10 * Math.pow(0.95, c.office_level - 1)) + c.equipment_level * 2 + 8;
+      const profit = income - costs;
+
+      stmts.push(db.prepare('INSERT INTO company_reports (company_id, period_start, income_rate, cost_rate, profit_rate, dividend_rate, price, total_shares, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(c.id, Math.floor(now / 3600000) * 3600000, income, costs, profit, dividendPerMinute(c), c.share_price || 100, c.total_shares, now));
+    } catch (e) {}
+  }
+
+  if (stmts.length > 0) {
+    for (let i = 0; i < stmts.length; i += 50) {
+      try { await db.batch(stmts.slice(i, i + 50)); } catch {}
     }
   }
+
+  // 清理舊快照 (一次查詢)
+  try {
+    const cutoff = now - SNAPSHOT_KEEP * 3600000;
+    await db.prepare('DELETE FROM company_reports WHERE created_at < ?').bind(cutoff).run();
+  } catch {}
 }
 
 async function getOwnerSubs(db, userId) {

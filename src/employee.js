@@ -123,9 +123,16 @@ export async function processEmployeeTick(db) {
 
   // 1 次 batch 預載公司存在性, 迴圈內零查詢
   const companyIds = [...new Set(employees.results.map(e => e.company_id))];
-  const compRes = await db.batch(companyIds.map(id => db.prepare('SELECT id FROM companies WHERE id = ?').bind(id)));
+  // 改用 WHERE IN (1 查詢) 取代 N 個 batch 查詢
   const exists = {};
-  compRes.forEach((r, i) => { if (r.results[0]) exists[companyIds[i]] = true; });
+  if (companyIds.length > 0) {
+    for (let i = 0; i < companyIds.length; i += 99) {
+      const chunk = companyIds.slice(i, i + 99);
+      const placeholders = chunk.map(() => '?').join(',');
+      const res = await db.prepare(`SELECT id FROM companies WHERE id IN (${placeholders})`).bind(...chunk).all();
+      for (const r of res.results) exists[r.id] = true;
+    }
+  }
 
   const stmts = [];
   for (const emp of employees.results) {

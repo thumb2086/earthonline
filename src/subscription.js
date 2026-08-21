@@ -50,9 +50,16 @@ export async function processSubscriptionTick(db, logger) {
 
   // 1 次 batch 預載這些用戶的錢包現金, 迴圈內零查詢
   const ids = [...new Set(subs.results.map(s => s.user_id))];
-  const walletRes = await db.batch(ids.map(id => db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(id)));
-  const cashMap = {};
-  walletRes.forEach((r, i) => { cashMap[ids[i]] = r.results[0]?.cash; });
+  // 改用 WHERE IN (1 查詢) 取代 N 個 batch 查詢
+  let cashMap = {};
+  if (ids.length > 0) {
+    for (let i = 0; i < ids.length; i += 99) {
+      const chunk = ids.slice(i, i + 99);
+      const placeholders = chunk.map(() => '?').join(',');
+      const walletRes = await db.prepare(`SELECT user_id, cash FROM wallets WHERE user_id IN (${placeholders})`).bind(...chunk).all();
+      for (const r of walletRes.results) cashMap[r.user_id] = r.cash;
+    }
+  }
 
   const stmts = [];
   const logs = [];
