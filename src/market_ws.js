@@ -1,5 +1,4 @@
 // Market WebSocket DO: 每 5 秒波動股價 + 推送給所有連線玩家
-// K線生成仍由 cron 每分鐘處理
 
 export class MarketWS {
   constructor(state, env) {
@@ -25,6 +24,7 @@ export class MarketWS {
       server.addEventListener('error', () => this.clients.delete(server));
       const prices = await this.state.storage.get('prices');
       server.send(JSON.stringify({ type: 'snapshot', prices: prices || {}, ts: Date.now() }));
+      // 確保 alarm 啟動
       await this.ensureAlarm();
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -39,6 +39,12 @@ export class MarketWS {
       this.broadcast(data);
       if (data.type === 'prices') await this.state.storage.put('prices', data.prices);
       return Response.json({ ok: true, clients: this.clients.size });
+    }
+
+    if (subPath === '/init' && request.method === 'POST') {
+      // cron 每分鐘呼叫，確保 alarm 持續運作
+      await this.ensureAlarm();
+      return Response.json({ ok: true });
     }
 
     return Response.json({ error: 'Not found' }, { status: 404 });
@@ -76,8 +82,11 @@ export class MarketWS {
 
       await this.state.storage.put('prices', prices);
       this.broadcast({ type: 'prices', prices });
-    } catch {}
+    } catch (e) {
+      console.error('MarketWS alarm error:', e.message);
+    }
 
+    // 無論成功失敗都重新排程，確保持續運作
     await this.ensureAlarm();
   }
 

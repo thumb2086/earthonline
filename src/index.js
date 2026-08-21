@@ -538,7 +538,14 @@ export default {
     try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
     try { await processMiningTick(db, hourlyLogger); } catch (err) { console.error('Scheduled mining error:', err.message); }
 
-    // 股價波動已改由 MarketWS DO alarm 每 5 秒處理，cron 不再負責
+    // 股價波動已改由 MarketWS DO alarm 每 5 秒處理
+    // cron 每分鐘確保 DO alarm 持續運作
+    if (env.MARKET_WS) {
+      try {
+        const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
+        await stub.fetch('https://market/init', { method: 'POST' });
+      } catch {}
+    }
 
     // 掛單撮合: 每分鐘執行
     try {

@@ -1554,14 +1554,19 @@ function AdminPanel({ api }) {
   }
 
   const stocksWithHolders = (stockDist || []).filter(s => s.held > 0)
-  const holdingsByCompany = stocksWithHolders.map(s => ({
-    id: s.id,
-    name: s.name,
-    data: (s.holders || []).map(h => h.quantity),
-    labels: (s.holders || []).map(h => h.username),
-    total: s.held,
-    system: s.system_inventory || 0,
-  }))
+  const holdingsByCompany = stocksWithHolders.map(s => {
+    const systemInv = s.system_inventory || 0;
+    const totalShares = s.total_shares || (s.held + systemInv);
+    const circulating = totalShares - systemInv;
+    return {
+      id: s.id,
+      name: s.name,
+      data: (s.holders || []).map(h => h.quantity),
+      labels: (s.holders || []).map(h => h.username),
+      total: circulating,
+      system: systemInv,
+    };
+  })
   const cashData = users.filter(u => u.cash > 0).map(u => u.cash)
   const cashLabels = users.filter(u => u.cash > 0).map(u => u.username)
   const earnedData = users.filter(u => u.total_earned > 0).map(u => u.total_earned)
