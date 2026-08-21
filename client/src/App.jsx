@@ -6,6 +6,7 @@ import { useToast } from './components/Toast.jsx'
 import DailyLogin from './components/DailyLogin'
 import LaunchBanner from './components/LaunchBanner'
 import Gaming from './components/Gaming'
+import Casino from './components/Casino'
 import LaunchPage from './components/LaunchPage'
 import OnboardingGuide from './components/OnboardingGuide'
 
@@ -102,6 +103,7 @@ export default function App() {
     { id: 'company', label: '🏢 公司' },
     { id: 'trading', label: '📈 交易' },
     { id: 'gaming', label: '🎰 娛樂' },
+    { id: 'casino', label: '🎲 賭場' },
     { id: 'subscription', label: '📦 訂閱' },
     { id: 'history', label: '💰 明細' },
     { id: 'leaderboard', label: '🏆 排行' },
@@ -174,6 +176,7 @@ export default function App() {
           {view === 'company' && <Company api={api} toast={toast} prompt={prompt} promptMulti={promptMulti} />}
           {view === 'trading' && <Trading api={api} toast={toast} prompt={prompt} user={user} />}
           {view === 'gaming' && <Gaming api={api} user={user} />}
+          {view === 'casino' && <Casino api={api} user={user} />}
           {view === 'history' && <History api={api} />}
           {view === 'subscription' && <Subscription api={api} toast={toast} />}
           {view === 'leaderboard' && <Leaderboard api={api} />}
