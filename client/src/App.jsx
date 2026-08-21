@@ -223,6 +223,10 @@ function Dashboard({ user, api }) {
         <div className="card"><div className="card-title">總資產</div><div className="text-lg">${netWorth.toLocaleString()}</div></div>
         <div className="card"><div className="card-title">累計賺取</div><div className="text-lg">${(user?.total_earned || 0).toLocaleString()}</div></div>
       </div>
+      <div className="grid-3 mb-12">
+        {(user?.estDivPerMin || 0) > 0 && <div className="card" style={{borderLeft:'3px solid #22c55e'}}><div className="card-title">💎 預估股息</div><div className="text-lg" style={{color:'#22c55e'}}>${user.estDivPerMin.toLocaleString()}/分</div><div className="text-dim text-sm">每 10 分鐘自動發放</div></div>}
+        {(user?.btc || 0) > 0 && <div className="card" style={{borderLeft:'3px solid #f7931a'}}><div className="card-title">₿ 比特幣</div><div className="text-lg" style={{color:'#f7931a'}}>{user.btc} BTC</div><div className="text-dim text-sm">開服限定紀念品</div></div>}
+      </div>
       <div className="grid-2 mb-12">
         <div className="card"><div className="card-title">活存</div><div className="text-lg">${(user?.savings || 0).toLocaleString()}</div></div>
         <div className="card"><div className="card-title">定存</div><div className="text-lg">${depTotal.toLocaleString()}</div></div>
@@ -1157,7 +1161,8 @@ function Stock({ api, toast, prompt, user }) {
   const maxBuy = async () => {
     const price = q?.price || 0
     if (price <= 0) return
-    const maxByCash = Math.floor((user?.cash || 0) / (price * 1.005))
+    const availableFunds = (user?.cash || 0) + (user?.savings || 0)
+    const maxByCash = Math.floor(availableFunds / (price * 1.005))
     const maxByInv = q?.systemInventory || 0
     const n = Math.max(0, Math.min(maxByCash, maxByInv))
     if (n <= 0) return toast('現金或庫存不足', 'error')

@@ -370,8 +370,9 @@ export default {
         const levels = await env.DB.prepare('SELECT computer, server, ai_assistant FROM income_levels WHERE user_id = ?').bind(user.id).first();
         const dbUser = await env.DB.prepare('SELECT username, role, discord_username, discord_avatar, last_active FROM users WHERE id = ?').bind(user.id).first();
         const investPending = await env.DB.prepare("SELECT COALESCE(SUM(pending_interest), 0) as p FROM investments WHERE user_id = ?").bind(user.id).first();
+        const btcRow = await env.DB.prepare("SELECT amount FROM user_btc WHERE user_id = ?").bind(user.id).first();
 
-        // Offline earnings
+        // 離線收益
         const now = Date.now();
         let offlineEarnings = 0;
         if (dbUser?.last_active) {
@@ -389,7 +390,20 @@ export default {
           }
         }
 
-        return json({ id: user.id, username: user.username, role: dbUser?.role || 'user', discord: dbUser?.discord_username, ...wallet, levels: levels || {}, pendingInterest: investPending?.p || 0, offlineEarnings }, headers);
+        // 預估每分鐘股利 (持股數 × 每股股利/分)
+        const holdings = await env.DB.prepare('SELECT company_id, quantity FROM stock_holdings WHERE user_id = ?').bind(user.id).all();
+        let estDivPerMin = 0;
+        for (const h of (holdings.results || [])) {
+          const comp = await env.DB.prepare('SELECT base_income, total_shares, created_at, industry FROM companies WHERE id = ?').bind(h.company_id).first();
+          if (!comp || comp.total_shares <= 0) continue;
+          const elapsed = Math.max((now - (comp.created_at || now)) / 60000, 0);
+          const growth = 0.0005;
+          const currentIncome = Math.floor((comp.base_income || 100) * Math.pow(1 + growth, elapsed));
+          const divPerShare = currentIncome / comp.total_shares / 10;
+          estDivPerMin += divPerShare * h.quantity;
+        }
+
+        return json({ id: user.id, username: user.username, role: dbUser?.role || 'user', discord: dbUser?.discord_username, ...wallet, levels: levels || {}, pendingInterest: investPending?.p || 0, offlineEarnings, estDivPerMin: Math.round(estDivPerMin * 100) / 100, btc: btcRow?.amount || 0 }, headers);
       }
 
       if (path === '/api/auth/rename' && request.method === 'POST') {
