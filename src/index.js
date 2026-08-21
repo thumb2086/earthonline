@@ -22,6 +22,7 @@ import { getDailyLoginStatus, claimDailyLogin } from './daily_login.js';
 import { handleLaunchEvent, getLaunchEventStatus, giveNewbieGift, maybeDistributeDailyLeaderboard } from './launch_event.js';
 import { getScratchStatus, scratch, getScratchHistory } from './scratch.js';
 import { getLotteryStatus, buyTicket, drawLottery, getLotteryHistory } from './lottery.js';
+import { handleMining, processMiningTick, loadMiningModels } from './mining.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
 const ADMIN_ROLE_NAME = '地球管理團隊';
@@ -471,6 +472,10 @@ export default {
       if (path === '/api/lottery/history') {
         return json(await getLotteryHistory(env.DB), headers);
       }
+      if (path.startsWith('/api/mining')) {
+        const r = await handleMining(env, request, path, user);
+        if (r !== null) return json(r, headers);
+      }
 
       const routes = [
         ['/api/income', handleIncome],
@@ -526,6 +531,7 @@ export default {
     try { await processBankTick(db, hourlyLogger); } catch (err) { console.error('Scheduled bank error:', err.message); }
     try { await processSubscriptionTick(db, hourlyLogger); } catch (err) { console.error('Scheduled subscription error:', err.message); }
     try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
+    try { await processMiningTick(db, hourlyLogger); } catch (err) { console.error('Scheduled mining error:', err.message); }
 
     // 輕量波動: 每分鐘, 只更新價格
     try {

@@ -1,0 +1,18 @@
+INSERT OR IGNORE INTO mining_models (model, type, category, tflops, watts, price, ai_score, vram, description, sort_order) VALUES
+('rta4000','gpu','pro',19.2,140,45000,35,16,'RTX A4000 Workstation',70),
+('rta5000','gpu','pro',27.8,230,80000,60,24,'RTX A5000',71),
+('rta6000','gpu','pro',38.7,300,200000,110,48,'RTX A6000 48GB',72),
+('rtx6000ada','gpu','pro',91.1,300,400000,250,48,'RTX 6000 Ada',73),
+('amdmi210','gpu','pro',45.3,300,300000,130,64,'AMD MI210 64GB',74),
+('amdmi250x','gpu','pro',111.1,560,800000,400,128,'AMD MI250X 128GB',75),
+('amdmi300x','gpu','pro',163.4,750,1500000,700,192,'AMD MI300X 192GB',76),
+('a10','gpu','dc',31.2,150,180000,80,24,'NVIDIA A10 24GB',80),
+('a100_40','gpu','dc',195,300,500000,600,40,'NVIDIA A100 40GB',81),
+('a100_80','gpu','dc',312,400,800000,900,80,'NVIDIA A100 80GB',82),
+('a100_sxm','gpu','dc',312,400,1200000,1000,80,'NVIDIA A100 SXM 80GB',83),
+('h100_pcie','gpu','dc',756,350,2500000,2500,80,'NVIDIA H100 PCIe',90),
+('h100_sxm','gpu','dc',990,700,3000000,3000,80,'NVIDIA H100 SXM',91),
+('h200_sxm','gpu','dc',990,700,4000000,3800,141,'NVIDIA H200 SXM',92),
+('b100','gpu','dc',1400,700,5500000,5500,192,'NVIDIA B100',95),
+('b200','gpu','dc',2250,1000,8000000,9000,192,'NVIDIA B200',96),
+('gb200','gpu','dc',3600,120000,60000000,80000,13824,'NVIDIA GB200 NVL72',99);
