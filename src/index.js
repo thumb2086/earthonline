@@ -590,11 +590,15 @@ export default {
       }
     }
     const now = new Date();
-    // 每日 00:00~00:04 UTC (台灣 08:00) 社會階級清算 + 開服排行榜每日發獎
-    if (now.getHours() === 0 && now.getMinutes() < 5) {
+    // 每天 00:00~00:10 UTC (台灣 08:00) 社會階級清算 + 開服排行榜每日發獎 + 樂透開獎
+    if (now.getHours() === 0 && now.getMinutes() < 10) {
       try { await weeklySettlement(db, env); } catch (e) {}
       try { await maybeDistributeDailyLeaderboard(db); } catch (e) {}
       try { await drawLottery(db); } catch (e) { console.error('Lottery draw error:', e.message); }
+    }
+    // 樂透: 每小時也檢查一次，防止當天 00:00 漏跑
+    if (now.getHours() === 6) {
+      try { await drawLottery(db); } catch (e) {}
     }
     // 最後才 flush 小時彙總 log (收集所有 tick 後一次 batch 寫入)
     try { await hourlyLogger.flush(); } catch (err) { console.error('Scheduled hourly log flush error:', err.message); }

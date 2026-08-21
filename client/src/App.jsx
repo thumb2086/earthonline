@@ -1160,12 +1160,12 @@ function Stock({ api, toast, prompt, user }) {
     const qty = parseInt(marginQty); const lev = parseInt(marginLev)
     if (!qty || qty <= 0) return toast('請輸入股數', 'error')
     const r = await api('/api/stock/margin/open', { companyId: selectedStock, quantity: qty, leverage: lev, type: marginType });
-    if (r.success) { toast(`${marginType === 'long' ? '做多' : '做空'}成功`, 'success'); setMarginQty(''); api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[])); api('/api/stock/quote?companyId=' + selectedStock).then(setQ); api('/api/stock/holdings').then(setH) }
+    if (r.success) { toast(`${marginType === 'long' ? '做多' : '做空'}成功，保證金 $${r.marginAmount.toLocaleString()}`, 'success'); setMarginQty(''); api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[])); api('/api/stock/quote?companyId=' + selectedStock).then(setQ); api('/api/stock/holdings').then(setH); refreshHeavy() }
     else toast(r.error, 'error')
   }
   const closePos = async (id) => {
     const r = await api('/api/stock/margin/close/' + id)
-    if (r.success) { toast('平倉成功', 'success'); api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[])); api('/api/stock/quote?companyId=' + selectedStock).then(setQ); api('/api/stock/holdings').then(setH) }
+    if (r.success) { toast('平倉成功', 'success'); api('/api/stock/margin/positions').then(d => setPositions(Array.isArray(d)?d:[])); api('/api/stock/quote?companyId=' + selectedStock).then(setQ); api('/api/stock/holdings').then(setH); refreshHeavy() }
     else toast(r.error, 'error')
   }
   const addMargin = async (p) => {
