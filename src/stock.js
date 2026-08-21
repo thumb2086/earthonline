@@ -16,6 +16,12 @@ const circuitBreakers = {}; // companyId -> breakUntil timestamp
 const MAX_PRICE_IMPACT = 0.50; // 影響上限 50% (不再用硬限制)
 const MIN_CIRCULATING_RATIO = 0.10;
 
+// 取得真實流通量：玩家持股總和
+async function getCirculating(db, companyId) {
+  const res = await db.prepare('SELECT COALESCE(SUM(quantity), 0) as held FROM stock_holdings WHERE company_id = ?').bind(companyId).first();
+  return res?.held || 0;
+}
+
 // 單筆上限 = 可交易供應量 (流通 + 系統可賣庫存) 的 20%
 // 系統 100% 持股時流通=0 若只用流通量會鎖死市場, 故納入系統庫存
 function getMaxTrade(circulating, inventory, minInventory) {
@@ -95,7 +101,7 @@ export async function handleStock(env, request, path, user) {
     const price = await getCurrentPrice(db, companyId);
     const inv = await db.prepare('SELECT cash, stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
     const company = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
-    const circulating = (company?.total_shares || 1000000) - (inv?.stock_quantity || 0);
+    const circulating = await getCirculating(db, companyId);
     const maxTrade = getMaxTrade(circulating, inv?.stock_quantity || 0, Math.floor((company?.total_shares || 0) * 0.03));
     // 熔斷狀態顯示
     let limit = checkCircuitBreak(companyId) ? 'circuit_break' : null;
@@ -260,7 +266,7 @@ export async function handleStock(env, request, path, user) {
     if (inv.stock_quantity < quantity) return { error: `系統庫存不足（僅剩 ${inv.stock_quantity.toLocaleString()} 股）` };
 
     // 交易上限: 單筆最多 20% 可交易供應量
-    const circulating = companyData.total_shares - inv.stock_quantity;
+    const circulating = await getCirculating(db, companyId);
     const maxTrade = getMaxTrade(circulating, inv.stock_quantity, Math.floor(companyData.total_shares * 0.03));
     if (quantity > maxTrade) return { error: `單筆交易上限 ${maxTrade.toLocaleString()} 股（流通量的 ${(MAX_TRADE_RATIO * 100).toFixed(0)}%），本次 ${quantity.toLocaleString()} 股超出限制` };
 
@@ -321,7 +327,7 @@ export async function handleStock(env, request, path, user) {
     // 系統無限接盤: 賣出永遠成功 (系統現金可為負, 買入時回收)
 
     const companyS = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
-    const circulatingS = companyS.total_shares - inv.stock_quantity;
+    const circulatingS = await getCirculating(db, companyId);
 
     // 交易上限: 單筆最多 20% 可交易供應量
     const maxTradeS = getMaxTrade(circulatingS, inv.stock_quantity, Math.floor(companyS.total_shares * 0.03));
@@ -383,7 +389,7 @@ export async function handleStock(env, request, path, user) {
     const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
     const comp = await db.prepare('SELECT total_shares, share_price FROM companies WHERE id = ?').bind(companyId).first();
     if (!comp) return { error: '公司不存在' };
-    const circulating = comp.total_shares - (inv?.stock_quantity || 0);
+    const circulating = await getCirculating(db, companyId);
     const maxTrade = Math.max(1, Math.floor(circulating * MAX_TRADE_RATIO));
     if (qty > maxTrade) return { error: `單筆上限 ${maxTrade.toLocaleString()} 股` };
     const openCount = await db.prepare("SELECT COUNT(*) as cnt FROM stock_limit_orders WHERE user_id = ? AND status = 'open'").bind(user.id).first();
@@ -485,7 +491,7 @@ export async function handleStock(env, request, path, user) {
 
     const companyData = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(companyId).first();
     const inv = await db.prepare('SELECT cash, stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
-    const circulating = companyData.total_shares - inv.stock_quantity;
+    const circulating = await getCirculating(db, companyId);
 
     const price = await getCurrentPrice(db, companyId);
 
@@ -595,7 +601,7 @@ async function closePosition(db, pos) {
   const currentPrice = await getCurrentPrice(db, pos.company_id);
   const companyData = await db.prepare('SELECT total_shares FROM companies WHERE id = ?').bind(pos.company_id).first();
   const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(pos.company_id).first();
-  const circulating = (companyData?.total_shares || 0) - (inv?.stock_quantity || 0);
+  const circulating = await getCirculating(db, pos.company_id);
   const impact = getPriceImpact(pos.quantity, circulating, companyData?.total_shares || 0);
   // 平倉也承受市場影響: 做多平倉=賣出(跌價), 做空平倉=買回(漲價)
   const closePrice = pos.type === 'long'
@@ -765,9 +771,11 @@ export async function matchLimitOrders(db) {
   const walletMap = {};
   for (const r of preloadRes.results[3]) walletMap[r.user_id] = r;
   const holdingsMap = {};
+  const circulatingMap = {};
   for (const r of preloadRes.results[4]) {
     const key = `${r.user_id}_${r.company_id}`;
     holdingsMap[key] = r.quantity;
+    circulatingMap[r.company_id] = (circulatingMap[r.company_id] || 0) + r.quantity;
   }
 
   // 2. 所有成交操作收集到 stmts 裡，最後一次 batch 執行
@@ -787,7 +795,7 @@ export async function matchLimitOrders(db) {
       const inv = invMap[o.company_id];
       const comp = companies[o.company_id];
       if (!inv || !comp) continue;
-      const circulating = comp.total_shares - inv.stock_quantity;
+      const circulating = circulatingMap[o.company_id] || 0;
       const maxTrade = getMaxTrade(circulating, inv.stock_quantity, Math.floor(comp.total_shares * 0.03));
       if (o.quantity > maxTrade) continue;
 
@@ -872,9 +880,15 @@ export async function computeMarketIndex(db) {
     JOIN ipo_state i ON i.company_id = c.id AND i.phase = 'trading'
   `).all();
   const rows = trading.results;
+
+  // 預載所有公司持股
+  const heldRes = await db.prepare('SELECT company_id, COALESCE(SUM(quantity), 0) as held FROM stock_holdings GROUP BY company_id').all();
+  const heldMap = {};
+  for (const r of heldRes.results) heldMap[r.company_id] = r.held;
+
   let currentCap = 0, baseCap = 0;
   for (const c of rows) {
-    const circulating = Math.max(c.total_shares - c.sys_inv, 1);
+    const circulating = Math.max(heldMap[c.id] || 0, 1);
     const first = await db.prepare('SELECT open FROM stock_klines WHERE company_id = ? ORDER BY minute ASC LIMIT 1').bind(c.id).first();
     const basePrice = first?.open || c.share_price || 100;
     currentCap += (c.share_price || 100) * circulating;
@@ -883,7 +897,7 @@ export async function computeMarketIndex(db) {
   const indexValue = baseCap > 0 ? Math.round((currentCap / baseCap) * 1000) : 1000;
   const blocks = {};
   for (const c of rows) {
-    const circulating = Math.max(c.total_shares - c.sys_inv, 1);
+    const circulating = Math.max(heldMap[c.id] || 0, 1);
     const klines = await db.prepare('SELECT minute, close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 720').bind(c.id).all();
     for (const k of klines.results) {
       if (!blocks[k.minute]) blocks[k.minute] = { cap: 0 };
@@ -905,7 +919,8 @@ export async function handleStockDashboard(db, user, companyId) {
       const price = await getCurrentPrice(db, companyId);
       const inv = await db.prepare('SELECT cash, stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
       const company = await db.prepare('SELECT total_shares, code, name FROM companies WHERE id = ?').bind(companyId).first();
-      const circulating = (company?.total_shares || 1000000) - (inv?.stock_quantity || 0);
+      const heldRes = await db.prepare('SELECT COALESCE(SUM(quantity), 0) as held FROM stock_holdings WHERE company_id = ?').bind(companyId).first();
+      const circulating = heldRes?.held || 0;
       const maxTrade = getMaxTrade(circulating, inv?.stock_quantity || 0, Math.floor((company?.total_shares || 0) * 0.03));
       let limit = null;
       const refTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, Date.now() - 60000).first();

@@ -105,7 +105,8 @@ export async function getCompanyReport(db, companyId) {
 
   const inv = await db.prepare('SELECT stock_quantity FROM stock_inventory WHERE company_id = ?').bind(companyId).first();
   const inventory = inv?.stock_quantity || 0;
-  const circulating = Math.max(company.total_shares - inventory, 0);
+  const heldRes = await db.prepare('SELECT COALESCE(SUM(quantity), 0) as held FROM stock_holdings WHERE company_id = ?').bind(companyId).first();
+  const circulating = Math.max(heldRes?.held || 0, 0);
 
   // 各項指標
   const epsDay = company.total_shares > 0 ? profitRate * 1440 / company.total_shares : 0; // 每股日盈餘

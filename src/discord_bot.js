@@ -38,10 +38,15 @@ async function priceContent(db) {
   `).all();
   if (trading.results.length === 0) return '📉 目前沒有上市股票';
 
+  // 預載所有公司持股
+  const heldRes = await db.prepare('SELECT company_id, COALESCE(SUM(quantity), 0) as held FROM stock_holdings GROUP BY company_id').all();
+  const heldMap = {};
+  for (const r of heldRes.results) heldMap[r.company_id] = r.held;
+
   // 大盤指數
   let currentCap = 0, baseCap = 0;
   for (const c of trading.results) {
-    const circulating = Math.max(c.total_shares - c.sys_inv, 1);
+    const circulating = Math.max(heldMap[c.id] || 0, 1);
     const first = await db.prepare('SELECT open FROM stock_klines WHERE company_id = ? ORDER BY minute ASC LIMIT 1').bind(c.id).first();
     const basePrice = first?.open || c.share_price || 100;
     currentCap += (c.share_price || 100) * circulating;
@@ -60,7 +65,7 @@ async function priceContent(db) {
   out += `━━━━━━━━━━━━━━━━━━━━━━\n`;
 
   for (const c of trading.results) {
-    const circulating = Math.max(c.total_shares - c.sys_inv, 1);
+    const circulating = Math.max(heldMap[c.id] || 0, 1);
     const maxTrade = Math.max(1, Math.floor(circulating * 0.05));
     // 最近漲跌
     const recent = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 6').all();
@@ -262,7 +267,8 @@ export async function handleInteractions(request, env) {
         const ipo = await db.prepare('SELECT phase FROM ipo_state WHERE company_id = ?').bind(company.id).first();
         if (!ipo || ipo.phase !== 'trading') return textResponse(`🟡 **${company.name}** 尚未上市（${ipo?.phase || '未IPO'}）`);
         const inv = await db.prepare('SELECT stock_quantity, cash FROM stock_inventory WHERE company_id = ?').bind(company.id).first();
-        const circulating = (company.total_shares || 0) - (inv?.stock_quantity || 0);
+        const heldRes = await db.prepare('SELECT COALESCE(SUM(quantity), 0) as held FROM stock_holdings WHERE company_id = ?').bind(company.id).first();
+        const circulating = heldRes?.held || 0;
         const lastTrade = await db.prepare('SELECT traded_at FROM stock_trades WHERE company_id = ? ORDER BY traded_at DESC LIMIT 1').bind(company.id).first();
         const lastTime = lastTrade?.traded_at ? new Date(lastTrade.traded_at).toLocaleString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
         return textResponse(

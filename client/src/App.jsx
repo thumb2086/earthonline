@@ -1554,19 +1554,15 @@ function AdminPanel({ api }) {
   }
 
   const stocksWithHolders = (stockDist || []).filter(s => s.held > 0)
-  const holdingsByCompany = stocksWithHolders.map(s => {
-    const systemInv = s.system_inventory || 0;
-    const totalShares = s.total_shares || (s.held + systemInv);
-    const circulating = totalShares - systemInv;
-    return {
-      id: s.id,
-      name: s.name,
-      data: (s.holders || []).map(h => h.quantity),
-      labels: (s.holders || []).map(h => h.username),
-      total: circulating,
-      system: systemInv,
-    };
-  })
+  const holdingsByCompany = stocksWithHolders.map(s => ({
+    id: s.id,
+    name: s.name,
+    data: (s.holders || []).map(h => h.quantity),
+    labels: (s.holders || []).map(h => h.username),
+    total: s.held,
+    system: s.system_inventory || 0,
+    totalShares: s.total_shares || (s.held + (s.system_inventory || 0)),
+  }))
   const cashData = users.filter(u => u.cash > 0).map(u => u.cash)
   const cashLabels = users.filter(u => u.cash > 0).map(u => u.username)
   const earnedData = users.filter(u => u.total_earned > 0).map(u => u.total_earned)
@@ -1679,7 +1675,7 @@ function AdminPanel({ api }) {
           {holdingsByCompany.map(s => (
             <div key={s.name} style={{marginBottom: 12}}>
               <div className="flex justify-between items-center" style={{marginBottom:6}}>
-                <span className="text-dim text-sm" style={{fontWeight:600}}>{s.name}（流通 {s.total.toLocaleString()} 股 · 庫存 {s.system.toLocaleString()}）</span>
+                <span className="text-dim text-sm" style={{fontWeight:600}}>{s.name}（玩家持股 {s.total.toLocaleString()} · 流通 {(s.totalShares - s.system).toLocaleString()}）</span>
                 <button className="btn btn-sm" style={{fontSize:10, padding:'2px 8px'}} onClick={() => dilute(s.id, s.name)}>＋增資</button>
               </div>
               <PieChart data={s.data} labels={s.labels} colors={CHART_COLORS} size={170} />
