@@ -807,7 +807,7 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
       }
     }
     fetchKlines()
-    const id = setInterval(fetchKlines, 5000)
+    const id = setInterval(fetchKlines, 1000)
     return () => { clearInterval(id); seqRef.current++ }
   }, [timeframe, companyId])
 

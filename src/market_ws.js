@@ -1,5 +1,4 @@
-// Market WebSocket DO: 每 5 秒更新價格 + WS推送
-// K線由 cron 每分鐘處理
+// Market WebSocket DO: 每 1 秒 波動股價 + K線 + WS推送
 
 export class MarketWS {
   constructor(state, env) {
@@ -52,6 +51,8 @@ export class MarketWS {
       const ipoPhase = {};
       for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
 
+      const now = Date.now();
+      const block = Math.floor(now / 1000) * 1000;
       const stmts = [];
       const prices = {};
 
@@ -64,6 +65,7 @@ export class MarketWS {
         if (newPrice !== price) {
           stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, c.id));
         }
+        stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, newPrice, newPrice, newPrice, newPrice, block));
       }
 
       if (stmts.length > 0) {
@@ -92,7 +94,7 @@ export class MarketWS {
 
   async ensureAlarm() {
     if (!(await this.state.storage.getAlarm())) {
-      await this.state.storage.setAlarm(Date.now() + 5000);
+      await this.state.storage.setAlarm(Date.now() + 1000);
     }
   }
 }
