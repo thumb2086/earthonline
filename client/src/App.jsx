@@ -790,9 +790,11 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1, livePrice = nu
   const seqRef = useRef(0)
   const klineBufferRef = useRef([])
 
-  // 即時模式: 用 WS 價格合成 K 線
+  // 即時模式: 用 API 輪詢價格合成 K 線
   useEffect(() => {
-    if (timeframe !== 'realtime' || !livePrice) return
+    if (timeframe !== 'realtime') return
+    setLoaded(true)
+    if (!livePrice) return
     const now = Date.now()
     const interval = 5000
     const block = Math.floor(now / interval) * interval
