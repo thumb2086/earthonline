@@ -344,7 +344,8 @@ export async function handleStock(env, request, path, user) {
 
     // 熔斷檢查
     if (checkCircuitBreak(companyId)) return { error: '⚠️ 該股已觸發熔斷，暫停交易 1 分鐘' };
-    if (impact >= CIRCUIT_BREAK_THRESHOLD) triggerCircuitBreak(companyId);
+    const limitHit = impact >= CIRCUIT_BREAK_THRESHOLD;
+    if (limitHit) triggerCircuitBreak(companyId);
     // 影響價結算: 以影響後價格計價 (大賣不再白嫖價格波動)
     const totalRevenue = newPrice * quantity;
     const fee = Math.floor(totalRevenue * FEE_RATE);
