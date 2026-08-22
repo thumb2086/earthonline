@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
-// 即時股價 hook: 從 API 輪詢股價 (不依賴 WS)
-export default function useMarketStream(_unused) {
+// 即時股價 hook: 從 API 輪詢股價
+export default function useMarketStream(_unused, api) {
   const [prices, setPrices] = useState({});
   const [connected, setConnected] = useState(true);
 
   useEffect(() => {
     let alive = true;
     const fetchPrices = () => {
-      fetch('/api/stock/index').then(r => r.json()).then(d => {
+      if (!api) return;
+      api('/api/stock/index').then(d => {
         if (!alive) return;
         if (d && d.stocks) {
           const p = {};
@@ -20,7 +21,7 @@ export default function useMarketStream(_unused) {
     fetchPrices();
     const id = setInterval(fetchPrices, 2000);
     return () => { alive = false; clearInterval(id); };
-  }, []);
+  }, [api]);
 
   return { prices, connected };
 }

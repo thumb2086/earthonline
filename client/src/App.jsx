@@ -1117,7 +1117,7 @@ function Stock({ api, toast, prompt, user }) {
 
   // 即時股價 WebSocket
   const wsUrl = typeof window !== 'undefined' ? `wss://${window.location.host}/ws/market/subscribe` : null
-  const { prices: livePrices, connected: wsConnected } = useMarketStream(wsUrl)
+  const { prices: livePrices, connected: wsConnected } = useMarketStream(null, api)
 
   // 即時更新股價到 stockList (不用等 5 秒 polling)
   useEffect(() => {
