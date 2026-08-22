@@ -790,6 +790,7 @@ export async function matchLimitOrders(db) {
 
       const price = companies[o.company_id]?.share_price;
       if (!price) continue;
+      // 買: 現價 ≤ 掛單價; 賣: 現價 ≥ 掛單價
       if (o.type === 'buy' && price > o.price) continue;
       if (o.type === 'sell' && price < o.price) continue;
 
@@ -802,8 +803,10 @@ export async function matchLimitOrders(db) {
 
       const walletCash = walletMap[o.user_id]?.cash ?? 0;
 
-      // 掛單成交價 = 限價 × 權重 + 市價 × 權重 (偏離越大越用市價)
-      const fillPrice = getLimitFillPrice(o.price, price, o.type);
+      // 掛單成交價: 買不超過掛單價, 賣不低於掛單價
+      let fillPrice = getLimitFillPrice(o.price, price, o.type);
+      if (o.type === 'buy') fillPrice = Math.min(fillPrice, o.price);
+      else fillPrice = Math.max(fillPrice, o.price);
 
       let ok = false;
 

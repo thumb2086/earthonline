@@ -649,22 +649,16 @@ async function processPriceWave(db) {
   const companies = await db.prepare('SELECT id, name, share_price, total_shares, issue_cap FROM companies').all();
   if (companies.results.length === 0) return;
   const now = Date.now();
-  const interval = 5000;
+  const minute = Math.floor(now / 60000) * 60000;
 
-  const [ipoRes, invRes, klineRes] = await db.batch([
+  const [ipoRes, invRes] = await db.batch([
     db.prepare("SELECT company_id, phase FROM ipo_state"),
     db.prepare('SELECT company_id, stock_quantity FROM stock_inventory'),
-    db.prepare('SELECT company_id, close, minute FROM stock_klines WHERE minute > ? ORDER BY company_id, minute DESC').bind(now - 3600000),
   ]);
   const ipoPhase = {};
   for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
   const invQty = {};
   for (const r of invRes.results) invQty[r.company_id] = r.stock_quantity;
-  const klinesByCompany = {};
-  for (const r of klineRes.results) {
-    if (!klinesByCompany[r.company_id]) klinesByCompany[r.company_id] = [];
-    klinesByCompany[r.company_id].push(r);
-  }
 
   const allStmts = [];
   const announcements = [];
@@ -686,25 +680,9 @@ async function processPriceWave(db) {
       }
     }
 
-    const klines = klinesByCompany[c.id] || [];
-    const closes = klines.map(k => k.close);
-    const basePrice = closes.length > 0 ? closes.reduce((s, v) => s + v, 0) / closes.length : (c.share_price || 100);
-    let price = c.share_price || basePrice;
-
-    const lastKlineTime = klines.length > 0 ? klines[0].minute : (Math.floor(now / interval) * interval - interval);
-    const stepsNeeded = Math.min(Math.floor((now - lastKlineTime) / interval), 12);
-
-    for (let step = 0; step <= stepsNeeded; step++) {
-      const blockTime = step < stepsNeeded ? (lastKlineTime + (step + 1) * interval) : (Math.floor(now / interval) * interval);
-      if (blockTime > now) break;
-      const deviation = basePrice > 0 ? (price - basePrice) / basePrice : 0;
-      const drift = (Math.random() * 2 - 1) * 0.015;
-      const revert = -deviation * 0.005;
-      const newPrice = Math.max(1, Math.round(price * (1 + drift + revert)));
-      allStmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, Math.max(price, newPrice), Math.min(price, newPrice), newPrice, blockTime));
-      price = newPrice;
-    }
-    allStmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(price, c.id));
+    const price = c.share_price || 100;
+    // 每分鐘一根K線: open=close=現價, volume=0 (無交易)
+    allStmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, price, price, price, minute));
   }
 
   for (const msg of announcements) {

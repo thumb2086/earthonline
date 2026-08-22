@@ -1404,7 +1404,7 @@ function Stock({ api, toast, prompt, user }) {
             <div style={{fontWeight:600, fontSize:13, marginBottom:8}}>📊 最近成交</div>
             {(t || []).slice(0,8).map(x => (
               <div key={x.id} style={{display:'flex', justifyContent:'space-between', padding:'3px 0', borderTop:'1px solid var(--border)', fontSize:12}}>
-                <span><span style={{color: x.type === 'buy' ? 'var(--accent)' : 'var(--danger)'}}>{x.type === 'buy' ? '▲' : '▼'}</span> ${x.price}</span>
+                <span><span style={{color: x.type === 'buy' ? 'var(--danger)' : 'var(--accent)'}}>{x.type === 'buy' ? '▲' : '▼'}</span> ${x.price}</span>
                 <span>{x.quantity} 股</span>
               </div>
             ))}
