@@ -1283,7 +1283,7 @@ function Stock({ api, toast, prompt, user }) {
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
               <div>
                 <div style={{fontSize:28, fontWeight:700}}>${q.price}</div>
-                {q.limit && <span style={{fontSize:11, color: q.limit === 'up' ? '#ef4444' : '#00ff41', fontWeight:600}}>⚠️ {q.limit === 'up' ? '漲停' : '跌停'}</span>}
+                {q.limit && <span style={{fontSize:11, color: q.limit === 'circuit_break' ? '#f59e0b' : q.limit === 'up' ? '#ef4444' : '#00ff41', fontWeight:600}}>⚠️ {q.limit === 'circuit_break' ? '熔斷暫停' : q.limit === 'up' ? '漲停' : '跌停'}</span>}
               </div>
               <div style={{textAlign:'right'}}>
                 <div className="text-dim text-sm">流通 {(q.circulating||0).toLocaleString()}</div>
@@ -1291,10 +1291,10 @@ function Stock({ api, toast, prompt, user }) {
               </div>
             </div>
             <div style={{display:'flex', gap:6, marginTop:10}}>
-              <button className="btn btn-primary btn-sm" onClick={buy} disabled={q.limit === 'up'} style={{flex:1, ...(q.limit === 'up' ? {opacity:0.5} : {})}}>買入</button>
-              <button className="btn btn-sm" onClick={sell} disabled={q.limit === 'down'} style={{flex:1, ...(q.limit === 'down' ? {opacity:0.5} : {})}}>賣出</button>
-              <button className="btn btn-sm" onClick={maxBuy} disabled={q.limit === 'up'} style={{fontSize:10, ...(q.limit === 'up' ? {opacity:0.5} : {})}}>全買</button>
-              <button className="btn btn-sm" onClick={maxSell} disabled={q.limit === 'down'} style={{fontSize:10, ...(q.limit === 'down' ? {opacity:0.5} : {})}}>全賣</button>
+              <button className="btn btn-primary btn-sm" onClick={buy} disabled={q.limit === 'up' || q.limit === 'circuit_break'} style={{flex:1, ...((q.limit === 'up' || q.limit === 'circuit_break') ? {opacity:0.5} : {})}}>買入</button>
+              <button className="btn btn-sm" onClick={sell} disabled={q.limit === 'down' || q.limit === 'circuit_break'} style={{flex:1, ...((q.limit === 'down' || q.limit === 'circuit_break') ? {opacity:0.5} : {})}}>賣出</button>
+              <button className="btn btn-sm" onClick={maxBuy} disabled={q.limit === 'up' || q.limit === 'circuit_break'} style={{fontSize:10, ...((q.limit === 'up' || q.limit === 'circuit_break') ? {opacity:0.5} : {})}}>全買</button>
+              <button className="btn btn-sm" onClick={maxSell} disabled={q.limit === 'down' || q.limit === 'circuit_break'} style={{fontSize:10, ...((q.limit === 'down' || q.limit === 'circuit_break') ? {opacity:0.5} : {})}}>全賣</button>
             </div>
           </div>
           <div className="card" style={{marginTop:12}}>
@@ -1306,8 +1306,8 @@ function Stock({ api, toast, prompt, user }) {
                 ))}
               </div>
             </div>
-            {limitInfo && <div style={{padding:'8px 10px', borderRadius:6, marginBottom:8, fontWeight:600, fontSize:12, background: limitInfo.side === 'up' ? 'rgba(239,68,68,0.12)' : 'rgba(0,255,65,0.12)', border:`1px solid ${limitInfo.side === 'up' ? 'rgba(239,68,68,0.3)' : 'rgba(0,255,65,0.3)'}`, color: limitInfo.side === 'up' ? '#ef4444' : '#00ff41', display:'flex', justifyContent:'space-between'}}>
-              <span>⚠️ {limitInfo.side === 'up' ? '漲停' : '跌停'}</span>
+            {limitInfo && <div style={{padding:'8px 10px', borderRadius:6, marginBottom:8, fontWeight:600, fontSize:12, background: limitInfo.side === 'up' ? 'rgba(239,68,68,0.12)' : limitInfo.side === 'circuit_break' ? 'rgba(245,158,11,0.12)' : 'rgba(0,255,65,0.12)', border:`1px solid ${limitInfo.side === 'up' ? 'rgba(239,68,68,0.3)' : limitInfo.side === 'circuit_break' ? 'rgba(245,158,11,0.3)' : 'rgba(0,255,65,0.3)'}`, color: limitInfo.side === 'up' ? '#ef4444' : limitInfo.side === 'circuit_break' ? '#f59e0b' : '#00ff41', display:'flex', justifyContent:'space-between'}}>
+              <span>⚠️ {limitInfo.side === 'up' ? '漲停' : limitInfo.side === 'circuit_break' ? '熔斷暫停' : '跌停'}</span>
               <span>{Math.max(0, Math.ceil(60 - (Date.now() - limitInfo.at) / 1000))}s</span>
             </div>}
             <KLineChart api={api} timeframe={chartTimeframe} companyId={selectedStock} />

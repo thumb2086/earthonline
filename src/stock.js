@@ -923,10 +923,14 @@ export async function handleStockDashboard(db, user, companyId) {
       const circulating = heldRes?.held || 0;
       const maxTrade = getMaxTrade(circulating, inv?.stock_quantity || 0, Math.floor((company?.total_shares || 0) * 0.03));
       let limit = null;
-      const refTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, Date.now() - 60000).first();
-      if (refTrade) {
-        if (price >= Math.ceil(refTrade.price * 1.2)) limit = 'up';
-        else if (price <= Math.floor(refTrade.price * 0.8)) limit = 'down';
+      if (checkCircuitBreak(companyId)) {
+        limit = 'circuit_break';
+      } else {
+        const refTrade = await db.prepare('SELECT price FROM stock_trades WHERE company_id = ? AND traded_at >= ? ORDER BY traded_at ASC LIMIT 1').bind(companyId, Date.now() - 60000).first();
+        if (refTrade) {
+          if (price >= Math.ceil(refTrade.price * 1.15)) limit = 'up';
+          else if (price <= Math.floor(refTrade.price * 0.85)) limit = 'down';
+        }
       }
       return { price, code: company?.code, companyName: company?.name, systemInventory: inv?.stock_quantity || 0, circulating, maxTrade, limit, minInventory: Math.floor((company?.total_shares || 0) * 0.03) };
     })(),
