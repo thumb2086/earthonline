@@ -538,8 +538,10 @@ export default {
     try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
     try { await processMiningTick(db, hourlyLogger); } catch (err) { console.error('Scheduled mining error:', err.message); }
 
-    // 股價波動已改由 MarketWS DO alarm 每 5 秒處理
-    // cron 每分鐘確保 DO alarm 持續運作
+    // K線生成: cron每分鐘
+    try { await processPriceWave(db); } catch (err) { console.error('Scheduled wave error:', err.message); }
+
+    // cron每分鐘確保 DO alarm 持續運作
     if (env.MARKET_WS) {
       try {
         const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
@@ -641,6 +643,79 @@ export default {
     try { await hourlyLogger.flush(); } catch (err) { console.error('Scheduled hourly log flush error:', err.message); }
   },
 };
+
+// K線生成: cron每分鐘, ±1.5% + 回歸力
+async function processPriceWave(db) {
+  const companies = await db.prepare('SELECT id, name, share_price, total_shares, issue_cap FROM companies').all();
+  if (companies.results.length === 0) return;
+  const now = Date.now();
+  const interval = 5000;
+
+  const [ipoRes, invRes, klineRes] = await db.batch([
+    db.prepare("SELECT company_id, phase FROM ipo_state"),
+    db.prepare('SELECT company_id, stock_quantity FROM stock_inventory'),
+    db.prepare('SELECT company_id, close, minute FROM stock_klines WHERE minute > ? ORDER BY company_id, minute DESC').bind(now - 3600000),
+  ]);
+  const ipoPhase = {};
+  for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
+  const invQty = {};
+  for (const r of invRes.results) invQty[r.company_id] = r.stock_quantity;
+  const klinesByCompany = {};
+  for (const r of klineRes.results) {
+    if (!klinesByCompany[r.company_id]) klinesByCompany[r.company_id] = [];
+    klinesByCompany[r.company_id].push(r);
+  }
+
+  const allStmts = [];
+  const announcements = [];
+
+  for (const c of companies.results) {
+    if (ipoPhase[c.id] !== 'trading') continue;
+
+    const stockQty = invQty[c.id];
+    const issueCap = c.issue_cap || (c.total_shares * 2);
+    if (stockQty !== undefined) {
+      const floor = Math.floor(c.total_shares * 0.1);
+      if (stockQty < floor && c.total_shares < issueCap) {
+        const topUp = Math.min(Math.floor(c.total_shares * 0.2) - stockQty, issueCap - c.total_shares);
+        if (topUp > 0) {
+          allStmts.push(db.prepare('UPDATE companies SET total_shares = total_shares + ? WHERE id = ?').bind(topUp, c.id));
+          allStmts.push(db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(topUp, c.id));
+          announcements.push(`${c.name} 庫存不足，系統限量回補 ${topUp.toLocaleString()} 股（發行上限內）`);
+        }
+      }
+    }
+
+    const klines = klinesByCompany[c.id] || [];
+    const closes = klines.map(k => k.close);
+    const basePrice = closes.length > 0 ? closes.reduce((s, v) => s + v, 0) / closes.length : (c.share_price || 100);
+    let price = c.share_price || basePrice;
+
+    const lastKlineTime = klines.length > 0 ? klines[0].minute : (Math.floor(now / interval) * interval - interval);
+    const stepsNeeded = Math.min(Math.floor((now - lastKlineTime) / interval), 12);
+
+    for (let step = 0; step <= stepsNeeded; step++) {
+      const blockTime = step < stepsNeeded ? (lastKlineTime + (step + 1) * interval) : (Math.floor(now / interval) * interval);
+      if (blockTime > now) break;
+      const deviation = basePrice > 0 ? (price - basePrice) / basePrice : 0;
+      const drift = (Math.random() * 2 - 1) * 0.015;
+      const revert = -deviation * 0.005;
+      const newPrice = Math.max(1, Math.round(price * (1 + drift + revert)));
+      allStmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, Math.max(price, newPrice), Math.min(price, newPrice), newPrice, blockTime));
+      price = newPrice;
+    }
+    allStmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(price, c.id));
+  }
+
+  for (const msg of announcements) {
+    allStmts.push(db.prepare('INSERT INTO community_announcements (message, created_at) VALUES (?, ?)').bind(msg, now));
+  }
+  if (allStmts.length > 0) {
+    for (let i = 0; i < allStmts.length; i += 50) {
+      try { await db.batch(allStmts.slice(i, i + 50)); } catch (e) {}
+    }
+  }
+}
 
 export { DiscordGateway, MarketWS };
 

@@ -1,4 +1,4 @@
-// Market WebSocket DO: 每 5 秒波動股價 + 生成K線 + 推送給所有連線玩家
+// Market WebSocket DO: 每 5 秒波動股價 + 條件式K線 + 推送
 
 export class MarketWS {
   constructor(state, env) {
@@ -61,34 +61,21 @@ export class MarketWS {
       const stmts = [];
       const prices = {};
 
-      // K線 interval = 5秒
-      const interval = 5000;
-      const now = Date.now();
-      const blockMinute = Math.floor(now / interval) * interval;
-
       for (const c of companies.results) {
         if (ipoPhase[c.id] !== 'trading') { prices[c.id] = c.share_price; continue; }
         const price = c.share_price || 100;
         const drift = (Math.random() * 2 - 1) * 0.015;
         const newPrice = Math.max(1, Math.round(price * (1 + drift)));
         prices[c.id] = newPrice;
-
         if (newPrice !== price) {
           stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, c.id));
         }
-
-        // K線合併: 同一 blockMinute 內合併
-        const existing = await db.prepare('SELECT id, open, high, low, close, volume FROM stock_klines WHERE company_id = ? AND minute = ?').bind(c.id, blockMinute).first();
-        if (existing) {
-          stmts.push(db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ?, volume = volume + 1 WHERE id = ?').bind(newPrice, newPrice, newPrice, existing.id));
-        } else {
-          stmts.push(db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 1, ?)').bind(c.id, newPrice, newPrice, newPrice, newPrice, blockMinute));
-        }
       }
 
-      if (stmts.length > 0) {
-        for (let i = 0; i < stmts.length; i += 50) {
-          try { await db.batch(stmts.slice(i, i + 50)); } catch {}
+      const allStmts = stmts;
+      if (allStmts.length > 0) {
+        for (let i = 0; i < allStmts.length; i += 50) {
+          try { await db.batch(allStmts.slice(i, i + 50)); } catch {}
         }
       }
 
