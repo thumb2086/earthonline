@@ -4,12 +4,12 @@ const LAUNCH_DURATION_MS = 72 * 3600 * 1000;
 
 export async function getLaunchEventStatus(db) {
   const startRow = await db.prepare("SELECT value FROM game_meta WHERE key = 'launch_event_start'").first();
-  const doubleRow = await db.prepare("SELECT value FROM game_meta WHERE key = 'launch_double_income'").first();
   const start = parseInt(startRow?.value || '0');
-  const doubleActive = doubleRow?.value === '1';
   const now = Date.now();
   const active = start > 0 && (now - start) < LAUNCH_DURATION_MS;
   const endsAt = active ? start + LAUNCH_DURATION_MS : 0;
+  // doubleActive 只在活動期間內才生效
+  const doubleActive = active ? true : false;
   return { active, doubleActive, start, endsAt, remainingMs: active ? endsAt - now : 0 };
 }
 

@@ -47,7 +47,8 @@ export default function LaunchPage({ api, user, onNavigate }) {
         )}
       </div>
 
-      {/* Bitcoin */}
+      {/* Bitcoin - 活動結束且未領取則不顯示 */}
+      {(launch?.active || btc?.claimed) && (
       <div className="card mb-12" style={{
         borderLeft:'3px solid #f7931a',
         background: btc?.claimed ? 'rgba(247,147,26,0.05)' : 'linear-gradient(135deg, rgba(247,147,26,0.12), rgba(247,147,26,0.03))',
@@ -63,18 +64,19 @@ export default function LaunchPage({ api, user, onNavigate }) {
               }
             </div>
           </div>
-          {!btc?.claimed ? (
+          {!btc?.claimed && launch?.active ? (
             <button className="btn btn-primary" onClick={claimBtc} disabled={claiming}
               style={{background:'#f7931a', borderColor:'#f7931a', fontWeight:700}}>
               {claiming ? '領取中...' : '領取 1 BTC'}
             </button>
-          ) : (
+          ) : btc?.claimed ? (
             <div style={{padding:'6px 12px', borderRadius:8, background:'rgba(247,147,26,0.15)', color:'#f7931a', fontWeight:600, fontSize:13}}>
               ✓ 已領取
             </div>
-          )}
+          ) : null}
         </div>
       </div>
+      )}
 
       {/* Launch Benefits */}
       <div className="card mb-12">
