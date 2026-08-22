@@ -644,22 +644,43 @@ export default {
   },
 };
 
-// K線生成: cron每分鐘, 每公司一根
+// K線生成: cron每分鐘, 補齊5秒K線
 async function processPriceWave(db) {
   const companies = await db.prepare('SELECT id, name, share_price, total_shares, issue_cap FROM companies').all();
   if (companies.results.length === 0) return;
   const now = Date.now();
-  const minute = Math.floor(now / 60000) * 60000;
+  const interval = 5000;
 
   const ipoRes = await db.prepare("SELECT company_id, phase FROM ipo_state").all();
   const ipoPhase = {};
   for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
 
+  // 預載最近K線
+  const klineRes = await db.prepare('SELECT company_id, minute FROM stock_klines WHERE minute > ? ORDER BY company_id, minute DESC').bind(now - 3600000).all();
+  const klinesByCompany = {};
+  for (const r of klineRes.results) {
+    if (!klinesByCompany[r.company_id]) klinesByCompany[r.company_id] = [];
+    klinesByCompany[r.company_id].push(r);
+  }
+
   const stmts = [];
   for (const c of companies.results) {
     if (ipoPhase[c.id] !== 'trading') continue;
     const price = c.share_price || 100;
-    stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, price, price, price, minute));
+
+    const klines = klinesByCompany[c.id] || [];
+    const lastKlineTime = klines.length > 0 ? klines[0].minute : (Math.floor(now / interval) * interval - interval);
+    const stepsNeeded = Math.min(Math.floor((now - lastKlineTime) / interval), 12);
+
+    let p = price;
+    for (let step = 0; step <= stepsNeeded; step++) {
+      const blockTime = step < stepsNeeded ? (lastKlineTime + (step + 1) * interval) : (Math.floor(now / interval) * interval);
+      if (blockTime > now) break;
+      const drift = (Math.random() * 2 - 1) * 0.015;
+      p = Math.max(1, Math.round(p * (1 + drift)));
+      stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, p, p, p, p, blockTime));
+    }
+    stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(p, c.id));
   }
   if (stmts.length > 0) {
     for (let i = 0; i < stmts.length; i += 50) {
