@@ -205,16 +205,17 @@ export async function handleStock(env, request, path, user) {
   if (path === '/api/stock/klines') {
     const reqUrl = new URL(request.url);
     const companyId = parseInt(reqUrl.searchParams.get('companyId') || '1');
-    const now = Date.now();
-    const interval = 5000;
-    const block = Math.floor(now / interval) * interval;
-    const lastPrice = await getCurrentPrice(db, companyId);
-    // 即時建立當前K線block + 更新OHLC
-    try {
-      await db.prepare('INSERT OR IGNORE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(companyId, lastPrice, lastPrice, lastPrice, lastPrice, block).run();
-      await db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ? WHERE company_id = ? AND minute = ?').bind(lastPrice, lastPrice, lastPrice, companyId, block).run();
-    } catch {}
     const klines = await db.prepare('SELECT * FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(companyId).all();
+    // 同步最新一根 close = 市價
+    if (klines.results.length > 0) {
+      const lastPrice = await getCurrentPrice(db, companyId);
+      const last = klines.results[0];
+      if (last.close !== lastPrice) {
+        last.close = lastPrice;
+        last.high = Math.max(last.high, lastPrice);
+        last.low = Math.min(last.low, lastPrice);
+      }
+    }
     return klines.results;
   }
 
