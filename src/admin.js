@@ -541,5 +541,42 @@ export async function handleAdmin(env, request, path, user) {
     return { request: JSON.parse(existing.value || '{}') };
   }
 
+  // ===== 維護模式管理 =====
+
+  if (path === '/api/admin/maintenance/toggle' && request.method === 'POST') {
+    const current = await db.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_mode'").first();
+    const newMode = current?.value === '1' ? '0' : '1';
+    await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('maintenance_mode', ?)").bind(newMode).run();
+    return { success: true, full: newMode === '1' };
+  }
+
+  if (path === '/api/admin/maintenance/page' && request.method === 'POST') {
+    const { page, enabled } = await request.json();
+    if (!page) return { error: '缺少頁面 ID' };
+    const row = await db.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_pages'").first();
+    const pages = JSON.parse(row?.value || '[]');
+    if (enabled && !pages.includes(page)) pages.push(page);
+    if (!enabled) {
+      const idx = pages.indexOf(page);
+      if (idx >= 0) pages.splice(idx, 1);
+    }
+    await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('maintenance_pages', ?)").bind(JSON.stringify(pages)).run();
+    return { success: true, pages };
+  }
+
+  if (path === '/api/admin/maintenance/message' && request.method === 'POST') {
+    const { message } = await request.json();
+    if (!message) return { error: '缺少訊息' };
+    await db.prepare("INSERT OR REPLACE INTO game_meta (key, value) VALUES ('maintenance_message', ?)").bind(message).run();
+    return { success: true };
+  }
+
+  if (path === '/api/admin/maintenance/status') {
+    const mode = await db.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_mode'").first();
+    const pages = await db.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_pages'").first();
+    const message = await db.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_message'").first();
+    return { full: mode?.value === '1', pages: JSON.parse(pages?.value || '[]'), message: message?.value || '系統維護中，請稍後再試。' };
+  }
+
   return null;
 }

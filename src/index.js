@@ -208,6 +208,13 @@ export default {
 
       if (path === '/api/health') return json({ status: 'ok', timestamp: Date.now() }, headers);
 
+      if (path === '/api/maintenance' && request.method === 'GET') {
+        const mode = await env.DB.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_mode'").first();
+        const pages = await env.DB.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_pages'").first();
+        const message = await env.DB.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_message'").first();
+        return json({ full: mode?.value === '1', pages: JSON.parse(pages?.value || '[]'), message: message?.value || '系統維護中，請稍後再試。' }, headers);
+      }
+
       if (path === '/api/auth/discord' && request.method === 'GET') {
         const state = await createOAuthState(env.DB, 'discord');
         const redirectUri = (env.FRONTEND_URL || `${url.origin}`) + CALLBACK_PATH;
@@ -358,6 +365,14 @@ export default {
       if (!user) return json({ error: 'Unauthorized' }, headers, 401);
       const banned = await env.DB.prepare('SELECT reason FROM blacklist WHERE user_id = ?').bind(user.id).first();
       if (banned) return json({ error: `帳號已被停權：${banned.reason}` }, headers, 403);
+      // 全站維護模式: 非 admin 用戶回 503
+      const maintenanceMode = await env.DB.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_mode'").first();
+      const maintenancePages = await env.DB.prepare("SELECT value FROM game_meta WHERE key = 'maintenance_pages'").first();
+      const maintPages = JSON.parse(maintenancePages?.value || '[]');
+      const userIsAdmin = user.role === 'admin';
+      if (maintenanceMode?.value === '1' && !userIsAdmin && !path.startsWith('/api/admin')) {
+        return json({ error: '系統維護中，請稍後再試。', maintenance: { full: true } }, headers, 503);
+      }
       if (!checkRateLimit(`user:${user.id}`, 300)) return json({ error: '請求過於頻繁，請稍後再試' }, headers, 429);
       // Track last active (每 60 秒才寫一次，省 DB 寫入)
       const lastActiveKey = `la:${user.id}`;

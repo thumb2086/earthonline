@@ -21,6 +21,7 @@ export default function App() {
   const [rev, setRev] = useState(0)
   const [notifs, setNotifs] = useState({ items: [], unread: 0 })
   const [notifOpen, setNotifOpen] = useState(false)
+  const [maintenance, setMaintenance] = useState({ full: false, pages: [], message: '系統維護中' })
   const { toast, prompt, promptMulti } = useToast()
 
   useEffect(() => {
@@ -48,6 +49,13 @@ export default function App() {
       .then(d => setUser(d))
       .catch(() => {})
   }, [token, rev])
+
+  useEffect(() => {
+    if (!token) return
+    fetch('/api/maintenance').then(r => r.json()).then(d => setMaintenance(d)).catch(() => {})
+    const id = setInterval(() => fetch('/api/maintenance').then(r => r.json()).then(d => setMaintenance(d)).catch(() => {}), 10000)
+    return () => clearInterval(id)
+  }, [token])
 
   useEffect(() => {
     if (!token) return
@@ -93,6 +101,19 @@ export default function App() {
   }
 
   if (!token) return <><LoginGateway onLogin={handleLogin} /><Watermark /></>
+
+  // 全站維護: 管理員仍可操作
+  if (maintenance.full && user?.role !== 'admin') {
+    return (
+      <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',background:'#0a0a0f',color:'#fff',textAlign:'center',padding:40}}>
+        <div>
+          <div style={{fontSize:64,marginBottom:20}}>🔧</div>
+          <div style={{fontSize:24,fontWeight:700,marginBottom:12}}>系統維護中</div>
+          <div style={{fontSize:14,color:'#94a3b8',lineHeight:1.6}}>{maintenance.message}</div>
+        </div>
+      </div>
+    )
+  }
 
   const tabs = [
     { id: 'launch', label: '🚀 開服' },
@@ -168,6 +189,15 @@ export default function App() {
           ))}
         </div>
         <div className="content">
+          {maintenance.pages.includes(view) && user?.role !== 'admin' ? (
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',textAlign:'center',padding:40}}>
+              <div>
+                <div style={{fontSize:48,marginBottom:16}}>🔧</div>
+                <div style={{fontSize:18,fontWeight:700,marginBottom:8}}>此功能維護中</div>
+                <div style={{fontSize:13,color:'#94a3b8'}}>{maintenance.message}</div>
+              </div>
+            </div>
+          ) : (<>
           {view === 'dashboard' && <Dashboard user={user} api={api} toast={toast} />}
           {view === 'launch' && <LaunchPage api={api} user={user} onNavigate={setView} />}
           {view === 'income' && <Income api={api} toast={toast} />}
@@ -182,6 +212,7 @@ export default function App() {
           {view === 'leaderboard' && <Leaderboard api={api} />}
           {view === 'help' && <Help />}
           {view === 'admin' && <AdminPanel api={api} />}
+          </>)}
         </div>
       </div>
       <Watermark />
@@ -1517,6 +1548,7 @@ function AdminPanel({ api }) {
   const [resetReq, setResetReq] = useState(null)
   const [ipoSchedule, setIpoSchedule] = useState([])
   const [settleLog, setSettleLog] = useState([])
+  const [maintStatus, setMaintStatus] = useState({ full: false, pages: [], message: '系統維護中，請稍後再試。' })
   const loadAll = (ex) => {
     const q = ex ? '?exclude=' + encodeURIComponent(ex) : ''
     api('/api/admin/users' + q).then(d => setUsers(Array.isArray(d) ? d : []));
@@ -1528,6 +1560,7 @@ function AdminPanel({ api }) {
     api('/api/admin/announcements').then(d => setAnnouncements(Array.isArray(d) ? d : []));
     api('/api/admin/reset/status').then(d => setResetReq(d?.request || null));
     api('/api/admin/ipo/schedule').then(d => setIpoSchedule(Array.isArray(d) ? d : []));
+    api('/api/admin/maintenance/status').then(d => setMaintStatus(d || { full: false, pages: [], message: '系統維護中' }));
   }
   useEffect(() => { loadAll(exclude) }, [])
   useEffect(() => {
@@ -1581,8 +1614,50 @@ function AdminPanel({ api }) {
     g.data = Object.values(g.detail)
   })
 
+  const toggleFullMaint = async () => {
+    const r = await api('/api/admin/maintenance/toggle', { method: 'POST' });
+    if (r.success !== undefined) setMaintStatus(s => ({ ...s, full: r.full }));
+  }
+  const togglePageMaint = async (page) => {
+    const enabled = !maintStatus.pages.includes(page)
+    const r = await api('/api/admin/maintenance/page', { method: 'POST', page, enabled });
+    if (r.success) setMaintStatus(s => ({ ...s, pages: r.pages }));
+  }
+  const updateMaintMsg = async () => {
+    const msg = prompt('輸入維護訊息：', maintStatus.message)
+    if (!msg || msg === maintStatus.message) return
+    const r = await api('/api/admin/maintenance/message', { method: 'POST', message: msg });
+    if (r.success) setMaintStatus(s => ({ ...s, message: msg }));
+  }
+  const pageOptions = [
+    { id: 'trading', label: '📈 交易' }, { id: 'gaming', label: '🎰 娛樂' }, { id: 'casino', label: '🎲 賭場' },
+    { id: 'bank', label: '🏦 銀行' }, { id: 'invest', label: '💼 投資' }, { id: 'company', label: '🏢 公司' },
+    { id: 'income', label: '⬆️ 升級' }, { id: 'subscription', label: '📦 訂閱' }, { id: 'launch', label: '🚀 開服' },
+    { id: 'dashboard', label: '📊 儀表板' }, { id: 'leaderboard', label: '🏆 排行' },
+  ]
+
   return (
     <>
+      <div className="card mb-12" style={maintStatus.full ? { borderLeft: '3px solid #ef4444' } : {}}>
+        <div className="card-title" style={{margin:0}}>🔧 維護模式</div>
+        <div className="flex gap-8 items-center" style={{marginTop:8}}>
+          <button className="btn btn-sm" onClick={toggleFullMaint}
+            style={{background: maintStatus.full ? '#ef4444' : undefined, color: maintStatus.full ? '#fff' : undefined}}>
+            {maintStatus.full ? '🔴 全站維護中 — 點擊關閉' : '🟢 全站正常 — 點擊開啟維護'}
+          </button>
+          <button className="btn btn-sm" onClick={updateMaintMsg}>📝 維護訊息</button>
+        </div>
+        <div style={{marginTop:10, display:'flex', flexWrap:'wrap', gap:6}}>
+          {pageOptions.map(p => (
+            <button key={p.id} className="btn btn-sm" onClick={() => togglePageMaint(p.id)}
+              style={{fontSize:11, background: maintStatus.pages.includes(p.id) ? '#f59e0b' : undefined, color: maintStatus.pages.includes(p.id) ? '#000' : undefined}}>
+              {maintStatus.pages.includes(p.id) ? '🔧 ' : ''}{p.label}
+            </button>
+          ))}
+        </div>
+        {maintStatus.full && <div style={{marginTop:8, fontSize:11, color:'#ef4444', fontWeight:600}}>⚠️ 全站維護中，非管理員無法操作</div>}
+        {maintStatus.pages.length > 0 && <div style={{marginTop:4, fontSize:11, color:'#f59e0b'}}>維護中分頁：{maintStatus.pages.join(', ')}</div>}
+      </div>
       <div className="card mb-12">
         <div className="card-title" style={{margin:0}}>統計排除設定</div>
         <div className="text-dim text-sm mb-12">輸入要排除的用戶名（逗號分隔，例如：好吃的蛋包咖哩飯, duckkk），排除後所有統計/圖表/明細都會過濾</div>
