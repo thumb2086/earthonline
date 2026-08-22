@@ -857,10 +857,12 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
       const top = Math.min(yo, yc), bh = Math.max(Math.abs(yc - yo), 1)
       ctx.fillStyle = col
       ctx.fillRect(x - barW / 2, top, barW, bh)
-      // 成交量柱 (下方, 只在有成交量時畫)
+      // 成交量柱 (下方, 買=紅 賣=綠)
       if (k.volume > 0) {
         const vH = maxVol > 0 ? (k.volume / maxVol) * chVol : 0
-        ctx.fillStyle = up ? 'rgba(239,68,68,0.45)' : 'rgba(0,255,65,0.45)'
+        const buyV = k.buy_volume || 0
+        const sellV = k.sell_volume || 0
+        ctx.fillStyle = buyV >= sellV ? 'rgba(239,68,68,0.45)' : 'rgba(0,255,65,0.45)'
         ctx.fillRect(x - barW / 2, volTop + chVol - vH, barW, vH)
       }
     })

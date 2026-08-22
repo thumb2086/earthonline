@@ -90,8 +90,6 @@ export class MarketWS {
   }
 
   async ensureAlarm() {
-    if (!(await this.state.storage.getAlarm())) {
-      await this.state.storage.setAlarm(Date.now() + 1000);
-    }
+    await this.state.storage.setAlarm(Date.now() + 1000);
   }
 }
