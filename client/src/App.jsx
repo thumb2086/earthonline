@@ -812,26 +812,7 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1, livePrice = nu
     setLoaded(true)
   }, [livePrice, timeframe])
 
-  // 即時模式: 同時從 DB 補歷史K線 (每5秒)
-  useEffect(() => {
-    if (timeframe !== 'realtime') return
-    const seq = ++seqRef.current
-    const fetchHistory = () => {
-      api('/api/stock/klines?companyId=' + companyId).then(d => {
-        if (seq !== seqRef.current || !Array.isArray(d)) return
-        if (d.length > 0) {
-          klineBufferRef.current = [...d].reverse()
-          setKlines([...klineBufferRef.current.slice(-120)])
-          setLoaded(true)
-        }
-      }).catch(() => {})
-    }
-    fetchHistory()
-    const id = setInterval(fetchHistory, 5000)
-    return () => { clearInterval(id); seqRef.current++ }
-  }, [timeframe, companyId])
-
-  // 非即時模式: 從API抓聚合K線
+  // 即時模式: 非即時模式: 從API抓聚合K線
   useEffect(() => {
     if (timeframe === 'realtime') return
     setLoaded(false)

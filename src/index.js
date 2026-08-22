@@ -553,8 +553,7 @@ export default {
     try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
     try { await processMiningTick(db, hourlyLogger); } catch (err) { console.error('Scheduled mining error:', err.message); }
 
-    // K線補齊: cron每分鐘
-    try { await processKlineTick(db); } catch (err) { console.error('Scheduled kline error:', err.message); }
+
 
     // 掛單撮合: 每分鐘執行
     try {
@@ -650,47 +649,6 @@ export default {
     try { await hourlyLogger.flush(); } catch (err) { console.error('Scheduled hourly log flush error:', err.message); }
   },
 };
-
-// K線補齊: cron每分鐘, 每公司補最多12根5秒K線
-async function processKlineTick(db) {
-  const companies = await db.prepare('SELECT id, share_price FROM companies').all();
-  if (companies.results.length === 0) return;
-  const now = Date.now();
-  const interval = 5000;
-
-  const ipoRes = await db.prepare("SELECT company_id, phase FROM ipo_state").all();
-  const ipoPhase = {};
-  for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
-
-  const latestRes = await db.prepare('SELECT company_id, MAX(minute) as minute FROM stock_klines WHERE minute > ? GROUP BY company_id').bind(now - 3600000).all();
-  const latestByCompany = {};
-  for (const r of latestRes.results) latestByCompany[r.company_id] = r.minute;
-
-  const stmts = [];
-  for (const c of companies.results) {
-    if (ipoPhase[c.id] !== 'trading') continue;
-    const price = c.share_price || 100;
-    const lastMinute = latestByCompany[c.id] || (Math.floor(now / interval) * interval - 60000);
-    const steps = Math.min(Math.floor((now - lastMinute) / interval), 12);
-
-    for (let step = 1; step <= steps; step++) {
-      const block = lastMinute + step * interval;
-      if (block > now) break;
-      const drift1 = (Math.random() * 2 - 1) * 0.03;
-      const drift2 = (Math.random() * 2 - 1) * 0.03;
-      const open = Math.max(1, Math.round(price * (1 + drift1)));
-      const close = Math.max(1, Math.round(price * (1 + drift2)));
-      const high = Math.max(open, close, price);
-      const low = Math.min(open, close, price);
-      stmts.push(db.prepare('INSERT OR IGNORE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, open, high, low, close, block));
-    }
-  }
-  if (stmts.length > 0) {
-    for (let i = 0; i < stmts.length; i += 50) {
-      try { await db.batch(stmts.slice(i, i + 50)); } catch {}
-    }
-  }
-}
 
 export { DiscordGateway, MarketWS };
 
