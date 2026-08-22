@@ -783,7 +783,9 @@ export async function matchLimitOrders(db) {
       if (ipoPhase[o.company_id] !== 'trading') continue;
       if (checkCircuitBreak(o.company_id)) continue;
 
-      const price = companies[o.company_id]?.share_price;
+      // 即時讀取最新股價 (不從預載取, 避免错过DO波動)
+      const freshPrice = await db.prepare('SELECT share_price FROM companies WHERE id = ?').bind(o.company_id).first();
+      const price = freshPrice?.share_price;
       if (!price) continue;
       // 買: 現價 ≤ 掛單價; 賣: 現價 ≥ 掛單價
       if (o.type === 'buy' && price > o.price) continue;
