@@ -195,6 +195,11 @@ export async function handleStock(env, request, path, user) {
     return await computeMarketIndex(db);
   }
 
+  if (path === '/api/stock/prices') {
+    const rows = await db.prepare('SELECT id, share_price as price FROM companies').all();
+    return { stocks: rows.results || [] };
+  }
+
   if (path === '/api/stock/report') {
     const reqUrl = new URL(request.url);
     const companyId = parseInt(reqUrl.searchParams.get('companyId') || '0');

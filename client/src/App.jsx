@@ -789,30 +789,35 @@ function KLineChart({ api, timeframe = 'realtime', companyId = 1, livePrice = nu
   const canvasRef = useRef(null)
   const seqRef = useRef(0)
   const klineBufferRef = useRef([])
+  const livePricesRef = useRef(null)
 
-  // 即時模式: 用 API 輪詢價格合成 K 線
+  // 同步 livePrice 到 ref
+  useEffect(() => { livePricesRef.current = livePrice }, [livePrice])
+
+  // 即時模式: 每秒合成 K 線 (不依賴 livePrice 變化)
   useEffect(() => {
     if (timeframe !== 'realtime') return
     setLoaded(true)
-    if (!livePrice) return
-    const now = Date.now()
-    const interval = 5000
-    const block = Math.floor(now / interval) * interval
-    const buf = klineBufferRef.current
+    const id = setInterval(() => {
+      const price = livePricesRef.current
+      if (!price) return
+      const now = Date.now()
+      const interval = 5000
+      const block = Math.floor(now / interval) * interval
+      const buf = klineBufferRef.current
 
-    if (buf.length === 0 || buf[buf.length - 1].minute < block) {
-      // 新的5秒block
-      buf.push({ open: livePrice, high: livePrice, low: livePrice, close: livePrice, volume: 0, minute: block })
-    } else {
-      // 同一個block: 更新OHLC
-      const k = buf[buf.length - 1]
-      k.close = livePrice
-      k.high = Math.max(k.high, livePrice)
-      k.low = Math.min(k.low, livePrice)
-    }
-    setKlines([...buf.slice(-120)])
-    setLoaded(true)
-  }, [livePrice, timeframe])
+      if (buf.length === 0 || buf[buf.length - 1].minute < block) {
+        buf.push({ open: price, high: price, low: price, close: price, volume: 0, minute: block })
+      } else {
+        const k = buf[buf.length - 1]
+        k.close = price
+        k.high = Math.max(k.high, price)
+        k.low = Math.min(k.low, price)
+      }
+      setKlines([...buf.slice(-120)])
+    }, 1000)
+    return () => clearInterval(id)
+  }, [timeframe])
 
   // 即時模式: 非即時模式: 從API抓聚合K線
   useEffect(() => {

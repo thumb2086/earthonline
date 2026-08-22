@@ -9,7 +9,7 @@ export default function useMarketStream(_unused, api) {
     let alive = true;
     const fetchPrices = () => {
       if (!api) return;
-      api('/api/stock/index').then(d => {
+      api('/api/stock/prices').then(d => {
         if (!alive) return;
         if (d && d.stocks) {
           const p = {};
