@@ -209,17 +209,12 @@ export async function handleStock(env, request, path, user) {
     const interval = 1000;
     const block = Math.floor(now / interval) * interval;
     const lastPrice = await getCurrentPrice(db, companyId);
-    // 即時建立當前K線block (如果不存在)
+    // 即時建立當前K線block + 更新OHLC
     try {
       await db.prepare('INSERT OR IGNORE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(companyId, lastPrice, lastPrice, lastPrice, lastPrice, block).run();
+      await db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ? WHERE company_id = ? AND minute = ?').bind(lastPrice, lastPrice, lastPrice, companyId, block).run();
     } catch {}
     const klines = await db.prepare('SELECT * FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(companyId).all();
-    // 同步: 最新一根 K 線 close 強制等於市價 (避免報價與走勢圖不同步)
-    if (klines.results.length > 0 && klines.results[0].close !== lastPrice) {
-      klines.results[0].close = lastPrice;
-      klines.results[0].high = Math.max(klines.results[0].high, lastPrice);
-      klines.results[0].low = Math.min(klines.results[0].low, lastPrice);
-    }
     return klines.results;
   }
 
