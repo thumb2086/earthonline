@@ -696,20 +696,7 @@ async function processStockTick(db, doDividend = true, logger) {
 
     // 自動增資已移除: 系統庫存有限, 不再發新股稀釋現有股東 (庫存買完即停止賣出)
 
-    // 有交易才寫K線 (無交易的波動由 MarketWS DO alarm 每5秒處理)
-    const trades = await db.prepare('SELECT price, quantity, type FROM stock_trades WHERE company_id = ? AND traded_at >= ?').bind(company.id, block).all();
-    const companyData = await db.prepare('SELECT share_price FROM companies WHERE id = ?').bind(company.id).first();
-    const close = companyData?.share_price || 100;
-
-    if (trades.results.length > 0) {
-      const open = trades.results[0].price;
-      const high = Math.max(...trades.results.map(t => t.price));
-      const low = Math.min(...trades.results.map(t => t.price));
-      const volume = trades.results.reduce((s, t) => s + t.quantity, 0);
-      const buyVol = trades.results.filter(t => t.type === 'buy').reduce((s, t) => s + t.quantity, 0);
-      const sellVol = trades.results.filter(t => t.type === 'sell').reduce((s, t) => s + t.quantity, 0);
-      stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(company.id, open, high, low, close, volume, buyVol, sellVol, block));
-    }
+    // K線已由 updateKline 在每筆交易時寫入 (5秒interval)
 
     if (!doDividend) continue;
 

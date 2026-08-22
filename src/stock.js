@@ -209,12 +209,7 @@ export async function handleStock(env, request, path, user) {
     const interval = 5000;
     const block = Math.floor(now / interval) * interval;
     const lastPrice = await getCurrentPrice(db, companyId);
-    const existing = await db.prepare('SELECT id FROM stock_klines WHERE company_id = ? AND minute = ?').bind(companyId, block).first();
-    if (!existing) {
-      const prev = await db.prepare('SELECT close FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 1').bind(companyId).first();
-      const close = prev?.close || lastPrice;
-      try { await db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, minute) VALUES (?, ?, ?, ?, ?, 0, ?)').bind(companyId, close, close, close, close, block).run(); } catch (e) {}
-    }
+    // K線只在有交易時由 updateKline 寫入，不在這裡生成
     const klines = await db.prepare('SELECT * FROM stock_klines WHERE company_id = ? ORDER BY minute DESC LIMIT 120').bind(companyId).all();
     // 同步: 最新一根 K 線 close 強制等於市價 (避免報價與走勢圖不同步)
     if (klines.results.length > 0 && klines.results[0].close !== lastPrice) {
@@ -826,7 +821,8 @@ export async function matchLimitOrders(db) {
           stmts.push(db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(o.user_id, o.company_id, o.quantity));
         }
         stmts.push(db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(o.company_id, o.user_id, 'buy', fillPrice, o.quantity, now));
-        stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(o.company_id, fillPrice, fillPrice, fillPrice, fillPrice, o.quantity, o.quantity, 0, Math.floor(now / 60000) * 60000));
+        const buyBlock = Math.floor(now / 5000) * 5000;
+        stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(o.company_id, fillPrice, fillPrice, fillPrice, fillPrice, o.quantity, o.quantity, 0, buyBlock));
         stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(fillPrice, o.company_id));
         stmts.push(db.prepare("UPDATE stock_limit_orders SET status = 'filled', filled_quantity = ?, filled_at = ? WHERE id = ?").bind(o.quantity, now, o.id));
         holdingsMap[hKey] = newQty;
@@ -849,7 +845,8 @@ export async function matchLimitOrders(db) {
           holdingsMap[hKey] = held - o.quantity;
         }
         stmts.push(db.prepare('INSERT INTO stock_trades (company_id, user_id, type, price, quantity, traded_at) VALUES (?, ?, ?, ?, ?, ?)').bind(o.company_id, o.user_id, 'sell', fillPrice, o.quantity, now));
-        stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(o.company_id, fillPrice, fillPrice, fillPrice, fillPrice, o.quantity, 0, o.quantity, Math.floor(now / 60000) * 60000));
+        const sellBlock = Math.floor(now / 5000) * 5000;
+        stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(o.company_id, fillPrice, fillPrice, fillPrice, fillPrice, o.quantity, 0, o.quantity, sellBlock));
         stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(fillPrice, o.company_id));
         stmts.push(db.prepare("UPDATE stock_limit_orders SET status = 'filled', filled_quantity = ?, filled_at = ? WHERE id = ?").bind(o.quantity, now, o.id));
         ok = true;
