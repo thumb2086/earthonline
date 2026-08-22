@@ -575,14 +575,6 @@ export default {
             try { await db.batch(stmts.slice(i, i + 50)); } catch {}
           }
         }
-        if (env.MARKET_WS) {
-          ctx.waitUntil((async () => {
-            try {
-              const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
-              await stub.fetch('https://market/update', { method: 'POST', body: JSON.stringify({ type: 'prices', prices }), headers: { 'X-Cron-Secret': env.CRON_SECRET || '' } });
-            } catch {}
-          })());
-        }
       }
     } catch (err) { console.error('Scheduled price wave error:', err.message); }
 
