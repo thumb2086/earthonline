@@ -538,6 +538,9 @@ export default {
     try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
     try { await processMiningTick(db, hourlyLogger); } catch (err) { console.error('Scheduled mining error:', err.message); }
 
+    // K線生成: cron每分鐘
+    try { await processPriceWave(db); } catch (err) { console.error('Scheduled wave error:', err.message); }
+
     // cron每分鐘確保 DO alarm 持續運作
     if (env.MARKET_WS) {
       try {
@@ -640,6 +643,30 @@ export default {
     try { await hourlyLogger.flush(); } catch (err) { console.error('Scheduled hourly log flush error:', err.message); }
   },
 };
+
+// K線生成: cron每分鐘, 每公司一根
+async function processPriceWave(db) {
+  const companies = await db.prepare('SELECT id, name, share_price, total_shares, issue_cap FROM companies').all();
+  if (companies.results.length === 0) return;
+  const now = Date.now();
+  const minute = Math.floor(now / 60000) * 60000;
+
+  const ipoRes = await db.prepare("SELECT company_id, phase FROM ipo_state").all();
+  const ipoPhase = {};
+  for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
+
+  const stmts = [];
+  for (const c of companies.results) {
+    if (ipoPhase[c.id] !== 'trading') continue;
+    const price = c.share_price || 100;
+    stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, price, price, price, price, minute));
+  }
+  if (stmts.length > 0) {
+    for (let i = 0; i < stmts.length; i += 50) {
+      try { await db.batch(stmts.slice(i, i + 50)); } catch {}
+    }
+  }
+}
 
 export { DiscordGateway, MarketWS };
 

@@ -1,4 +1,5 @@
-// Market WebSocket DO: 每 1 秒波動股價 + K線 + 推送
+// Market WebSocket DO: 每 5 秒更新價格 + WS推送
+// K線由 cron 每分鐘處理
 
 export class MarketWS {
   constructor(state, env) {
@@ -33,13 +34,6 @@ export class MarketWS {
       return Response.json({ prices: prices || {}, ts: Date.now() });
     }
 
-    if (subPath === '/update' && request.method === 'POST') {
-      const data = await request.json();
-      this.broadcast(data);
-      if (data.type === 'prices') await this.state.storage.put('prices', data.prices);
-      return Response.json({ ok: true, clients: this.clients.size });
-    }
-
     if (subPath === '/init' && request.method === 'POST') {
       await this.ensureAlarm();
       return Response.json({ ok: true });
@@ -58,15 +52,6 @@ export class MarketWS {
       const ipoPhase = {};
       for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
 
-      const interval = 1000;
-      const now = Date.now();
-      const block = Math.floor(now / interval) * interval;
-
-      // 預載本秒所有K線（1次查詢）
-      const klineRes = await db.prepare('SELECT id, company_id FROM stock_klines WHERE minute = ?').bind(block).all();
-      const klineMap = {};
-      for (const r of klineRes.results) klineMap[r.company_id] = r.id;
-
       const stmts = [];
       const prices = {};
 
@@ -76,16 +61,8 @@ export class MarketWS {
         const drift = (Math.random() * 2 - 1) * 0.015;
         const newPrice = Math.max(1, Math.round(price * (1 + drift)));
         prices[c.id] = newPrice;
-
         if (newPrice !== price) {
           stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, c.id));
-        }
-
-        const kId = klineMap[c.id];
-        if (kId) {
-          stmts.push(db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ? WHERE id = ?').bind(newPrice, newPrice, newPrice, kId));
-        } else {
-          stmts.push(db.prepare('INSERT INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, newPrice, newPrice, newPrice, newPrice, block));
         }
       }
 
@@ -115,7 +92,7 @@ export class MarketWS {
 
   async ensureAlarm() {
     if (!(await this.state.storage.getAlarm())) {
-      await this.state.storage.setAlarm(Date.now() + 1000);
+      await this.state.storage.setAlarm(Date.now() + 5000);
     }
   }
 }
