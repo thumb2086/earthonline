@@ -466,9 +466,9 @@ export async function handleStock(env, request, path, user) {
     if (batchRes[0].meta.changes === 0) return { error: '餘額不足' };
 
     // 玩家公司 IPO: 錢給 owner; 系統公司: 錢銷毀(回收經濟)
-    if (owner && owner.owner_id > 0) {
-      await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(totalCost, totalCost, owner.owner_id).run();
-      await logTransaction(db, owner.owner_id, 'ipo_revenue', totalCost, `IPO募集 ${shares} 股 × $${company?.share_price || 100}`);
+    if (company && company.owner_id > 0) {
+      await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(totalCost, totalCost, company.owner_id).run();
+      await logTransaction(db, company.owner_id, 'ipo_revenue', totalCost, `IPO募集 ${shares} 股 × $${company?.share_price || 100}`);
     }
 
     await logTransaction(db, user.id, 'ipo_subscribe', -totalCost, `IPO認購 ${shares} 股 @ $${company?.share_price || 100}`);
@@ -519,12 +519,6 @@ export async function handleStock(env, request, path, user) {
         await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(marginAmount, user.id).run();
         return { error: '系統庫存不足' };
       }
-      const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(user.id, companyId).first();
-      if (holding) {
-        await db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(quantity, user.id, companyId).run();
-      } else {
-        await db.prepare('INSERT INTO stock_holdings (user_id, company_id, quantity) VALUES (?, ?, ?)').bind(user.id, companyId, quantity).run();
-      }
       const loanAmount = totalValue - marginAmount;
       await db.prepare('INSERT INTO margin_positions (user_id, company_id, type, quantity, entry_price, loan_amount, margin_amount, leverage, opened_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(user.id, companyId, 'long', quantity, newPrice, loanAmount, marginAmount, leverage, now).run();
 
@@ -559,7 +553,7 @@ export async function handleStock(env, request, path, user) {
     if (!pos) return { error: '倉位不存在' };
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
     if (!wallet || wallet.cash < amount) return { error: '現金不足' };
-    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(amount, user.id).run();
+    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ? AND cash >= ?').bind(amount, user.id, amount).run();
     await db.prepare('UPDATE margin_positions SET extra_margin = COALESCE(extra_margin, 0) + ?, margin_call_at = NULL WHERE id = ?').bind(amount, positionId).run();
     await logTransaction(db, user.id, 'margin_call', -amount, `補繳保證金 $${amount.toLocaleString()} 至倉位 #${positionId}`);
     const currentPrice = await getCurrentPrice(db, pos.company_id);
@@ -609,12 +603,6 @@ async function closePosition(db, pos) {
     const totalReturn = (sellValue - pos.loan_amount) + pos.margin_amount + (pos.extra_margin || 0) - pos.dividend_debt;
     const pnl = totalReturn - pos.margin_amount - (pos.extra_margin || 0);
     await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(Math.max(totalReturn, 0), pos.user_id).run();
-    const holding = await db.prepare('SELECT quantity FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(pos.user_id, pos.company_id).first();
-    if (holding && holding.quantity <= pos.quantity) {
-      await db.prepare('DELETE FROM stock_holdings WHERE user_id = ? AND company_id = ?').bind(pos.user_id, pos.company_id).run();
-    } else if (holding) {
-      await db.prepare('UPDATE stock_holdings SET quantity = quantity - ? WHERE user_id = ? AND company_id = ?').bind(pos.quantity, pos.user_id, pos.company_id).run();
-    }
     await db.prepare('UPDATE stock_inventory SET stock_quantity = stock_quantity + ? WHERE company_id = ?').bind(pos.quantity, pos.company_id).run();
     await logTransaction(db, pos.user_id, 'margin_close', Math.max(totalReturn, 0), `平倉做多 ${pos.quantity}股 @ $${closePrice}（損益 ${pnl >= 0 ? '+' : ''}${pnl.toLocaleString()}）`);
   } else {
@@ -814,7 +802,7 @@ export async function matchLimitOrders(db) {
         const hKey = `${o.user_id}_${o.company_id}`;
         const newQty = (holdingsMap[hKey] || 0) + o.quantity;
 
-        stmts.push(db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(cost + fee, o.user_id));
+        stmts.push(db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ? AND cash >= ?').bind(cost + fee, o.user_id, cost + fee));
         stmts.push(db.prepare('UPDATE stock_inventory SET cash = cash + ?, stock_quantity = stock_quantity - ? WHERE company_id = ?').bind(cost + fee, o.quantity, o.company_id));
         if (holdingsMap[hKey]) {
           stmts.push(db.prepare('UPDATE stock_holdings SET quantity = quantity + ? WHERE user_id = ? AND company_id = ?').bind(o.quantity, o.user_id, o.company_id));

@@ -58,6 +58,15 @@ export async function getLotteryStatus(db, userId) {
 
 export async function buyTicket(db, userId, numbers, isFree) {
   const round = await getCurrentRound(db);
+  if (Array.isArray(numbers)) {
+    if (numbers.length !== NUM_COUNT) return { error: `需選 ${NUM_COUNT} 個號碼` };
+    const seen = new Set();
+    for (const n of numbers) {
+      if (!Number.isInteger(n) || n < 1 || n > NUM_MAX) return { error: `號碼須為 1~${NUM_MAX} 的整數` };
+      if (seen.has(n)) return { error: '號碼不可重複' };
+      seen.add(n);
+    }
+  }
     if (isFree) {
     const today = todayUTC();
     const row = await db.prepare('SELECT * FROM lottery_daily WHERE user_id = ?').bind(userId).first();
@@ -71,7 +80,8 @@ export async function buyTicket(db, userId, numbers, isFree) {
   } else {
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(userId).first();
     if (!wallet || wallet.cash < COST_PER_TICKET) return { error: '餘額不足' };
-    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(COST_PER_TICKET, userId).run();
+    const deductRes = await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ? AND cash >= ?').bind(COST_PER_TICKET, userId, COST_PER_TICKET).run();
+    if (deductRes.meta.changes === 0) return { error: '餘額不足' };
     await logTransaction(db, userId, 'lottery_cost', -COST_PER_TICKET, '樂透購票');
   }
 
@@ -102,7 +112,7 @@ export async function drawLottery(db) {
   for (const ticket of tickets.results) {
     const matches = matchCount(ticket.numbers.split(',').map(Number), winning);
     const pct = PRIZE_TABLE[matches] || 0;
-    if (pct > 0) {
+    if (pct > 0 && ticket.cost > 0) {
       const prize = Math.floor(round.total_pool * pct / Math.max(1, tickets.results.filter(t => matchCount(t.numbers.split(',').map(Number), winning) === matches).length));
       await db.prepare('UPDATE lottery_tickets SET prize = ?, matches = ? WHERE id = ?').bind(prize, matches, ticket.id).run();
       await db.prepare('UPDATE wallets SET cash = cash + ?, total_earned = total_earned + ? WHERE user_id = ?').bind(prize, prize, ticket.user_id).run();

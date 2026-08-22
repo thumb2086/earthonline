@@ -357,6 +357,12 @@ export default {
 
       // Market WebSocket (不需要 auth, DO 自己處理)
       if (path.startsWith('/ws/market/')) {
+        if (request.method === 'POST' && path === '/ws/market/update') {
+          const secret = request.headers.get('X-Cron-Secret');
+          if (!env.CRON_SECRET || secret !== env.CRON_SECRET) {
+            return json({ error: 'Unauthorized' }, headers, 401);
+          }
+        }
         const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
         return stub.fetch(request);
       }
@@ -544,16 +550,50 @@ export default {
     const db = env.DB;
     const minute = Math.floor(Date.now() / 60000);
 
-    // 核心 tick: 每分鐘必跑 (income/扣費/投資利息) — 各自獨立容錯
-    // 共用批次 logger: 1次預載 + 記憶體累加 + 最後1次 batch 寫入 (取代逐用戶 logHourly)
+    // 1. 價格波動 (最優先, 確保每分鐘執行)
+    try {
+      const companies = await db.prepare('SELECT id, share_price FROM companies').all();
+      if (companies.results.length > 0) {
+        const ipoRes = await db.prepare("SELECT company_id, phase FROM ipo_state").all();
+        const ipoPhase = {};
+        for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
+        const stmts = [];
+        const prices = {};
+        for (const c of companies.results) {
+          if (ipoPhase[c.id] !== 'trading') { prices[c.id] = c.share_price; continue; }
+          const price = c.share_price || 100;
+          const drift = (Math.random() * 2 - 1) * 0.05;
+          const minMove = Math.max(1, Math.round(price * 0.01));
+          const move = Math.max(minMove, Math.abs(Math.round(price * drift)));
+          const direction = drift >= 0 ? 1 : -1;
+          const newPrice = Math.max(1, Math.round(price + move * direction));
+          prices[c.id] = newPrice;
+          if (newPrice !== price) stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, c.id));
+        }
+        if (stmts.length > 0) {
+          for (let i = 0; i < stmts.length; i += 50) {
+            try { await db.batch(stmts.slice(i, i + 50)); } catch {}
+          }
+        }
+        if (env.MARKET_WS) {
+          ctx.waitUntil((async () => {
+            try {
+              const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
+              await stub.fetch('https://market/update', { method: 'POST', body: JSON.stringify({ type: 'prices', prices }), headers: { 'X-Cron-Secret': env.CRON_SECRET || '' } });
+            } catch {}
+          })());
+        }
+      }
+    } catch (err) { console.error('Scheduled price wave error:', err.message); }
+
+    // 2. 核心 ticks
+    // 共用批次 logger
     const hourlyLogger = await createHourlyLogger(db);
     try { await processIncomeTick(db, hourlyLogger); } catch (err) { console.error('Scheduled income error:', err.message); }
     try { await processBankTick(db, hourlyLogger); } catch (err) { console.error('Scheduled bank error:', err.message); }
     try { await processSubscriptionTick(db, hourlyLogger); } catch (err) { console.error('Scheduled subscription error:', err.message); }
     try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
     try { await processMiningTick(db, hourlyLogger); } catch (err) { console.error('Scheduled mining error:', err.message); }
-
-
 
     // 掛單撮合: 每分鐘執行
     try {

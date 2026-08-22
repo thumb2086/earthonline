@@ -1,9 +1,9 @@
 import { logTransaction, notify } from './utils.js';
 
 const TIERS = {
-  bronze:   { cost: 500,   label: '銅級刮刮樂',   icon: '🥉', rewards: [0, 0, 0.5, 0.5, 0.8, 0.8, 1, 1, 1.5, 2, 3] },
-  silver:   { cost: 1000,  label: '銀級刮刮樂',   icon: '🥈', rewards: [0, 0, 0.5, 0.8, 1, 1, 1.5, 1.5, 2, 3, 5] },
-  gold:     { cost: 5000,  label: '金級刮刮樂',   icon: '🥇', rewards: [0, 0.5, 0.8, 1, 1, 1.5, 2, 2, 3, 5, 10] },
+  bronze:   { cost: 500,   label: '銅級刮刮樂',   icon: '🥉', rewards: [0, 0, 0, 0.5, 0.5, 0.8, 0.8, 1, 1, 1.5, 2] },
+  silver:   { cost: 1000,  label: '銀級刮刮樂',   icon: '🥈', rewards: [0, 0, 0, 0.5, 0.8, 0.8, 1, 1, 1.5, 2, 3] },
+  gold:     { cost: 5000,  label: '金級刮刮樂',   icon: '🥇', rewards: [0, 0, 0.5, 0.5, 0.8, 1, 1, 1.5, 2, 3, 5] },
 };
 
 function todayUTC() {
@@ -35,7 +35,8 @@ export async function scratch(db, userId, tier, isFree) {
   } else {
     const wallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(userId).first();
     if (!wallet || wallet.cash < info.cost) return { error: '餘額不足' };
-    await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ?').bind(info.cost, userId).run();
+    const deductRes = await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ? AND cash >= ?').bind(info.cost, userId, info.cost).run();
+    if (deductRes.meta.changes === 0) return { error: '餘額不足' };
     await logTransaction(db, userId, 'scratch_cost', -info.cost, `${info.label}購買`);
   }
 

@@ -74,11 +74,11 @@ function playSlots(bet) {
   const s1 = r(), s2 = r(), s3 = r();
   let payout = 0;
   if (s1 === s2 && s2 === s3) {
-    if (s1 === '7️⃣') payout = amount * 50;
-    else if (s1 === '💎') payout = amount * 20;
-    else payout = amount * 10;
+    if (s1 === '7️⃣') payout = amount * 25;
+    else if (s1 === '💎') payout = amount * 12;
+    else payout = amount * 8;
   } else if (s1 === s2 || s2 === s3 || s1 === s3) {
-    payout = amount * 3;
+    payout = amount * 2;
   }
   return { game: 'slots', symbols: [s1, s2, s3], win: payout > 0, payout, profit: payout - amount };
 }
@@ -118,11 +118,17 @@ export async function handleCasino(env, request, path, user) {
     else return { error: '無效遊戲' };
 
     const profit = result.profit;
-    await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(profit, user.id).run();
+    if (profit < 0) {
+      const deductRes = await db.prepare('UPDATE wallets SET cash = cash - ? WHERE user_id = ? AND cash >= ?').bind(amount, user.id, amount).run();
+      if (deductRes.meta.changes === 0) return { error: '餘額不足' };
+    } else if (profit > 0) {
+      await db.prepare('UPDATE wallets SET cash = cash + ? WHERE user_id = ?').bind(profit, user.id).run();
+    }
     await logTransaction(db, user.id, profit >= 0 ? 'casino_win' : 'casino_lose', profit, `${gameInfo.label} ${result.win ? '贏' : '輸'} $${Math.abs(profit).toLocaleString()}`);
     await db.prepare('INSERT INTO casino_history (user_id, game, amount, payout, created_at) VALUES (?, ?, ?, ?, ?)').bind(user.id, game, amount, result.payout, Date.now()).run();
 
-    return { ...result, cash: wallet.cash + profit };
+    const afterWallet = await db.prepare('SELECT cash FROM wallets WHERE user_id = ?').bind(user.id).first();
+    return { ...result, cash: afterWallet?.cash || 0 };
   }
 
   return null;
