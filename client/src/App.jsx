@@ -116,7 +116,6 @@ export default function App() {
   }
 
   const tabs = [
-    { id: 'launch', label: '🚀 開服' },
     { id: 'dashboard', label: '📊 儀表板' },
     { id: 'income', label: '⬆️ 升級' },
     { id: 'bank', label: '🏦 銀行' },

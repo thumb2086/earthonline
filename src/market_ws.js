@@ -65,7 +65,9 @@ export class MarketWS {
         if (newPrice !== price) {
           stmts.push(db.prepare('UPDATE companies SET share_price = ? WHERE id = ?').bind(newPrice, c.id));
         }
-        stmts.push(db.prepare('INSERT OR REPLACE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, newPrice, newPrice, newPrice, newPrice, block));
+        // K線: 只在該秒block不存在時INSERT, 存在時UPDATE OHLC (不碰volume)
+        stmts.push(db.prepare('INSERT OR IGNORE INTO stock_klines (company_id, open, high, low, close, volume, buy_volume, sell_volume, minute) VALUES (?, ?, ?, ?, ?, 0, 0, 0, ?)').bind(c.id, newPrice, newPrice, newPrice, newPrice, block));
+        stmts.push(db.prepare('UPDATE stock_klines SET high = MAX(high, ?), low = MIN(low, ?), close = ? WHERE company_id = ? AND minute = ?').bind(newPrice, newPrice, newPrice, c.id, block));
       }
 
       if (stmts.length > 0) {
