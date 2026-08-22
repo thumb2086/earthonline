@@ -60,7 +60,7 @@ export class MarketWS {
 
       const stmts = [];
       const prices = {};
-      const interval = 5000;
+      const interval = 1000;
       const now = Date.now();
       const block = Math.floor(now / interval) * interval;
 
@@ -110,7 +110,7 @@ export class MarketWS {
 
   async ensureAlarm() {
     if (!(await this.state.storage.getAlarm())) {
-      await this.state.storage.setAlarm(Date.now() + 5000);
+      await this.state.storage.setAlarm(Date.now() + 1000);
     }
   }
 }

@@ -70,7 +70,7 @@ async function getCurrentPrice(db, companyId) {
 }
 
 async function updateKline(db, companyId, price, quantity, timestamp, type = null) {
-  const interval = 5000;
+  const interval = 1000;
   const block = Math.floor(timestamp / interval) * interval;
   const existing = await db.prepare('SELECT id FROM stock_klines WHERE company_id = ? AND minute = ?').bind(companyId, block).first();
   if (existing) {
