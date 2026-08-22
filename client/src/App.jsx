@@ -781,32 +781,72 @@ function IndexSparkline({ data }) {
   return <canvas ref={ref} style={{ width: '100%', height: 60 }} />
 }
 
-function KLineChart({ api, timeframe = 'realtime', companyId = 1 }) {
+function KLineChart({ api, timeframe = 'realtime', companyId = 1, livePrice = null }) {
   const [klines, setKlines] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [hoverIdx, setHoverIdx] = useState(null)
   const [hoverX, setHoverX] = useState(0)
   const canvasRef = useRef(null)
   const seqRef = useRef(0)
+  const klineBufferRef = useRef([])
 
+  // 即時模式: 用 WS 價格合成 K 線
   useEffect(() => {
+    if (timeframe !== 'realtime' || !livePrice) return
+    const now = Date.now()
+    const interval = 5000
+    const block = Math.floor(now / interval) * interval
+    const buf = klineBufferRef.current
+
+    if (buf.length === 0 || buf[buf.length - 1].minute < block) {
+      // 新的5秒block
+      buf.push({ open: livePrice, high: livePrice, low: livePrice, close: livePrice, volume: 0, minute: block })
+    } else {
+      // 同一個block: 更新OHLC
+      const k = buf[buf.length - 1]
+      k.close = livePrice
+      k.high = Math.max(k.high, livePrice)
+      k.low = Math.min(k.low, livePrice)
+    }
+    setKlines([...buf.slice(-120)])
+    setLoaded(true)
+  }, [livePrice, timeframe])
+
+  // 即時模式: 同時從 DB 補歷史K線 (每5秒)
+  useEffect(() => {
+    if (timeframe !== 'realtime') return
+    const seq = ++seqRef.current
+    const fetchHistory = () => {
+      api('/api/stock/klines?companyId=' + companyId).then(d => {
+        if (seq !== seqRef.current || !Array.isArray(d)) return
+        if (d.length > 0) {
+          klineBufferRef.current = [...d].reverse()
+          setKlines([...klineBufferRef.current.slice(-120)])
+          setLoaded(true)
+        }
+      }).catch(() => {})
+    }
+    fetchHistory()
+    const id = setInterval(fetchHistory, 5000)
+    return () => { clearInterval(id); seqRef.current++ }
+  }, [timeframe, companyId])
+
+  // 非即時模式: 從API抓聚合K線
+  useEffect(() => {
+    if (timeframe === 'realtime') return
     setLoaded(false)
     setKlines([])
+    klineBufferRef.current = []
     const seq = ++seqRef.current
     const fetchKlines = () => {
-      const apply = (d, reversed) => {
-        if (seq !== seqRef.current) return
-        setKlines((reversed ? [...d].reverse() : d).slice(-120))
+      api(`/api/stock/klines/agg?interval=${timeframe === '1h' ? '3600000' : '300000'}&limit=120&companyId=${companyId}`).then(d => {
+        if (seq !== seqRef.current || !Array.isArray(d)) return
+        setKlines(d.slice(-120))
         setLoaded(true)
-      }
-      if (timeframe === 'realtime') {
-        api('/api/stock/klines?companyId=' + companyId).then(d => { if (Array.isArray(d)) apply(d, true) }).catch(() => {})
-      } else {
-        api(`/api/stock/klines/agg?interval=${timeframe === '1h' ? '3600000' : '300000'}&limit=120&companyId=${companyId}`).then(d => { if (Array.isArray(d)) apply(d, false) }).catch(() => {})
-      }
+      }).catch(() => {})
     }
     fetchKlines()
-    const id = setInterval(fetchKlines, 1000)
+    const id = setInterval(fetchKlines, 5000)
     return () => { clearInterval(id); seqRef.current++ }
   }, [timeframe, companyId])
 
@@ -1342,7 +1382,7 @@ function Stock({ api, toast, prompt, user }) {
               <span>⚠️ {limitInfo.side === 'up' ? '漲停' : limitInfo.side === 'circuit_break' ? '熔斷暫停' : '跌停'}</span>
               <span>{Math.max(0, Math.ceil(60 - (Date.now() - limitInfo.at) / 1000))}s</span>
             </div>}
-            <KLineChart api={api} timeframe={chartTimeframe} companyId={selectedStock} />
+            <KLineChart api={api} timeframe={chartTimeframe} companyId={selectedStock} livePrice={livePrices?.[selectedStock]} />
           </div>
         </div>
 
