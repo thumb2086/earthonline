@@ -553,16 +553,8 @@ export default {
     try { await processInvestmentTick(db, hourlyLogger); } catch (err) { console.error('Scheduled investment error:', err.message); }
     try { await processMiningTick(db, hourlyLogger); } catch (err) { console.error('Scheduled mining error:', err.message); }
 
-    // K線補齊: cron每分鐘, 用DB實際股價建立5秒K線
+    // K線補齊: cron每分鐘
     try { await processKlineTick(db); } catch (err) { console.error('Scheduled kline error:', err.message); }
-
-    // cron每分鐘確保 DO alarm 持續運作
-    if (env.MARKET_WS) {
-      try {
-        const stub = env.MARKET_WS.get(env.MARKET_WS.idFromName('market'));
-        await stub.fetch('https://market/init', { method: 'POST' });
-      } catch {}
-    }
 
     // 掛單撮合: 每分鐘執行
     try {
@@ -659,7 +651,7 @@ export default {
   },
 };
 
-// K線補齊: cron每分鐘, 用DB實際股價建立5秒K線 (DO只管價格, 這邊管K線)
+// K線補齊: cron每分鐘, 每公司補最多12根5秒K線
 async function processKlineTick(db) {
   const companies = await db.prepare('SELECT id, share_price FROM companies').all();
   if (companies.results.length === 0) return;
@@ -670,7 +662,6 @@ async function processKlineTick(db) {
   const ipoPhase = {};
   for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
 
-  // 預載每家最新K線時間
   const latestRes = await db.prepare('SELECT company_id, MAX(minute) as minute FROM stock_klines WHERE minute > ? GROUP BY company_id').bind(now - 3600000).all();
   const latestByCompany = {};
   for (const r of latestRes.results) latestByCompany[r.company_id] = r.minute;
@@ -679,13 +670,12 @@ async function processKlineTick(db) {
   for (const c of companies.results) {
     if (ipoPhase[c.id] !== 'trading') continue;
     const price = c.share_price || 100;
-    const lastMinute = latestByCompany[c.id] || 0;
+    const lastMinute = latestByCompany[c.id] || (Math.floor(now / interval) * interval - 60000);
     const steps = Math.min(Math.floor((now - lastMinute) / interval), 12);
 
     for (let step = 1; step <= steps; step++) {
       const block = lastMinute + step * interval;
       if (block > now) break;
-      // 模擬5秒內的價格波動: open→close, high/low涵蓋區間
       const drift1 = (Math.random() * 2 - 1) * 0.03;
       const drift2 = (Math.random() * 2 - 1) * 0.03;
       const open = Math.max(1, Math.round(price * (1 + drift1)));

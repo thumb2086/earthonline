@@ -1,4 +1,5 @@
-// Market WebSocket DO: 每 1 秒 波動股價 + K線 + WS推送
+// Market WebSocket DO: 每 1 秒波動股價 + WS推送
+// K線由前端用WS價格即時合成
 
 export class MarketWS {
   constructor(state, env) {
@@ -51,8 +52,6 @@ export class MarketWS {
       const ipoPhase = {};
       for (const r of ipoRes.results) ipoPhase[r.company_id] = r.phase;
 
-      const now = Date.now();
-      const block = Math.floor(now / 1000) * 1000;
       const stmts = [];
       const prices = {};
 
@@ -68,7 +67,9 @@ export class MarketWS {
       }
 
       if (stmts.length > 0) {
-        await db.batch(stmts);
+        for (let i = 0; i < stmts.length; i += 50) {
+          try { await db.batch(stmts.slice(i, i + 50)); } catch {}
+        }
       }
 
       await this.state.storage.put('prices', prices);

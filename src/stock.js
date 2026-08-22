@@ -758,16 +758,16 @@ export async function matchLimitOrders(db) {
   const preloadRes = await db.batch(preloadStmts);
 
   const ipoPhase = {};
-  for (const r of preloadRes.results[0]) ipoPhase[r.company_id] = r.phase;
+  for (const r of preloadRes.results?.[0] || []) ipoPhase[r.company_id] = r.phase;
   const companies = {};
-  for (const r of preloadRes.results[1]) companies[r.id] = r;
+  for (const r of preloadRes.results?.[1] || []) companies[r.id] = r;
   const invMap = {};
-  for (const r of preloadRes.results[2]) invMap[r.company_id] = r;
+  for (const r of preloadRes.results?.[2] || []) invMap[r.company_id] = r;
   const walletMap = {};
-  for (const r of preloadRes.results[3]) walletMap[r.user_id] = r;
+  for (const r of preloadRes.results?.[3] || []) walletMap[r.user_id] = r;
   const holdingsMap = {};
   const circulatingMap = {};
-  for (const r of preloadRes.results[4]) {
+  for (const r of preloadRes.results?.[4] || []) {
     const key = `${r.user_id}_${r.company_id}`;
     holdingsMap[key] = r.quantity;
     circulatingMap[r.company_id] = (circulatingMap[r.company_id] || 0) + r.quantity;
