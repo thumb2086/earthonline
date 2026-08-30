@@ -8,12 +8,6 @@
     "binding": "ASSETS",
     "run_worker_first": true
   },
-  "routes": [
-    {
-      "pattern": "twonline.dpdns.org",
-      "custom_domain": true
-    }
-  ],
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {
     "bindings": [
@@ -38,6 +32,11 @@
   "vars": {
     "DISCORD_CLIENT_ID": "1513563333985304596",
     "FRONTEND_URL": "https://twonline.dpdns.org",
-    "DISCORD_GUILD_ID": "1512345209005015101"
-  }
+    "DISCORD_GUILD_ID": "1512345209005015101",
+    "AIBOT_REPORT_CHANNEL": ""
+  },
+  "routes": [
+    { "pattern": "twonline.dpdns.org", "custom_domain": true },
+    { "pattern": "aibot.twonline.dpdns.org", "custom_domain": true }
+  ]
 }

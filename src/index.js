@@ -24,6 +24,8 @@ import { getScratchStatus, scratch, getScratchHistory } from './scratch.js';
 import { getLotteryStatus, buyTicket, drawLottery, getLotteryHistory } from './lottery.js';
 import { handleMining, processMiningTick, loadMiningModels } from './mining.js';
 import { handleCasino } from './casino.js';
+import { reportTask, listQueue, pendingTasks, patchTask, triggerTasks, queueStats, aibotAuth } from './aibot_queue.js';
+import { handleAIBotInteractions, setupAIBotDiscord } from './aibot_discord.js';
 
 const ADMIN_GUILD_ID = '1512345209005015101';
 const ADMIN_ROLE_NAME = '地球管理團隊';
@@ -240,6 +242,36 @@ export default {
       // Discord Bot interactions (slash commands)
       if (path === '/interactions') {
         return await handleInteractions(request, env);
+      }
+
+      // ── AI Bot 自動修復系統（獨立 Discord bot，不經遊戲 JWT）──
+      if (path === '/aibot/interactions') {
+        return await handleAIBotInteractions(request, env);
+      }
+      if (path === '/aibot/setup' && request.method === 'GET') {
+        const au = await authCheck(request, env);
+        if (!au || au.role !== 'admin') return json({ error: 'Unauthorized' }, headers, 401);
+        const result = await setupAIBotDiscord(env);
+        return json(result, headers, result.error ? 400 : 200);
+      }
+      // 公開寫入端點：Discord bot 帶 AIBOT_TOKEN 寫入佇列
+      if (path === '/api/aibot/report' && request.method === 'POST') {
+        return await reportTask(request, env, headers);
+      }
+      // AIBOT_TOKEN 保護的管理/輪詢端點（本地 daemon、管理頁用）
+      if (path.startsWith('/api/aibot/') && path !== '/api/aibot/report') {
+        if (!aibotAuth(request, env)) return json({ error: 'Unauthorized' }, headers, 401);
+        const m = path.match(/^\/api\/aibot\/queue\/(\d+)$/);
+        if (m) {
+          if (request.method === 'GET') return await listQueue(request, env, headers, url, Number(m[1]));
+          if (request.method === 'PATCH') return await patchTask(request, env, headers, Number(m[1]));
+          return json({ error: 'Method not allowed' }, headers, 405);
+        }
+        if (path === '/api/aibot/queue' && request.method === 'GET') return await listQueue(request, env, headers, url, null);
+        if (path === '/api/aibot/pending' && request.method === 'GET') return await pendingTasks(request, env, headers, url);
+        if (path === '/api/aibot/trigger' && request.method === 'POST') return await triggerTasks(request, env, headers);
+        if (path === '/api/aibot/stats' && request.method === 'GET') return await queueStats(request, env, headers);
+        return json({ error: 'Not found' }, headers, 404);
       }
 
       // 一次性 bot 設定 (註冊指令 + 查 public key + 改名)
