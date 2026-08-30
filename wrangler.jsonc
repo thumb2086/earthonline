@@ -3,6 +3,7 @@
   "account_id": "2513d9129183c9319ad07b504251a69b",
   "compatibility_date": "2026-07-29",
   "main": "src/index.js",
+  "workers_dev": true,
   "assets": {
     "directory": "client/dist",
     "binding": "ASSETS",
@@ -17,7 +18,9 @@
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["DiscordGateway"] },
-    { "tag": "v2", "new_sqlite_classes": ["MarketWS"] }
+    { "tag": "v2", "new_sqlite_classes": ["MarketWS"] },
+    { "tag": "v3" },
+    { "tag": "v4", "new_sqlite_classes": ["MarketWS"] }
   ],
   "d1_databases": [
     {
@@ -32,8 +35,7 @@
   "vars": {
     "DISCORD_CLIENT_ID": "1513563333985304596",
     "FRONTEND_URL": "https://twonline.dpdns.org",
-    "DISCORD_GUILD_ID": "1512345209005015101",
-    "AIBOT_REPORT_CHANNEL": ""
+    "DISCORD_GUILD_ID": "1512345209005015101"
   },
   "routes": [
     { "pattern": "twonline.dpdns.org", "custom_domain": true },
