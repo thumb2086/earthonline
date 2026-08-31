@@ -9,7 +9,6 @@ import Gaming from './components/Gaming'
 import Casino from './components/Casino'
 import LaunchPage from './components/LaunchPage'
 import OnboardingGuide from './components/OnboardingGuide'
-import DomainFallbackBanner from './DomainFallback'
 
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('eo_token'))
@@ -139,7 +138,6 @@ export default function App() {
 
   return (
     <div className="app">
-      <DomainFallbackBanner />
       <div className="topbar">
         <div className="topbar-left">
           <span className="logo">EARTHONLINE</span>
