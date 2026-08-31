@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Earth Online 域名備援機制 (B)
-// 雲科大等校園網路可能封鎖標準 DNS (port 53)，導致主網域 twonline.dpdns.org
-// 在瀏覽器層無法解析 / 後端 API 連線失敗。此元件在主網域載入時探測
-// /api/health，若連線失敗則顯示醒目 banner，讓使用者一鍵切換到備援網址
-// (Cloudflare workers.dev)，後端 100% 正常，可無縫繼續遊玩。
+// Earth Online 域名備援機制 (B+)
+// 雲科大等校園網路封鎖標準 DNS (port 53)，導致主網域 twonline.dpdns.org
+// 後端 API (/api/health) 連線失敗。主網域載入即「自動」探測健康狀態，
+// 若連線失敗（雲科大 DNS 導致 /api/health 不可達），不再只顯示 banner 等
+// 手動點，而是「無痛自動跳轉」到備援網址 (Cloudflare workers.dev)，後端
+// 100% 正常，使用者直接看到遊戲。備援網域下不自動跳回。
 const MAIN_DOMAIN = 'twonline.dpdns.org'
 const FALLBACK_URL = 'https://earthonline.bold-waterfall-5f4d.workers.dev/'
-const LS_KEY = 'eo_use_fallback'
+// 自動跳轉標記：避免重複跳，並讓下次回到主網域時直接跳（省去再探測一輪）
+const AUTO_KEY = 'eo_fallback_auto'
 
 function isMainDomain() {
   try {
@@ -17,7 +19,9 @@ function isMainDomain() {
   }
 }
 
-// 探測後端健康狀態；回傳 true 表示連線正常
+// 探測後端健康狀態；回傳 true 表示連線正常。
+// 走同源 /api/health：主網域若因 DNS 失敗而連不上，fetch 會直接 reject，
+// 這正是我們要的觸發條件。設短逾時 (4s) 避免卡住。
 async function probeHealth() {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 4000)
@@ -36,55 +40,71 @@ async function probeHealth() {
 }
 
 export default function DomainFallbackBanner() {
-  const [state, setState] = useState('idle') // idle | checking | blocked | ok
-  const [dismissed, setDismissed] = useState(false)
+  const [showManual, setShowManual] = useState(false)
   const probeTimer = useRef(null)
 
   useEffect(() => {
-    // 若使用者先前選擇備援且目前仍在主網域，立即跳轉
-    const wantFallback = localStorage.getItem(LS_KEY) === '1'
-    if (wantFallback && isMainDomain()) {
-      window.location.replace(FALLBACK_URL)
-      return
-    }
-    // 若已成功抵達備援網域，清除強制標記，讓下次回主網域可重新探測
+    // 已抵達備援網域：正常遊玩，清除自動標記以便下次回主網域重新探測
     if (!isMainDomain()) {
-      localStorage.removeItem(LS_KEY)
+      try { localStorage.removeItem(AUTO_KEY) } catch {}
       return
     }
 
+    // 已標記自動跳轉（例如上次跳過）→ 直接無痛再跳，不重複探測
+    try {
+      if (localStorage.getItem(AUTO_KEY) === '1') {
+        window.location.replace(FALLBACK_URL)
+        return
+      }
+    } catch {}
+
     let cancelled = false
+    let redirected = false
+
     const run = async () => {
-      if (dismissed) return
+      if (redirected || cancelled) return
       const ok = await probeHealth()
-      if (cancelled || dismissed) return
-      setState(ok ? 'ok' : 'blocked')
+      if (cancelled || redirected) return
+      if (!ok) {
+        // 主網域連線失敗（雲科大 DNS 導致 /api/health 不可達）
+        // → 寫入標記並「無痛自動跳轉」備援網址，location.replace 不堆歷史
+        redirected = true
+        try { localStorage.setItem(AUTO_KEY, '1') } catch {}
+        try {
+          window.location.replace(FALLBACK_URL)
+        } catch {
+          // 極少數（如被 sandbox 擋）才顯示手動備援按鈕
+          setShowManual(true)
+        }
+      }
+      // 連線正常：什麼都不顯示，直接玩遊戲
     }
-    setState('checking')
+
     run()
-    // 持續監測：每 60 秒重新探測，捕捉連線中途失效
+
+    // 持續監測：每 60 秒重新探測，若連線中途失效則自動跳轉
     probeTimer.current = setInterval(() => {
-      if (state !== 'blocked') run()
+      if (redirected) return
+      try {
+        if (localStorage.getItem(AUTO_KEY) === '1') return
+      } catch {}
+      run()
     }, 60000)
 
     return () => {
       cancelled = true
       if (probeTimer.current) clearInterval(probeTimer.current)
     }
-  }, [dismissed])
+  }, [])
 
-  const goFallback = () => {
-    localStorage.setItem(LS_KEY, '1')
+  const goFallbackManual = () => {
+    try { localStorage.setItem(AUTO_KEY, '1') } catch {}
     window.location.replace(FALLBACK_URL)
   }
-  const stayMain = () => {
-    localStorage.setItem(LS_KEY, '0')
-    setDismissed(true)
-    setState('ok')
-  }
 
-  if (state !== 'blocked') return null
+  if (!showManual) return null
 
+  // 僅當自動跳轉被環境阻擋時的備用入口
   return (
     <div
       style={{
@@ -106,10 +126,10 @@ export default function DomainFallbackBanner() {
       }}
     >
       <span style={{ fontWeight: 700 }}>
-        ⚠️ 偵測到主網域連線異常（可能為校園網路 DNS 限制，無法解析 twonline.dpdns.org）
+        ⚠️ 自動跳轉失敗，請手動切換備援網址繼續遊玩
       </span>
       <button
-        onClick={goFallback}
+        onClick={goFallbackManual}
         style={{
           background: '#fff',
           color: '#b91c1c',
@@ -121,19 +141,6 @@ export default function DomainFallbackBanner() {
         }}
       >
         切換備援網址繼續遊玩 ↗
-      </button>
-      <button
-        onClick={stayMain}
-        style={{
-          background: 'transparent',
-          color: '#fff',
-          border: '1px solid rgba(255,255,255,0.7)',
-          borderRadius: 6,
-          padding: '6px 10px',
-          cursor: 'pointer',
-        }}
-      >
-        仍使用主網域
       </button>
       <a
         href="https://earthonline.bold-waterfall-5f4d.workers.dev/"
