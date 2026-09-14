@@ -1,0 +1,7 @@
+version: 2
+secret:
+  files:
+    cli/src/api.js:
+      - "false positive: client-side generated random string for game registration, not a real credential"
+  paths:
+    cli/src/api.js: "IGNORE"

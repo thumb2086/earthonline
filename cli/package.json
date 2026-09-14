@@ -1,0 +1,17 @@
+{
+  "name": "earthonline-tui",
+  "version": "1.1.0",
+  "description": "Earth Online CLI — 終端機版地球在線掛機遊戲",
+  "type": "module",
+  "bin": {
+    "earthonline-cli": "./bin/cli.js"
+  },
+  "main": "./src/api.js",
+  "scripts": {
+    "start": "node bin/cli.js"
+  },
+  "keywords": ["cli", "game", "idle", "earth", "online"],
+  "author": "thumb2086",
+  "license": "MIT",
+  "files": ["bin/", "src/"]
+}
