@@ -16,11 +16,22 @@
       { "name": "MARKET_WS", "class_name": "MarketWS" }
     ]
   },
+  // Durable Object 遷移記錄。
+  //
+  // 2026-10-03 修正: 原本 v1/v2/v4 帶 new_sqlite_classes, 其中 MarketWS 在 v2 與 v4
+  // 重複宣告。重新部署時 wrangler 會嘗試「再次套用」已存在 DO 的 sqlite class 遷移,
+  // 導致 Cloudflare 回 error 10074:
+  //   "Cannot apply new-sqlite-class migration to class 'DiscordGateway' that is
+  //    already depended on by existing Durable Objects"
+  //
+  // 這兩個 DO (DiscordGateway / MarketWS) 早已在服務端以 SQLite-backed 模式運行,
+  // storage 模式不需要重新宣告, 因此保留 tag 但移除 new_sqlite_classes。
+  // 新增 DO 類別時, 請在最後追加一個帶 new_sqlite_classes 的新 tag。
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["DiscordGateway"] },
-    { "tag": "v2", "new_sqlite_classes": ["MarketWS"] },
+    { "tag": "v1" },
+    { "tag": "v2" },
     { "tag": "v3" },
-    { "tag": "v4", "new_sqlite_classes": ["MarketWS"] }
+    { "tag": "v4" }
   ],
   "d1_databases": [
     {
@@ -29,8 +40,18 @@
       "database_id": "168d5cd6-06af-42fb-b0bd-862449771580"
     }
   ],
+  // 排程已停用 (2026-10-03)
+  //
+  // 原因: 本專案為「整合前的舊專案」, 功能已併入 zixi-earth。
+  // 原設定 */1 (每分鐘) 的 cron 會持續消耗 D1 讀取額度, 而 Cloudflare D1
+  // 免費額度是「帳號層級」的 —— account_id 與 zixi-earth 相同 (2513d912...),
+  // 因此本專案的排程會直接吃掉 zixi-earth 的額度, 導致其 /api/me 等端點回 503。
+  //
+  // 網站本身仍可存取 (twonline.dpdns.org), 只是不再自動推進經濟 tick。
+  //
+  // 恢復方式: 改回 "crons": ["*/10 * * * *"] 後重新 wrangler deploy。
   "triggers": {
-    "crons": ["*/1 * * * *"]
+    "crons": []
   },
   "vars": {
     "DISCORD_CLIENT_ID": "1513563333985304596",
