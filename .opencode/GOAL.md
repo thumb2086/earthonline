@@ -23,3 +23,16 @@
 - pm2 logs earthonline --err --lines 5
 ## Progress log
 - [2026-09-14T02:00+08:00] checkpoint：建立 goal。前三個 goal 已完成（投資修復 + 伺服器遷移 + API/WS/Discord 修復）；還剩：功能比對、效能優化、git push。
+
+- [2026-09-30T00:00+08:00] **CP-Casino**：完成賭場前端全面升級。
+  來源整合：zixi-casino (apps/web/src/features/casino) 前端 UI 移植到 earthonline。
+  新增/修改檔案：
+  - `client/src/components/casino.css` — 賭場專用樣式（輪盤、骰子、老虎機、21點、大廳）
+  - `client/src/components/CasinoLobby.jsx` — 賭場大廳（Hero + 遊戲卡片網格 + RTP/最低投注 + 規則速查）
+  - `client/src/components/SlotsGame.jsx` — 老虎機（3×3轉輪 + 骨架動畫 + 自動旋轉 + 跳過 + 累積頭獎池）
+  - `client/src/components/SicboGame.jsx` — 骰寶（骰子滾動動畫 + 大/小/奇/偶/圍骰5種押注）
+  - `client/src/components/RouletteGame.jsx` — 輪盤（5.2秒 conic-gradient 旋轉 + 完整下注桌 + 外側押注）
+  - `client/src/components/BlackjackGame.jsx` — 21點（牌面視覺 + 逐張揭牌動畫 + 結果 overlay）
+  - `client/src/components/Casino.jsx` — 重寫：大廳入口 + 遊戲路由 + 快速切換導覽列
+  後端相容：沿用 earthonline `/api/casino/play` 與 `/api/casino/stats`，無須改動後端。
+  參考設計：zixi-casino (SlotsView/SicboView/RouletteView/BlackjackView/LobbyView) + quadcino.com/casino 風格。

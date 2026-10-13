@@ -1,25 +1,90 @@
 import { useState, useEffect } from 'react';
-import { useToast } from './Toast.jsx';
-import { Sicbo, Blackjack, Roulette, Slots } from './CasinoGames.jsx';
+import CasinoLobby from './CasinoLobby.jsx';
+import SlotsGame from './SlotsGame.jsx';
+import SicboGame from './SicboGame.jsx';
+import RouletteGame from './RouletteGame.jsx';
+import BlackjackGame from './BlackjackGame.jsx';
+import './casino.css';
+
+const GAME_META = {
+  slots:     { icon: '🎰', name: '老虎機' },
+  sicbo:     { icon: '🎲', name: '骰寶' },
+  roulette:  { icon: '🎡', name: '輪盤' },
+  blackjack: { icon: '🃏', name: '21 點' },
+};
 
 export default function Casino({ api, user }) {
-  const [game, setGame] = useState('sicbo');
+  const [game, setGame] = useState(null); // null = 大廳
   const [stats, setStats] = useState(null);
-  const refresh = () => api('/api/casino/stats').then(setStats).catch(() => {});
-  useEffect(() => { refresh(); }, []);
-  const games = [['sicbo','🎲','骰寶'],['blackjack','🃏','21點'],['roulette','🎡','輪盤'],['slots','🎰','老虎機']];
-  return (<>
-    <div style={{display:'flex',gap:6,marginBottom:12}}>
-      {games.map(([id,icon,label])=><button key={id} className={`btn btn-sm ${game===id?'btn-primary':''}`} onClick={()=>setGame(id)}>{icon} {label}</button>)}
+
+  useEffect(() => {
+    api('/api/casino/stats').then(setStats).catch(() => {});
+  }, [game]); // 每次切換遊戲時刷新統計
+
+  const goLobby = () => setGame(null);
+  const meta = game ? GAME_META[game] : null;
+
+  return (
+    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      {/* ── 頂部導覽列 ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        marginBottom: 20, paddingBottom: 16,
+        borderBottom: '1px solid var(--border)',
+      }}>
+        {game ? (
+          <>
+            <button
+              className="btn btn-sm"
+              onClick={goLobby}
+              style={{ flexShrink: 0 }}
+            >
+              ← 大廳
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+              <span style={{ fontSize: 20 }}>{meta?.icon}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                {meta?.name}
+              </span>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+            <span style={{ fontSize: 18 }}>🎰</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Casino Floor
+            </span>
+          </div>
+        )}
+
+        {/* 快速切換遊戲（遊戲內才顯示） */}
+        {game && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            {Object.entries(GAME_META).map(([id, m]) => (
+              <button key={id}
+                className={`btn btn-sm ${game === id ? 'btn-primary' : ''}`}
+                onClick={() => setGame(id)}
+                title={m.name}
+              >
+                {m.icon}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── 主內容 ── */}
+      {!game && (
+        <CasinoLobby
+          onSelect={setGame}
+          stats={stats}
+          user={user}
+        />
+      )}
+      {game === 'slots'     && <SlotsGame     api={api} user={user} />}
+      {game === 'sicbo'     && <SicboGame     api={api} user={user} />}
+      {game === 'roulette'  && <RouletteGame  api={api} user={user} />}
+      {game === 'blackjack' && <BlackjackGame api={api} user={user} />}
     </div>
-    {stats&&<div className="card mb-12" style={{borderLeft:'3px solid #f59e0b'}}><div className="flex justify-between" style={{fontSize:12}}>
-      <span className="text-dim">總投注 ${stats.wagered.toLocaleString()}</span>
-      <span className="text-dim">{stats.games} 局</span>
-      <span>餘額 ${(user?.cash||0).toLocaleString()}</span>
-    </div></div>}
-    {game==='sicbo'&&<Sicbo api={api} refresh={refresh}/>}
-    {game==='blackjack'&&<Blackjack api={api} refresh={refresh}/>}
-    {game==='roulette'&&<Roulette api={api} refresh={refresh}/>}
-    {game==='slots'&&<Slots api={api} refresh={refresh}/>}
-  </>);
+  );
 }

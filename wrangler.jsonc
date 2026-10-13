@@ -58,8 +58,17 @@
     "FRONTEND_URL": "https://twonline.dpdns.org",
     "DISCORD_GUILD_ID": "1512345209005015101"
   },
+  // 2026-10-13：twonline.dpdns.org 已改掛到 zixi-earth（合併後的正式站）。
+  //
+  // 為什麼要移走：這個網域名稱（地球在線）已經是合併後平台的名稱，
+  //   繼續指向舊 earthonline 會讓玩家看到舊系統，以為合併沒生效。
+  //
+  // aibot.twonline.dpdns.org 保留：Discord 機器人仍走這裡，
+  //   那個 Gateway DO 還在這個 Worker 上。
+  //
+  // 注意：兩個專案共用同一個 account_id，custom_domain 不能重複掛載，
+  //   所以這裡必須先移除才能掛到 zixi-earth。
   "routes": [
-    { "pattern": "twonline.dpdns.org", "custom_domain": true },
     { "pattern": "aibot.twonline.dpdns.org", "custom_domain": true }
   ]
 }
