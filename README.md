@@ -1,8 +1,25 @@
 # Earth Online 🌍
 
+> # ⚠️ 本專案已併入 zixi-earth（2026-10-13）
+>
+> **這個 repo 已經不是線上服務的來源了。**
+>
+> - 舊資產（1,588,009,200 EO$）已換算（`1 ZXC = 10,000 EO$`）併入 **`zixi-earth`**
+> - 對外網域 `twonline.dpdns.org` **現在指向 `zixi-earth`**，不再指向這裡
+> - 這個 repo 的 Cloudflare Worker **仍然活著**，但只剩 `aibot.twonline` 還在用
+>   （可以部署，但那是歷史包袱，不是主要服務）
+>
+> **主要專案**：`../zixi-earth/`（含自己的 `AGENTS.md`，記錄不可協商的開發約束）
+> **整體說明**：`../README.md`、`../專案關係圖.html`
+>
+> 這份文件保留作為歷史紀錄。要改現行程式請看 `zixi-earth`。
+
+---
+
 即時多人線上經營遊戲，基於 Cloudflare Workers + D1 + React。
 
 🔗 **線上遊玩**: https://twonline.dpdns.org
+（⚠️ 此網域已改指向 `zixi-earth`，不再由本 repo 提供）
 
 ## 技術架構
 
