@@ -37,13 +37,6 @@ async function getWallet() {
   return r.json ?? (await api('/api/me')).json;
 }
 
-async function fireConcurrent(fn, n) {
-  const ok = results.filter(r => r.status === 200 && !r.json?.error);
-  const err = results.filter(r => r.status !== 200 || r.json?.error);
-  console.log(`[${label}] total=${results.length} accepted=${ok.length} rejected=${err.length}`);
-  return ok;
-}
-
 async function testWithdraw() {
   const before = await getWallet();
   const amount = Math.floor((before.savings || 0) / 2);
