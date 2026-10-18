@@ -137,6 +137,34 @@ const body = { type: 'bug', content: 'crash on login', user_id: 'u1', channel_id
   check('寫入 1 筆佇列', api.rows().length === 1, `實際 ${api.rows().length}`);
 }
 
+// --- T1c: fail-closed —— 沒有設定 AIBOT_TOKEN 時必須拒絕 ---------------------
+//
+// ★ 2026-10-18 線上實測：production 的 secret 清單裡根本沒有 AIBOT_TOKEN，
+//   而原本 `if (!env.AIBOT_TOKEN) return true;` → 無 token 的 POST 拿到 HTTP 201。
+//   這個測試就是為了讓那種狀態不可能再發生。
+{
+  console.log('T1c fail-closed（secret 未設定時）');
+  const { db, api } = makeDB();
+  const res = await reportTask(req('POST', body), { DB: db }, H);
+  check('AIBOT_TOKEN 未設定 → 401', res.status === 401, `實際 ${res.status}`);
+  check('AIBOT_TOKEN 未設定 → 不寫入 D1', api.q.length === 0, `寫了 ${api.q.length} 筆`);
+}
+{
+  console.log('T1d 明確 opt-in 才有例外');
+  const { db, api } = makeDB();
+  const res = await reportTask(req('POST', body),
+    { DB: db, AIBOT_ALLOW_ANONYMOUS: 'true' }, H);
+  check('AIBOT_ALLOW_ANONYMOUS=true → 放行', res.status === 201, `實際 ${res.status}`);
+}
+{
+  console.log('T1e 長度不符的 token 必須拒絕');
+  const { db, api } = makeDB();
+  const res = await reportTask(req('POST', body, { Authorization: 'Bearer short' }),
+    env(db), H);
+  check('長度不符 → 401', res.status === 401, `實際 ${res.status}`);
+  check('長度不符 → 不寫入 D1', api.q.length === 0, `寫了 ${api.q.length} 筆`);
+}
+
 // --- T2: content 長度上限 ---------------------------------------------------
 {
   console.log('T2 /report content 長度上限');

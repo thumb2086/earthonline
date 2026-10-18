@@ -33,7 +33,11 @@ function getHeaderIgnoreCase(headers, name) {
 
 async function verifySignature(request, env) {
   const publicKey = env.AIBOT_DISCORD_PUBLIC_KEY;
-  if (!publicKey) return true; // 未設定時跳過（開發/本地）
+  // ★ 2026-10-18：與 aibotAuth 同一個理由 —— 原本 `if (!publicKey) return true;`
+  //   是 fail-open。公鑰一旦被刪掉或打錯 key 名，slash command 就變成任何人可觸發。
+  //   改成明確 opt-in 才放行。
+  if (String(env.AIBOT_ALLOW_ANONYMOUS || '') === 'true') return true;
+  if (!publicKey) return false;
   const timestamp = getHeaderIgnoreCase(request.headers, 'X-Signature-Ed25519-Timestamp') || '';
   const signature = getHeaderIgnoreCase(request.headers, 'X-Signature-Ed25519-Signature') || '';
   if (!timestamp || !signature) return false;

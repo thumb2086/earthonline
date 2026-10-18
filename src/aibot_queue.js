@@ -28,11 +28,29 @@ const STALE_PROCESSING_MS = 30 * 60 * 1000;
 function now() { return Date.now(); }
 
 // 簡單 Bearer token 驗證（AIBOT_TOKEN 存 wrangler vars/secrets）
+//
+// ★ 2026-10-18：原本是 `if (!env.AIBOT_TOKEN) return true;`（未設就放行）。
+//
+//   這在 production 是**開著的門**，不是開發期便利。實測：
+//     wrangler secret list → AIBOT_TOKEN 不存在
+//     POST /api/aibot/report（無 Authorization）→ HTTP 201 {"id":3,"status":"pending"}
+//
+//   而且它和 zixi-earth 共用同一個 Cloudflare account_id，
+//   所以任何人都能用一個 curl 迴圈燒掉**別的專案**的免費層 D1 額度。
+//
+//   現在改成 **fail-closed**：沒有 token 一律拒絕。
+//   要在本地開發必須**明確**設 `AIBOT_ALLOW_ANONYMOUS = "true"`，
+//   不能靠「忘了設密鑰」來達成。
 export function aibotAuth(request, env) {
-  if (!env.AIBOT_TOKEN) return true; // 未設則放行（開發期）
+  // 明確的開發期 opt-in，而不是「secret 沒設就當開發環境」
+  if (String(env.AIBOT_ALLOW_ANONYMOUS || '') === 'true') return true;
+  if (!env.AIBOT_TOKEN) return false;
   const h = request.headers.get('Authorization') || '';
   if (!h.startsWith('Bearer ')) return false;
-  return h.slice(7) === env.AIBOT_TOKEN;
+  // 長度先比，避免明顯不同的長度被逐字元比較浪費時間
+  const provided = h.slice(7);
+  if (provided.length !== env.AIBOT_TOKEN.length) return false;
+  return provided === env.AIBOT_TOKEN;
 }
 
 async function readBody(request) {
