@@ -45,6 +45,38 @@ function authHeaders() {
   return h;
 }
 
+/**
+ * ★ 2026-10-18：Worker 端改成 fail-closed 之後，這邊必須同步。
+ *
+ * 原本兩邊都沒有 token，所以「都能通」—— 但代價是
+ * `/api/aibot/*` 對**整個網際網路**敞開。實測（修復前）：
+ *
+ *     POST /api/aibot/report   （完全沒有 Authorization）
+ *       → HTTP 201 {"id":3,"status":"pending"}
+ *
+ * 而 earthonline 與 zixi-earth 共用同一個 Cloudflare account_id，
+ * 等於把「燒別人額度」的按鈕交給任何有 curl 的人。
+ *
+ * 現在 Worker 沒有 token 就一律 401。所以 daemon 這邊沒設 token
+ * 會**直接不能用** —— 那正是我們想要的（fail-closed），
+ * 但必須講清楚怎麼修，而不是讓人看到一堆 401 猜。
+ */
+if (!AIBOT_TOKEN) {
+  console.error([
+    '',
+    '========================================',
+    '  AIBOT_TOKEN 未設定 —— 這個 daemon 會全部被擋下來（401）。',
+    '',
+    '  為什麼要這樣：Worker 端在 2026-10-18 改成 fail-closed，',
+    '  沒有 token 就拒絕。不設的話端點等於對整個網際網路敞開，',
+    '  任何人都能寫入佇列、消耗共用 account_id 的 D1 額度。',
+    '',
+    '  修法：把與 worker 相同的 token 設成 AIBOT_TOKEN 環境變數後重啟。',
+    '========================================',
+    '',
+  ].join('\n'));
+}
+
 async function apiRequest(method, rel, body) {
   const url = `${API_BASE}${rel}`;
   const init = { method, headers: authHeaders(), signal: AbortSignal.timeout(15000) };

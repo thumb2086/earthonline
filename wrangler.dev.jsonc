@@ -39,9 +39,18 @@
   //   「帳號層級」—— 每分鐘排程會直接吃掉 zixi-earth 的額度。
   //   AGENTS.md 有記錄：prod 正是為此改成十分鐘一次的。
   //
-  //   而且 dev.twonline.dpdns.org 已經無法解析，代表它很可能根本沒部署；
-  //   狀態是「改了也不生效、但一旦有人部署就出事」。
-    "crons": ["*/10 * * * *"]
+  //   2026-10-18 修正：原本以為 dev 沒部署過（因為 dev.twonline.dpdns.org 不解析）。
+  //   實際查 `wrangler deployments list --name earthonline-dev` → **有 10 筆部署紀錄**。
+  //   也就是說這個 `*/10`（144 次/天）**一直在跑**。
+  //
+  //   ★ 重點：Cloudflare 免費層的 D1 額度是**帳號層級**的，
+  //     與 zixi-earth 共用同一個 account_id（2513d912…）。
+  //     所以 dev worker 每 10 分鐘醒一次，是在燒**另一個專案**的額度。
+  //
+  //   與 prod（wrangler.jsonc 的 "crons": []）對齊。
+  //   migrations 的 new_sqlite_classes **維持原樣** ——
+  //   dev 確實部署過，移除已套用的 migration tag 會讓狀態不一致。
+    "crons": []
   },
   "vars": {
     "DISCORD_CLIENT_ID": "1513563333985304596",
